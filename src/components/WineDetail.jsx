@@ -504,7 +504,7 @@ function WineDetail() {
                               {review.reviewer_name}
                             </span>
                           </div>
-                          {user && user.id === review.user_id && (
+                          {user && (user.id === review.user_id || canManageWines) && (
                             <div className="review-card__actions">
                               <button
                                 type="button"
