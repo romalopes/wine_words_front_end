@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { subscriptionsApi } from "../services/api";
+import { useCallback, useEffect, useState } from "react";
+import { subscriptionsApi, billingApi } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 
 function formatPrice(cents) {
   if (cents == null) return null;
@@ -10,10 +11,11 @@ function formatPrice(cents) {
 // One card renders every kind of plan — free and paid are just different rows
 // of the same list. The small visual differences (price line, badge, CTA) are
 // derived from the plan itself.
-function PlanCard({ plan }) {
+function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
   const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
   const yearly = formatPrice(plan.yearly_price_cents);
   const monthly = formatPrice(plan.monthly_price_cents);
+  const busy = loadingPlanId === plan.id;
 
   return (
     <article
@@ -64,19 +66,40 @@ function PlanCard({ plan }) {
       <button
         type="button"
         className="auth-form__submit"
-        disabled
-        title={isFree ? "Coming soon" : "Online payments are coming soon"}
+        disabled={!isFree && !onChoose && !onManage}
+        onClick={() => {
+          if (isFree && isCurrent) return;
+          if (onManage) onManage();
+          else if (onChoose) onChoose(plan.id);
+        }}
+        title={
+          isFree
+            ? "FREE is your current plan"
+            : undefined
+        }
       >
-        {isFree ? "Start free" : "Payment coming soon"}
+        {busy
+          ? "Processing…"
+          : isFree
+            ? isCurrent
+              ? "Current plan"
+              : "Coming soon"
+            : isCurrent
+              ? "Current plan"
+              : onManage
+                ? "Manage subscription"
+                : "Choose plan"}
       </button>
     </article>
   );
 }
 
 function Subscribe() {
+  const { user } = useAuth();
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingPlanId, setLoadingPlanId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +118,35 @@ function Subscribe() {
       cancelled = true;
     };
   }, []);
+
+  const handleChoose = useCallback(
+    async (planId) => {
+      setError(null);
+      setLoadingPlanId(planId);
+      try {
+        const result = await billingApi.checkout(planId);
+        // Redirect to Stripe Checkout.
+        window.location.href = result.url;
+      } catch (err) {
+        setError(err.message || "Could not start checkout.");
+        setLoadingPlanId(null);
+      }
+    },
+    [],
+  );
+
+  const handleManage = useCallback(async () => {
+    setError(null);
+    try {
+      const result = await billingApi.portal();
+      window.location.href = result.url;
+    } catch (err) {
+      setError(err.message || "Could not open billing portal.");
+    }
+  }, []);
+
+  const currentPlanId = user?.subscription?.id;
+  const canManageBilling = user?.can_manage_billing; // Stripe is available for this user
 
   // FREE first, then the paid tiers sorted by price.
   const free =
@@ -127,9 +179,23 @@ function Subscribe() {
             marginBottom: 32,
           }}
         >
-          {orderedPlans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
-          ))}
+          {orderedPlans.map((plan) => {
+            const isCurrent = currentPlanId === plan.id;
+            const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
+            // Free plans: no checkout. Paid plans that aren't the current plan
+            // get a "Choose plan" button (only if billing is configured).
+            // The current paid plan gets a "Manage subscription" button.
+            return (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                isCurrent={isCurrent}
+                onChoose={(!isFree && !isCurrent && canManageBilling) ? handleChoose : undefined}
+                onManage={(isCurrent && canManageBilling) ? handleManage : undefined}
+                loadingPlanId={loadingPlanId}
+              />
+            );
+          })}
         </div>
       )}
     </main>

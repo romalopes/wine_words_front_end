@@ -333,6 +333,22 @@ export const subscriptionsApi = {
   },
 };
 
+export const billingApi = {
+  checkout(subscriptionId) {
+    return request("/billing/checkout", {
+      method: "POST",
+      auth: true,
+      body: { subscription_id: subscriptionId },
+    });
+  },
+  portal() {
+    return request("/billing/portal", {
+      method: "POST",
+      auth: true,
+    });
+  },
+};
+
 export const tasteParametersApi = {
   list() {
     return request("/taste_parameters");
