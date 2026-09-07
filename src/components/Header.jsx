@@ -136,6 +136,12 @@ function Header() {
           alt="Wine Words"
           style={{ height: "2.5rem", display: "block", borderRadius: ".35rem" }}
         />
+        <div>
+          {/* <div class="site-header__title">Wine Words - React</div> */}
+          <p class="site-header__subtitle">
+            Wine Words - React - Explore producers, wines and reviews
+          </p>
+        </div>
       </NavLink>
       <nav aria-label="Primary navigation">
         <NavLink end to="/">
