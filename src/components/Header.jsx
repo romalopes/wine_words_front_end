@@ -139,10 +139,10 @@ function Header() {
           style={{ height: "2.5rem", display: "block", borderRadius: ".35rem" }}
         />
         <div>
-          <div class="site-header__title">Wine Words - React</div>
-          <p class="site-header__subtitle">
+          <div className="site-header__title">Wine Words - React</div>
+          {/* <p className="site-header__subtitle">
             Explore producers, wines and reviews
-          </p>
+          </p> */}
         </div>
       </NavLink>
       <nav aria-label="Primary navigation">
@@ -287,10 +287,24 @@ function Header() {
             <span className="site-header__avatar" aria-hidden="true">
               {initials}
             </span>
-            <span className="site-header__user-name">{displayName}</span>
-            {user.email && (
-              <span className="site-header__user-email">{user.email}</span>
-            )}
+            <div className="site-header__user-info">
+              <span className="site-header__user-name">{displayName}</span>
+              {user.roles && user.roles.length > 0 && (
+                <span className="site-header__user-roles" aria-label="Roles">
+                  {user.roles.map((role) => (
+                    <span
+                      key={role}
+                      className={`site-header__user-role site-header__user-role--${role.toLowerCase()}`}
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </span>
+              )}
+              {user.email && (
+                <span className="site-header__user-email">{user.email}</span>
+              )}
+            </div>
             <button
               className="site-header__auth"
               onClick={handleSignOut}

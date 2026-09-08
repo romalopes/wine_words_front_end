@@ -6,7 +6,7 @@ import { isAdmin } from "../constants/roles";
 
 function UserRoles() {
   const { user } = useAuth();
-  const isAdmin = isAdmin(user);
+  const isAdminUser = isAdmin(user);
 
   const [allRoles, setAllRoles] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -112,7 +112,7 @@ function UserRoles() {
     }
   }
 
-  if (!isAdmin) {
+  if (!isAdminUser) {
     return (
       <main className="wine-app">
         <p className="wine-management__empty-state">

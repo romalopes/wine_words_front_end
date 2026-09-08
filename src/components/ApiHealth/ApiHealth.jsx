@@ -37,7 +37,7 @@ function StatusBadge({ passed }) {
 
 export default function ApiHealth() {
   const { user, token } = useAuth();
-  const isAdmin = isAdmin(user);
+  const isAdminUser = isAdmin(user);
 
   const [results, setResults] = useState({});
   const [running, setRunning] = useState({}); // checkId -> bool
@@ -60,7 +60,7 @@ export default function ApiHealth() {
     return map;
   }, [regularChecks]);
 
-  if (!isAdmin) {
+  if (!isAdminUser) {
     return (
       <main className={styles.container}>
         <p className={styles.statusText}>
