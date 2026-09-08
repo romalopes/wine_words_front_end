@@ -35,6 +35,129 @@ function StatusBadge({ passed }) {
   return <span className={`${styles.badge} ${cls}`}>{label}</span>;
 }
 
+// Renders a 2-column definition list (key/value pairs) for the new
+// infrastructure sections in /api/v1/health/detailed. Values that are
+// null/undefined render as "—" so the layout stays consistent.
+function InfoGrid({ entries }) {
+  return (
+    <dl className={styles.infoGrid}>
+      {entries.map(([key, value]) => (
+        <div key={key} className={styles.infoRow}>
+          <dt className={styles.infoKey}>{key}</dt>
+          <dd className={styles.infoValue}>
+            {value === null || value === undefined || value === ""
+              ? "—"
+              : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function InfrastructurePanel({ detailed }) {
+  const payload = detailed?.payload;
+  if (!payload) return null;
+
+  // Some sections are always present (server/endpoint), others depend on
+  // whether the database connection is alive. Only render the
+  // "Database connection" section when we have any data to show, so a
+  // half-broken DB still leaves the other two sections visible.
+  const db = payload.database_details;
+  const hasDbData =
+    db && Object.values(db).some((v) => v !== null && v !== undefined);
+
+  return (
+    <div className={styles.infraPanel}>
+      <h2 className={styles.infraTitle}>Infrastructure</h2>
+      <p className={styles.infraSubtitle}>
+        From <code>GET /api/v1/health/detailed</code>
+        {payload.environment && (
+          <>
+            {" · environment: "}
+            <code>{payload.environment}</code>
+          </>
+        )}
+      </p>
+
+      {hasDbData && (
+        <section className={styles.infraSection}>
+          <h3 className={styles.infraSectionTitle}>Database connection</h3>
+          <InfoGrid
+            entries={[
+              ["Adapter", db.adapter],
+              ["Database", db.database],
+              ["Host", db.host],
+              ["Port", db.port],
+              ["Username", db.username],
+              ["Encoding", db.encoding],
+              ["Pool size", db.pool],
+              ["Checkout timeout (s)", db.checkout_timeout],
+              ["Reaping frequency (s)", db.reaping_frequency],
+              ["Idle timeout (s)", db.idle_timeout],
+            ]}
+          />
+        </section>
+      )}
+
+      {payload.server && (
+        <section className={styles.infraSection}>
+          <h3 className={styles.infraSectionTitle}>Server</h3>
+          <InfoGrid
+            entries={[
+              ["Rails version", payload.server.rails_version],
+              ["Ruby", payload.server.ruby],
+              ["Puma workers", payload.server.puma_workers],
+              ["Hostname", payload.server.hostname],
+              ["PID", payload.server.pid],
+              ["Hosted on Render", payload.server.render ? "yes" : "no"],
+            ]}
+          />
+        </section>
+      )}
+
+      {payload.endpoint && (
+        <section className={styles.infraSection}>
+          <h3 className={styles.infraSectionTitle}>Request endpoint</h3>
+          <InfoGrid
+            entries={[
+              ["Scheme", payload.endpoint.scheme],
+              ["Host", payload.endpoint.host],
+              ["Port", payload.endpoint.port],
+              ["Base URL", payload.endpoint.base_url],
+              ["Path", payload.endpoint.path],
+            ]}
+          />
+        </section>
+      )}
+
+      {payload.storage_details && (
+        <section className={styles.infraSection}>
+          <h3 className={styles.infraSectionTitle}>File storage</h3>
+          <InfoGrid
+            entries={[
+              ["Service", payload.storage_details.service],
+              ["Service class", payload.storage_details.service_class],
+              ["Bucket", payload.storage_details.bucket],
+              ["Region", payload.storage_details.region],
+              ["Endpoint", payload.storage_details.endpoint],
+              ["Disk root", payload.storage_details.root],
+              [
+                "Public",
+                payload.storage_details.public == null
+                  ? null
+                  : payload.storage_details.public
+                    ? "yes"
+                    : "no",
+              ],
+            ]}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
 export default function ApiHealth() {
   const { user, token } = useAuth();
   const isAdminUser = isAdmin(user);
@@ -180,6 +303,8 @@ export default function ApiHealth() {
             : `⚠ Version mismatch: backend reports ${backendVersion} but frontend expects ${BACK_END_VERSION}`}
         </div>
       )}
+
+      <InfrastructurePanel detailed={detailed} />
 
       {allResults.length > 0 && (
         <div className={styles.summaryBar}>

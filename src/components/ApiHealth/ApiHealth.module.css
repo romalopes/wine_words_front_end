@@ -213,3 +213,86 @@
 }
 
 .statusText { font-size: 0.85rem; }
+
+/* --- Infrastructure panel (DB / server / endpoint) --- */
+
+.infraPanel {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: var(--surface, #fafafa);
+  padding: 1rem 1.25rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.infraTitle {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.infraSubtitle {
+  margin: 0 0 0.85rem;
+  color: var(--text-muted, #666);
+  font-size: 0.8rem;
+}
+
+.infraSubtitle code {
+  background: #eef0f2;
+  border-radius: 4px;
+  padding: 0 0.3rem;
+  font-size: 0.78rem;
+}
+
+.infraSection {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e5e5e5);
+}
+
+.infraSection:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.infraSectionTitle {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #555);
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+}
+
+.infoRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px dotted #e0e0e0;
+}
+
+.infoKey {
+  margin: 0;
+  color: var(--text-muted, #666);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex: 0 0 auto;
+}
+
+.infoValue {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: #1f1f1f;
+  text-align: right;
+  word-break: break-word;
+}

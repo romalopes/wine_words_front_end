@@ -247,113 +247,117 @@ function Regions() {
           </div>
         </div>
 
-      {showForm && (
-        <section>
-          <div className="grapes-page__form-container">
-            <form className="grape-form" onSubmit={handleSubmit}>
-              <h2>{mode === "edit" ? "Edit Region" : "New Region"}</h2>
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="region-name">Name *</label>
-                  <input
-                    type="text"
-                    id="region-name"
-                    value={form.name}
-                    onChange={(e) => updateField("name", e.target.value)}
-                    disabled={saving}
-                  />
+        {showForm && (
+          <section>
+            <div className="grapes-page__form-container">
+              <form className="grape-form" onSubmit={handleSubmit}>
+                <h2>{mode === "edit" ? "Edit Region" : "New Region"}</h2>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="region-name">Name *</label>
+                    <input
+                      type="text"
+                      id="region-name"
+                      value={form.name}
+                      onChange={(e) => updateField("name", e.target.value)}
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="region-country">Country *</label>
+                    <select
+                      id="region-country"
+                      value={form.country_id}
+                      onChange={(e) =>
+                        updateField("country_id", e.target.value)
+                      }
+                      disabled={saving || countries.length === 0}
+                    >
+                      <option value="">Select a country</option>
+                      {countries.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.flag_emoji} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="region-country">Country *</label>
-                  <select
-                    id="region-country"
-                    value={form.country_id}
-                    onChange={(e) => updateField("country_id", e.target.value)}
-                    disabled={saving || countries.length === 0}
-                  >
-                    <option value="">Select a country</option>
-                    {countries.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.flag_emoji} {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="region-parent">Parent Region</label>
-                  <select
-                    id="region-parent"
-                    value={form.parent_id || ""}
-                    onChange={(e) =>
-                      updateField("parent_id", e.target.value || null)
-                    }
-                    disabled={saving}
-                  >
-                    <option value="">No parent (top-level region)</option>
-                    {countries
-                      .map((c) =>
-                        c.regions
-                          ?.filter((r) => r.parent_id === null)
-                          .map((r) => (
-                            <option key={r.id + "-parent"} value={r.id}>
-                              {r.name} ({c.name})
-                            </option>
-                          )),
-                      )
-                      .flat(2)
-                      .filter(Boolean) || []}
-                  </select>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="region-parent">Parent Region</label>
+                    <select
+                      id="region-parent"
+                      value={form.parent_id || ""}
+                      onChange={(e) =>
+                        updateField("parent_id", e.target.value || null)
+                      }
+                      disabled={saving}
+                    >
+                      <option value="">No parent (top-level region)</option>
+                      {countries
+                        .map((c) =>
+                          c.regions
+                            ?.filter((r) => r.parent_id === null)
+                            .map((r) => (
+                              <option key={r.id + "-parent"} value={r.id}>
+                                {r.name} ({c.name})
+                              </option>
+                            )),
+                        )
+                        .flat(2)
+                        .filter(Boolean) || []}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <div className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        id="region-is-state"
+                        checked={form.is_state}
+                        onChange={(e) =>
+                          updateField("is_state", e.target.checked)
+                        }
+                      />
+                      <label htmlFor="region-is-state">is State?</label>
+                    </div>
+                  </div>
                 </div>
                 <div className="form-group">
                   <div className="checkbox-label">
                     <input
                       type="checkbox"
-                      id="region-is-state"
-                      checked={form.is_state}
+                      id="region-is-appellation"
+                      checked={form.is_appellation}
                       onChange={(e) =>
-                        updateField("is_state", e.target.checked)
+                        updateField("is_appellation", e.target.checked)
                       }
                     />
-                    <label htmlFor="region-is-state">is State?</label>
+                    <label htmlFor="region-is-appellation">
+                      is Appellation?
+                    </label>
                   </div>
                 </div>
-              </div>
-              <div className="form-group">
-                <div className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    id="region-is-appellation"
-                    checked={form.is_appellation}
-                    onChange={(e) =>
-                      updateField("is_appellation", e.target.checked)
-                    }
-                  />
-                  <label htmlFor="region-is-appellation">is Appellation?</label>
+                <div className="form-actions">
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={saving}
+                  >
+                    {mode === "edit" ? "Update" : "Create"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={resetForm}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </button>
                 </div>
-              </div>
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={saving}
-                >
-                  {mode === "edit" ? "Update" : "Create"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={resetForm}
-                  disabled={saving}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-      )}
+              </form>
+            </div>
+          </section>
+        )}
 
         <div className="region-tree-filter">
           <label className="region-tree-filter__label">
@@ -369,7 +373,9 @@ function Regions() {
         {loading ? (
           <p className="grapes-page__loading">Loading regions…</p>
         ) : displayTree.length === 0 ? (
-          <p className="grapes-page__empty">No countries or regions found.</p>
+          <p className="grapes-page__empty">
+            No countries or regions with wines found.
+          </p>
         ) : (
           <div className="region-tree-container">
             {displayTree.map((country) => {
@@ -426,7 +432,6 @@ function Regions() {
           </div>
         )}
       </section>
-
     </div>
   );
 }
