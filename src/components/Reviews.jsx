@@ -46,7 +46,7 @@ function timeAgo(dateStr) {
 function Reviews() {
   const { user } = useAuth();
   const canSeeAll = canManageWinesRole(user);
-  // Super Users, Editors and Reviewers see the management filters and the
+  // Admins, Editors and Reviewers see the management filters and the
   // add button; Guests/Readers only see published reviews.
   const canManageContent = canManageWinesRole(user);
   const [myReviews, setMyReviews] = useState([]);

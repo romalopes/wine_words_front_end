@@ -10,7 +10,7 @@ import {
   runWriteFlow,
 } from "../../services/apiHealth/healthRunner.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
-import { isSuperUser } from "../../constants/roles.js";
+import { isAdmin } from "../../constants/roles.js";
 import { BACK_END_VERSION } from "../../constants/versions.js";
 import ResponseInspector from "./components/ResponseInspector.jsx";
 import WriteSandbox from "./components/WriteSandbox.jsx";
@@ -37,7 +37,7 @@ function StatusBadge({ passed }) {
 
 export default function ApiHealth() {
   const { user, token } = useAuth();
-  const isAdmin = isSuperUser(user);
+  const isAdmin = isAdmin(user);
 
   const [results, setResults] = useState({});
   const [running, setRunning] = useState({}); // checkId -> bool

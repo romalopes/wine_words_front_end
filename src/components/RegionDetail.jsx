@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { regionsApi, winesApi, producersApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageGrapes, canManageWinesRole } from "../constants/roles";
+import { isAdmin, canManageGrapes, canManageWinesRole } from "../constants/roles";
 import WineTable from "./WineTable";
 import ProducerTable from "./ProducerTable";
 import Pagination from "./Pagination";
@@ -21,8 +21,8 @@ function RegionDetail() {
   const { slug } = useParams();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
-  const canManage = isSuperUser(user) || canManageGrapes(user);
-  // Super Users, Reviewers and Editors may link wines to this region.
+  const canManage = isAdmin(user) || canManageGrapes(user);
+  // Admins, Reviewers and Editors may link wines to this region.
   const canManageWines = canManageWinesRole(user);
   const [region, setRegion] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -219,7 +219,7 @@ function Categories() {
           </div>
         </form>
         ) : (
-          <p className="wine-management__hint">Only Super User and Editor can manage categories.</p>
+          <p className="wine-management__hint">Only Admin and Editor can manage categories.</p>
         )}
       </section>
 

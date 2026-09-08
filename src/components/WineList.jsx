@@ -10,7 +10,7 @@ import WineAdvancedSearch from "./WineAdvancedSearch";
 
 function WineList() {
   const { user } = useAuth();
-  // Super Users, Reviewers and Editors may add, edit or delete wines.
+  // Admins, Reviewers and Editors may add, edit or delete wines.
   const canManageWines = canManageWinesRole(user);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);

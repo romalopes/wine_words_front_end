@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { usersApi, subscriptionsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser } from "../constants/roles";
+import { isAdmin } from "../constants/roles";
 
 function UserRoles() {
   const { user } = useAuth();
-  const isAdmin = isSuperUser(user);
+  const isAdmin = isAdmin(user);
 
   const [allRoles, setAllRoles] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);

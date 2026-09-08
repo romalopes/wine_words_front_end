@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { countriesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageGrapes } from "../constants/roles";
+import { isAdmin, canManageGrapes } from "../constants/roles";
 
 const emptyForm = {
   name: "",
@@ -35,7 +35,7 @@ function Countries() {
   const [editingId, setEditingId] = useState(null);
   const [onlyWineCountries, setOnlyWineCountries] = useState(true);
 
-  const canManage = isSuperUser(user) || canManageGrapes(user);
+  const canManage = isAdmin(user) || canManageGrapes(user);
 
   const sortedCountries = useMemo(() => {
     const source = onlyWineCountries

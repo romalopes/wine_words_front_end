@@ -45,7 +45,7 @@ function WineDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
-  // Super Users, Reviewers and Editors may edit or delete wines.
+  // Admins, Reviewers and Editors may edit or delete wines.
   const canManageWines = canManageWinesRole(user);
   const [wine, setWine] = useState(null);
   const [loading, setLoading] = useState(true);

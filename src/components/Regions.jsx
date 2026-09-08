@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { regionsApi, countriesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageGrapes } from "../constants/roles";
+import { isAdmin, canManageGrapes } from "../constants/roles";
 
 const emptyForm = {
   name: "",
@@ -85,7 +85,7 @@ function RegionTreeNode({ node, level, targetRegionId }) {
 
 function Regions() {
   const { user } = useAuth();
-  const canManage = isSuperUser(user) || canManageGrapes(user);
+  const canManage = isAdmin(user) || canManageGrapes(user);
   const [treeData, setTreeData] = useState([]);
   const [countries, setCountries] = useState([]);
   const [loading, setLoading] = useState(true);

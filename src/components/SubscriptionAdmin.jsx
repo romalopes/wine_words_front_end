@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { subscriptionsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser } from "../constants/roles";
+import { isAdmin } from "../constants/roles";
 import { Link } from "react-router-dom";
 
 const EMPTY_FORM = {
@@ -45,7 +45,7 @@ function toForm(sub) {
 
 function SubscriptionAdmin() {
   const { user } = useAuth();
-  const isAdmin = isSuperUser(user);
+  const isAdmin = isAdmin(user);
 
   const [plans, setPlans] = useState([]);
   const [allFeatures, setAllFeatures] = useState([]);

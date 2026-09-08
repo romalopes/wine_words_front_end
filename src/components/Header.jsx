@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageWinesRole } from "../constants/roles";
+import { isAdmin, canManageWinesRole } from "../constants/roles";
 import { categoriesApi } from "../services/api";
 
 function NavDropdown({ label, items }) {
@@ -63,11 +63,13 @@ function Header() {
   const { user, session, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const isAdmin = isSuperUser(user);
-  // Editors (and reviewers/super users) may manage categories, so show the
-  // Settings menu for them too; "Users & Roles" stays super-admin only.
-  const canManageSettings = isSuperUser(user) || canManageWinesRole(user);
+  const isAdminUser = isAdmin(user);
+  // Editors (and reviewers/admins) may manage categories, so show the
+  // Settings menu for them too. The "Admin" menu (Users & Roles, API Health,
+  // Subscriptions) is admin-only only.
+  const canManageSettings = isAdminUser || canManageWinesRole(user);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [counts, setCounts] = useState({});
@@ -221,27 +223,6 @@ function Header() {
             </button>
             {settingsOpen && (
               <div className="settings-menu__dropdown">
-                {isAdmin && (
-                  <NavLink to="/users" onClick={() => setSettingsOpen(false)}>
-                    Users &amp; Roles
-                  </NavLink>
-                )}
-                {isAdmin && (
-                  <NavLink
-                    to="/admin/api-health"
-                    onClick={() => setSettingsOpen(false)}
-                  >
-                    API Health
-                  </NavLink>
-                )}
-                {isAdmin && (
-                  <NavLink
-                    to="/subscriptions"
-                    onClick={() => setSettingsOpen(false)}
-                  >
-                    Subscriptions
-                  </NavLink>
-                )}
                 <NavLink to="/producers" onClick={() => setSettingsOpen(false)}>
                   Producers
                 </NavLink>
@@ -259,6 +240,42 @@ function Header() {
                 </NavLink>
                 <NavLink to="/regions" onClick={() => setSettingsOpen(false)}>
                   Regions
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
+        {isAdminUser && (
+          <div
+            className="settings-menu"
+            onMouseEnter={() => setAdminOpen(true)}
+            onMouseLeave={() => setAdminOpen(false)}
+          >
+            <button
+              type="button"
+              className="settings-menu__toggle"
+              aria-haspopup="true"
+              aria-expanded={adminOpen}
+              onClick={() => setAdminOpen((open) => !open)}
+            >
+              Admin
+            </button>
+            {adminOpen && (
+              <div className="settings-menu__dropdown">
+                <NavLink to="/users" onClick={() => setAdminOpen(false)}>
+                  Users &amp; Roles
+                </NavLink>
+                <NavLink
+                  to="/admin/api-health"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  API Health
+                </NavLink>
+                <NavLink
+                  to="/subscriptions"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Subscriptions
                 </NavLink>
               </div>
             )}

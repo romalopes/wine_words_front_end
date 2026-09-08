@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { grapesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageGrapes } from "../constants/roles";
+import { isAdmin, canManageGrapes } from "../constants/roles";
 
 const emptyForm = {
   name: "",
@@ -39,7 +39,7 @@ function Grapes() {
   const [newSynonym, setNewSynonym] = useState("");
   const [newNote, setNewNote] = useState("");
 
-  const isWineManager = isSuperUser(user) || canManageGrapes(user);
+  const isWineManager = isAdmin(user) || canManageGrapes(user);
 
   const sortedGrapes = useMemo(() => {
     const sorted = [...grapes];

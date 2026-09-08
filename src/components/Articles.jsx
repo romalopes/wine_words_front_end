@@ -21,7 +21,7 @@ function Articles() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const canSeeAll = canManageWinesRole(user);
-  // Super Users, Editors and Reviewers see the management filters and the
+  // Admins, Editors and Reviewers see the management filters and the
   // add button; Guests/Readers only see published articles.
   const canManageContent = canManageWinesRole(user);
   const categoryOrder = useCategoryOrder("sort_order_article");

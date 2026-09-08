@@ -8,7 +8,7 @@ import ProducerTable from "./ProducerTable";
 
 function ProducerList() {
   const { user } = useAuth();
-  // Super Users, Reviewers and Editors may add, edit or delete wines.
+  // Admins, Reviewers and Editors may add, edit or delete wines.
   const canManageProducers = canManageWinesRole(user);
   const list = usePagedList({
     fetcher: (params) => producersApi.list(params),

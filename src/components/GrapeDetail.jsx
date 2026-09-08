@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { grapesApi, winesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { isSuperUser, canManageGrapes, canManageWinesRole } from "../constants/roles";
+import { isAdmin, canManageGrapes, canManageWinesRole } from "../constants/roles";
 import WineTable from "./WineTable";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
@@ -42,8 +42,8 @@ function GrapeDetail() {
   const [newSynonym, setNewSynonym] = useState("");
   const [newNote, setNewNote] = useState("");
 
-  const isWineManager = isSuperUser(user) || canManageGrapes(user);
-  // Super Users, Reviewers and Editors may link wines to this grape.
+  const isWineManager = isAdmin(user) || canManageGrapes(user);
+  // Admins, Reviewers and Editors may link wines to this grape.
   const canLinkWines = canManageWinesRole(user);
 
   // Inline wine search for linking wines to this grape.

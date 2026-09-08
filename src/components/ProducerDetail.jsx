@@ -14,7 +14,7 @@ function ProducerDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
-  // Super Users, Reviewers and Editors may manage producers / link wines.
+  // Admins, Reviewers and Editors may manage producers / link wines.
   const canManageProducers = canManageWinesRole(user);
   const [producer, setProducer] = useState(null);
   const [loading, setLoading] = useState(true);
