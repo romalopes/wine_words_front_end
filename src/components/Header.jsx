@@ -302,6 +302,11 @@ function Header() {
                   ))}
                 </span>
               )}
+              {user.subscription && (
+                <span className="site-header__user-subscription">
+                  {user.subscription.name}
+                </span>
+              )}
               {user.email && (
                 <span className="site-header__user-email">{user.email}</span>
               )}

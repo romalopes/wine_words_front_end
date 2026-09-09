@@ -73,11 +73,15 @@ function UserRoles() {
     setSaving(u.id);
     setError(null);
     try {
-      const roleIds = Array.from(selected[u.id] != null ? selected[u.id] : u.role_ids || []);
+      const roleIds = Array.from(
+        selected[u.id] != null ? selected[u.id] : u.role_ids || [],
+      );
       const updated = await usersApi.assignRoles(u.id, roleIds);
       setResults((prev) =>
         (prev || []).map((x) =>
-          x.id === u.id ? { ...x, roles: updated.roles, role_ids: updated.role_ids } : x,
+          x.id === u.id
+            ? { ...x, roles: updated.roles, role_ids: updated.role_ids }
+            : x,
         ),
       );
       setSelected((prev) => {
@@ -93,7 +97,12 @@ function UserRoles() {
   }
 
   async function changeSubscription(u, subscriptionId) {
-    if (!window.confirm("Change this user's subscription? This swaps their base role (Guest/Reader).")) return;
+    if (
+      !window.confirm(
+        "Change this user's subscription? This swaps their base role (Guest/Reader).",
+      )
+    )
+      return;
     setSavingSub(u.id);
     setError(null);
     try {
@@ -101,7 +110,12 @@ function UserRoles() {
       setResults((prev) =>
         (prev || []).map((x) =>
           x.id === u.id
-            ? { ...x, roles: updated.roles, role_ids: updated.role_ids, subscription: updated.subscription }
+            ? {
+                ...x,
+                roles: updated.roles,
+                role_ids: updated.role_ids,
+                subscription: updated.subscription,
+              }
             : x,
         ),
       );
@@ -131,7 +145,8 @@ function UserRoles() {
         <h1>Users &amp; Roles</h1>
       </div>
       <p className="review-card__comment">
-        Search for a user, then tick the roles they belong to. A user can be linked to many roles.
+        Search for a user, then tick the roles they belong to. A user can be
+        linked to many roles.
       </p>
 
       <div className="review-form__field">
@@ -157,7 +172,10 @@ function UserRoles() {
               <span className="review-card__comment">{u.email}</span>
             </div>
             {allRoles.map((role) => (
-              <label key={role.id} style={{ display: "block", fontWeight: 400 }}>
+              <label
+                key={role.id}
+                style={{ display: "block", fontWeight: 400 }}
+              >
                 <input
                   type="checkbox"
                   checked={hasRole(u, role.id)}
@@ -167,7 +185,10 @@ function UserRoles() {
               </label>
             ))}
             <div style={{ marginTop: 10 }}>
-              <label className="review-form__label" style={{ display: "block" }}>
+              <label
+                className="review-form__label"
+                style={{ display: "block" }}
+              >
                 Subscription
               </label>
               <select

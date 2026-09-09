@@ -49,9 +49,9 @@ textarea {
   background: rgba(247, 243, 236, 0.92);
   border-bottom: 1px solid #e4d9cd;
   display: flex;
-  gap: 24px;
+  gap: 12px;
   justify-content: space-between;
-  padding: 18px clamp(18px, 5vw, 64px);
+  padding: 10px clamp(18px, 5vw, 64px);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -66,14 +66,17 @@ textarea {
 }
 
 .site-header nav {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .site-header nav a {
+  align-items: center;
   border-radius: 999px;
   color: #5d514b;
+  display: inline-flex;
   padding: 8px 14px;
   text-decoration: none;
 }
@@ -178,7 +181,7 @@ textarea {
 .wine-workspace {
   align-items: start;
   display: grid;
-  gap: 24px;
+  gap: 12px;
   grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
   margin-top: 24px;
 }
@@ -569,7 +572,7 @@ textarea {
 
 .wine-test__grid {
   display: grid;
-  gap: 24px;
+  gap: 12px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
 }
 
@@ -806,6 +809,19 @@ textarea {
 .site-header__user-role--guest {
   background: #f3e9e3;
   color: #6b5855;
+}
+
+.site-header__user-subscription {
+  background: #27615e;
+  border-radius: 999px;
+  color: #fff8f0;
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.55rem;
+  text-transform: uppercase;
 }
 
 .site-header__user-email {
@@ -3134,7 +3150,7 @@ textarea {
 .account-grid {
   display: grid;
   grid-template-columns: 3fr 2fr;
-  gap: 24px;
+  gap: 12px;
   align-items: start;
   margin-top: 24px;
 }
