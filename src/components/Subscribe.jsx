@@ -95,11 +95,13 @@ function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
 }
 
 function Subscribe() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingPlanId, setLoadingPlanId] = useState(null);
+  // Set when the user returns from Stripe Checkout (?checkout=success|cancelled).
+  const [checkoutNotice, setCheckoutNotice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +120,26 @@ function Subscribe() {
       cancelled = true;
     };
   }, []);
+
+  // Coming back from Stripe Checkout lands on /subscribe?checkout=success
+  // (or =cancelled). Show a status message, strip the query from the URL, and
+  // refresh the session so the current-plan state reflects any activation the
+  // webhook has already processed. The subscription itself is applied by the
+  // Stripe webhook, which can lag the redirect by a moment — so retry the
+  // refresh once after a short delay.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const state = params.get("checkout");
+    if (!state) return undefined;
+
+    setCheckoutNotice(state === "success" ? "success" : "cancelled");
+    window.history.replaceState({}, "", window.location.pathname);
+
+    refreshSession();
+    const retry = setTimeout(() => refreshSession(), 3000);
+
+    return () => clearTimeout(retry);
+  }, [refreshSession]);
 
   const handleChoose = useCallback(
     async (planId) => {
@@ -169,6 +191,18 @@ function Subscribe() {
 
       {loading && <p className="wine-management__loading">Loading plans…</p>}
       {error && <p className="review-form__error">{error}</p>}
+      {checkoutNotice === "success" && (
+        <p className="review-card__comment" style={{ fontWeight: 600 }}>
+          ✅ Payment received — your plan is being activated. This page will
+          update automatically; if it still shows the old plan in a moment,
+          refresh once more.
+        </p>
+      )}
+      {checkoutNotice === "cancelled" && (
+        <p className="review-card__comment">
+          Checkout cancelled — you have not been charged.
+        </p>
+      )}
 
       {!loading && !error && (
         <div

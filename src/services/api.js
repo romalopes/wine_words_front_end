@@ -333,6 +333,26 @@ export const subscriptionsApi = {
   },
 };
 
+export const accountApi = {
+  show() {
+    return request("/account", { auth: true });
+  },
+  update(data) {
+    return request("/account", {
+      method: "PATCH",
+      auth: true,
+      body: data,
+    });
+  },
+  changePassword(data) {
+    return request("/account/password", {
+      method: "PATCH",
+      auth: true,
+      body: data,
+    });
+  },
+};
+
 export const billingApi = {
   checkout(subscriptionId) {
     return request("/billing/checkout", {

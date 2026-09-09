@@ -84,7 +84,11 @@ function Login() {
         ) : (
           <>
             <p className="wine-kicker">
-              {isForgot ? "Account recovery" : isSignUp ? "Create account" : "Welcome back"}
+              {isForgot
+                ? "Account recovery"
+                : isSignUp
+                  ? "Create account"
+                  : "Welcome back"}
             </p>
             <h1 id="auth-title">
               {isForgot
@@ -107,7 +111,7 @@ function Login() {
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
                 {isSignUp && !isForgot ? (
                   <label className="auth-form__field">
-                    <span>Name</span>
+                    <span>User Name</span>
                     <input
                       autoComplete="name"
                       name="name"
@@ -134,7 +138,9 @@ function Login() {
                   <label className="auth-form__field">
                     <span>Password</span>
                     <input
-                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      autoComplete={
+                        isSignUp ? "new-password" : "current-password"
+                      }
                       minLength={6}
                       name="password"
                       onChange={updateField("password")}

@@ -1,5 +1,6 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import About from "./About.jsx";
+import AccountSettings from "./AccountSettings.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Home from "./Home.jsx";
 import Login from "./Login.jsx";
@@ -36,6 +37,7 @@ function AppRoutes({ user, setUser }) {
   return (
     <>
       <Routes>
+        <Route element={<AccountSettings />} path="/account" />
         <Route element={<Dashboard />} path="/" />
         <Route element={<Home />} path="/finder" />
         <Route element={<Quiz />} path="quiz" />

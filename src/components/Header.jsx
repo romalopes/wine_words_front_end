@@ -121,6 +121,7 @@ function Header() {
   function getDisplayName() {
     if (!session || !user) return null;
     return (
+      user.user_name ||
       user.name ||
       user.displayName ||
       (user.email ? user.email.split("@")[0] : null)
@@ -305,6 +306,9 @@ function Header() {
                 <span className="site-header__user-email">{user.email}</span>
               )}
             </div>
+            <NavLink className="site-header__auth" to="/account">
+              Account settings
+            </NavLink>
             <button
               className="site-header__auth"
               onClick={handleSignOut}
