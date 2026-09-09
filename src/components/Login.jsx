@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi } from "../services/api";
 
-const initialForm = { email: "", password: "", name: "" };
+const initialForm = { email: "", password: "", user_name: "" };
 
 function Login() {
   const { user, signIn, signUp } = useAuth();
@@ -37,7 +37,7 @@ function Login() {
     setSuccess(null);
 
     try {
-      const { email, password, name } = form;
+      const { email, password, user_name } = form;
 
       if (isForgot) {
         if (!email) {
@@ -60,7 +60,7 @@ function Login() {
       }
 
       if (isSignUp) {
-        await signUp({ email, password, name });
+        await signUp({ email, password, user_name: user_name.trim() });
       } else {
         await signIn({ email, password });
       }
@@ -113,11 +113,14 @@ function Login() {
                   <label className="auth-form__field">
                     <span>User Name</span>
                     <input
-                      autoComplete="name"
-                      name="name"
-                      onChange={updateField("name")}
+                      autoComplete="username"
+                      name="user_name"
+                      onChange={updateField("user_name")}
                       type="text"
-                      value={form.name}
+                      value={form.user_name}
+                      minLength={2}
+                      maxLength={40}
+                      required
                     />
                   </label>
                 ) : null}

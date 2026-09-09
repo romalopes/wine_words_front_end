@@ -96,11 +96,11 @@ export const authApi = {
       body: { user: { email, password } },
     });
   },
-  signUp({ email, password, name }) {
+  signUp({ email, password, user_name }) {
     return request("/auth/sign_up", {
       method: "POST",
       body: {
-        user: { name, email, password, password_confirmation: password },
+        user: { user_name, email, password, password_confirmation: password },
       },
     });
   },
