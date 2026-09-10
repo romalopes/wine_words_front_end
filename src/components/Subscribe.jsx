@@ -102,6 +102,9 @@ function Subscribe() {
   const [loadingPlanId, setLoadingPlanId] = useState(null);
   // Set when the user returns from Stripe Checkout (?checkout=success|cancelled).
   const [checkoutNotice, setCheckoutNotice] = useState(null);
+  // Reconciliation with Stripe after returning from Checkout (no webhook needed).
+  const [confirmState, setConfirmState] = useState(null); // null | "confirming" | "confirmed" | "error"
+  const [confirmError, setConfirmError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,22 +124,44 @@ function Subscribe() {
     };
   }, []);
 
-  // Coming back from Stripe Checkout lands on /subscribe?checkout=success
-  // (or =cancelled). Show a status message, strip the query from the URL, and
-  // refresh the session so the current-plan state reflects any activation the
-  // webhook has already processed. The subscription itself is applied by the
-  // Stripe webhook, which can lag the redirect by a moment — so retry the
-  // refresh once after a short delay.
+  // Coming back from Stripe Checkout lands on
+  // /subscribe?checkout=success&session_id=cs_... (or checkout=cancelled).
+  // The plan is reconciled via POST /billing/confirm, which verifies the
+  // Stripe session server-side and applies the subscription — the Stripe
+  // webhook may not have been delivered yet in local dev.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const state = params.get("checkout");
     if (!state) return undefined;
 
+    const sessionId = params.get("session_id");
     setCheckoutNotice(state === "success" ? "success" : "cancelled");
     window.history.replaceState({}, "", window.location.pathname);
 
-    refreshSession();
-    const retry = setTimeout(() => refreshSession(), 3000);
+    let retry;
+    if (state === "success" && sessionId) {
+      setConfirmState("confirming");
+      setConfirmError(null);
+      billingApi
+        .confirm(sessionId)
+        .then(() => {
+          setConfirmState("confirmed");
+          return refreshSession();
+        })
+        .catch((err) => {
+          // Session not paid yet (202) or an error — surface it but still
+          // refresh in case the webhook applied the plan in the meantime.
+          setConfirmState("error");
+          setConfirmError(err.message || "Could not confirm payment yet.");
+          return refreshSession();
+        })
+        .then(() => {
+          retry = setTimeout(() => refreshSession(), 3000);
+        });
+    } else {
+      refreshSession();
+      retry = setTimeout(() => refreshSession(), 3000);
+    }
 
     return () => clearTimeout(retry);
   }, [refreshSession]);
@@ -193,9 +218,14 @@ function Subscribe() {
       {error && <p className="review-form__error">{error}</p>}
       {checkoutNotice === "success" && (
         <p className="review-card__comment" style={{ fontWeight: 600 }}>
-          ✅ Payment received — your plan is being activated. This page will
-          update automatically; if it still shows the old plan in a moment,
-          refresh once more.
+          {confirmState === "confirming" &&
+            "⏳ Confirming your payment with Stripe…"}
+          {confirmState === "confirmed" &&
+            "✅ Payment confirmed — your plan is now active."}
+          {confirmState === "error" &&
+            `⚠️ Payment received but activation needs a moment${confirmError ? `: ${confirmError}` : "."} If it still shows the old plan in a moment, refresh once more.`}
+          {confirmState === null &&
+            "✅ Payment received — your plan is being activated. This page will update automatically; if it still shows the old plan in a moment, refresh once more."}
         </p>
       )}
       {checkoutNotice === "cancelled" && (

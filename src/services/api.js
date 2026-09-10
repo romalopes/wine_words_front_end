@@ -361,6 +361,13 @@ export const billingApi = {
       body: { subscription_id: subscriptionId },
     });
   },
+  confirm(sessionId) {
+    return request("/billing/confirm", {
+      method: "POST",
+      auth: true,
+      body: { session_id: sessionId },
+    });
+  },
   portal() {
     return request("/billing/portal", {
       method: "POST",
