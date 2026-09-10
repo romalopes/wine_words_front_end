@@ -677,4 +677,10 @@ export const regionsApi = {
   },
 };
 
+export const logsApi = {
+  fetchLines(lines = 500) {
+    return request(`/logs?lines=${lines}`, { auth: true });
+  },
+};
+
 export { API_BASE_URL };

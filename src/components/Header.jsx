@@ -278,6 +278,12 @@ function Header() {
                 >
                   Subscriptions
                 </NavLink>
+                <NavLink
+                  to="/admin/logs"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Logs
+                </NavLink>
               </div>
             )}
           </div>
@@ -312,7 +318,7 @@ function Header() {
               )}
             </div>
             <NavLink className="site-header__auth" to="/account">
-              Account settings
+              Account
             </NavLink>
             <button
               className="site-header__auth"

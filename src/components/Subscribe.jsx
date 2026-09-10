@@ -11,7 +11,7 @@ function formatPrice(cents) {
 // One card renders every kind of plan — free and paid are just different rows
 // of the same list. The small visual differences (price line, badge, CTA) are
 // derived from the plan itself.
-function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
+function PlanCard({ plan, isCurrent, isLowerTier, onChoose, onManage, loadingPlanId }) {
   const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
   const yearly = formatPrice(plan.yearly_price_cents);
   const monthly = formatPrice(plan.monthly_price_cents);
@@ -66,29 +66,33 @@ function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
       <button
         type="button"
         className="auth-form__submit"
-        disabled={!isFree && !onChoose && !onManage}
+        disabled={(!isFree && !onChoose && !onManage) || isLowerTier}
         onClick={() => {
           if (isFree && isCurrent) return;
           if (onManage) onManage();
           else if (onChoose) onChoose(plan.id);
         }}
         title={
-          isFree
-            ? "FREE is your current plan"
-            : undefined
+          isLowerTier
+            ? "Downgrading to a lower-priced plan is not available"
+            : isFree
+              ? "FREE is your current plan"
+              : undefined
         }
       >
         {busy
           ? "Processing…"
-          : isFree
-            ? isCurrent
-              ? "Current plan"
-              : "Coming soon"
-            : isCurrent
-              ? "Current plan"
-              : onManage
-                ? "Manage subscription"
-                : "Choose plan"}
+          : isLowerTier
+            ? "Downgrade not available"
+            : isFree
+              ? isCurrent
+                ? "Current plan"
+                : "Coming soon"
+              : isCurrent
+                ? "Current plan"
+                : onManage
+                  ? "Manage subscription"
+                  : "Choose plan"}
       </button>
     </article>
   );
@@ -193,6 +197,7 @@ function Subscribe() {
   }, []);
 
   const currentPlanId = user?.subscription?.id;
+  const currentPlan = plans.find((p) => p.id === currentPlanId);
   const canManageBilling = user?.can_manage_billing; // Stripe is available for this user
 
   // FREE first, then the paid tiers sorted by price.
@@ -246,6 +251,7 @@ function Subscribe() {
           {orderedPlans.map((plan) => {
             const isCurrent = currentPlanId === plan.id;
             const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
+            const isLowerTier = !isCurrent && currentPlan != null && (plan.yearly_price_cents ?? 0) < (currentPlan.yearly_price_cents ?? 0);
             // Free plans: no checkout. Paid plans that aren't the current plan
             // get a "Choose plan" button (only if billing is configured).
             // The current paid plan gets a "Manage subscription" button.
@@ -254,7 +260,8 @@ function Subscribe() {
                 key={plan.id}
                 plan={plan}
                 isCurrent={isCurrent}
-                onChoose={(!isFree && !isCurrent && canManageBilling) ? handleChoose : undefined}
+                isLowerTier={isLowerTier}
+                onChoose={(!isFree && !isCurrent && !isLowerTier && canManageBilling) ? handleChoose : undefined}
                 onManage={(isCurrent && canManageBilling) ? handleManage : undefined}
                 loadingPlanId={loadingPlanId}
               />
