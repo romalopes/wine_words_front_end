@@ -1,5 +1,5 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1").replace(/\/+$/, "");
+
 
 const TOKEN_STORAGE_KEY = "wine_prediction_token";
 
@@ -55,7 +55,8 @@ async function request(
     requestHeaders.Authorization = `Bearer ${authToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = API_BASE_URL + path;
+  const response = await fetch(url, {
     method,
     headers: requestHeaders,
     body: payload,
