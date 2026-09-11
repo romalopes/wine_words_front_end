@@ -241,6 +241,14 @@ function Header() {
                 <NavLink to="/regions" onClick={() => setSettingsOpen(false)}>
                   Regions
                 </NavLink>
+                {isAdminUser && (
+                  <NavLink
+                    to="/admin/logs"
+                    onClick={() => setSettingsOpen(false)}
+                  >
+                    Logs
+                  </NavLink>
+                )}
               </div>
             )}
           </div>

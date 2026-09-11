@@ -681,6 +681,16 @@ export const logsApi = {
   fetchLines(lines = 500) {
     return request(`/logs?lines=${lines}`, { auth: true });
   },
+  // Database audit trail: paginated, filterable list. The backend returns the
+  // Api::Paginatable envelope { items, page, per_page, total_count,
+  // total_pages } when `page` is given, a plain array otherwise.
+  fetchAuditLogs(params = {}) {
+    return request(`/logs/audit${buildQuery(params)}`, { auth: true });
+  },
+  // A single audit entry with its associated objects and alive flags.
+  fetchAuditLog(id) {
+    return request(`/logs/${id}`, { auth: true });
+  },
 };
 
 export { API_BASE_URL };

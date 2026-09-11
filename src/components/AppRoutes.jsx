@@ -33,6 +33,7 @@ import ApiHealth from "./ApiHealth/ApiHealth.jsx";
 import Subscribe from "./Subscribe.jsx";
 import SubscriptionAdmin from "./SubscriptionAdmin.jsx";
 import Logs from "./Logs.jsx";
+import LogDetail from "./LogDetail.jsx";
 
 function AppRoutes({ user, setUser }) {
   return (
@@ -80,6 +81,7 @@ function AppRoutes({ user, setUser }) {
         <Route element={<Subscribe />} path="/subscribe" />
         <Route element={<SubscriptionAdmin />} path="/subscriptions" />
         <Route element={<Logs />} path="/admin/logs" />
+        <Route element={<LogDetail />} path="/admin/logs/:id" />
       </Routes>
     </>
   );
