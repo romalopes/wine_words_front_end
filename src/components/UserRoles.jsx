@@ -168,7 +168,9 @@ function UserRoles() {
         {(results || []).map((u) => (
           <div key={u.id} className="review-card">
             <div className="review-card__top">
-              <h3 className="review-card__title">{u.name || "(no name)"}</h3>
+              <h3 className="review-card__title">
+                {u.user_name || "(no name)"}
+              </h3>
               <span className="review-card__comment">{u.email}</span>
             </div>
             {allRoles.map((role) => (

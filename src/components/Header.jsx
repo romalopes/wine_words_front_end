@@ -122,7 +122,6 @@ function Header() {
     if (!session || !user) return null;
     return (
       user.user_name ||
-      user.name ||
       user.displayName ||
       (user.email ? user.email.split("@")[0] : null)
     );
@@ -278,10 +277,7 @@ function Header() {
                 >
                   Subscriptions
                 </NavLink>
-                <NavLink
-                  to="/admin/logs"
-                  onClick={() => setAdminOpen(false)}
-                >
+                <NavLink to="/admin/logs" onClick={() => setAdminOpen(false)}>
                   Logs
                 </NavLink>
               </div>
