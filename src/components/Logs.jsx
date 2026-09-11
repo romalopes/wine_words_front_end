@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import { logsApi } from "../services/api";
+import { copyText } from "../utils/clipboard";
 import Pagination from "./Pagination.jsx";
 
 const LINE_COUNT_OPTIONS = [100, 250, 500, 1000, 2000];
@@ -86,6 +87,20 @@ function LogFileViewer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lineCount, setLineCount] = useState(500);
+  const [copyState, setCopyState] = useState("idle"); // idle | copied | failed
+  const copyTimerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
+
+  function handleCopyAll() {
+    copyText(logs.join("\n"))
+      .then(() => setCopyState("copied"))
+      .catch(() => setCopyState("failed"))
+      .finally(() => {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = setTimeout(() => setCopyState("idle"), 1500);
+      });
+  }
 
   async function fetchLogs() {
     if (!token) return;
@@ -123,6 +138,22 @@ function LogFileViewer() {
         </select>
         <button
           type="button"
+          className="logCopyBtn"
+          data-copied={copyState === "copied"}
+          disabled={loading || logs.length === 0}
+          onClick={handleCopyAll}
+          aria-label="Copy entire log"
+          title="Copy entire log"
+          style={{ marginLeft: 8 }}
+        >
+          {copyState === "copied"
+            ? "Copied ✓"
+            : copyState === "failed"
+            ? "Failed"
+            : "Copy"}
+        </button>
+        <button
+          type="button"
           className="auth-form__submit"
           disabled={loading}
           onClick={fetchLogs}
@@ -144,7 +175,7 @@ function LogFileViewer() {
         fontFamily: "monospace",
         margin: 0,
       }}>
-        {logs.length === 0 && !loading && "No log entries found."}
+                {logs.length === 0 && !loading && "No log entries found."}
         {logs.map((line, i) => (
           <div key={i}>{line}</div>
         ))}

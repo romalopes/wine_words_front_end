@@ -261,6 +261,15 @@ function Articles() {
                 return catNames.includes(selectedCategory);
               });
 
+              // Deduplicate by article id (guards against eager-load joins in the API
+              // producing one row per article→category association).
+              const seen = new Set();
+              const deduped = filtered.filter((a) => {
+                if (seen.has(a.id)) return false;
+                seen.add(a.id);
+                return true;
+              });
+
               if (effectiveScope === "mine" && !user) {
                 return (
                   <p className="wine-management__empty-state">
@@ -268,7 +277,7 @@ function Articles() {
                   </p>
                 );
               }
-              if (filtered.length === 0) {
+              if (deduped.length === 0) {
                 return (
                   <p className="wine-management__empty-state">
                     {source.length === 0
@@ -284,7 +293,7 @@ function Articles() {
               if (selectedCategory) {
                 return (
                   <div className="content-grid">
-                    {filtered.map((article) => (
+                    {deduped.map((article) => (
                       <div
                         key={article.id}
                         className="wine-management__card"
@@ -369,14 +378,21 @@ function Articles() {
                 );
               }
 
-              // Group by category
-              const grouped = filtered.reduce((acc, article) => {
+              // Group by category — an article can belong to multiple categories,
+              // so it is listed under every category it is tagged with.
+              const grouped = deduped.reduce((acc, article) => {
                 const catNames = Array.isArray(article.categories)
                   ? article.categories.map((c) => c.name)
                   : [];
-                const key = catNames.length > 0 ? catNames[0] : "Uncategorised";
-                if (!acc[key]) acc[key] = [];
-                acc[key].push(article);
+                if (catNames.length === 0) {
+                  if (!acc["Uncategorised"]) acc["Uncategorised"] = [];
+                  acc["Uncategorised"].push(article);
+                } else {
+                  catNames.forEach((name) => {
+                    if (!acc[name]) acc[name] = [];
+                    acc[name].push(article);
+                  });
+                }
                 return acc;
               }, {});
 

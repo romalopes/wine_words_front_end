@@ -645,14 +645,30 @@ function ReviewsList({
     return catNames.includes(selectedCategory);
   });
 
-  // Group by category
-  const grouped = filtered.reduce((acc, review) => {
+  // Deduplicate by review id (guards against eager-load joins in the API
+  // producing one row per review→category association).
+  const seen = new Set();
+  const deduped = filtered.filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+
+  // Group by category — a review can belong to multiple categories,
+  // so it is listed under every category it is tagged with.
+  const grouped = deduped.reduce((acc, review) => {
     const catNames = Array.isArray(review.categories)
       ? review.categories.map((c) => c.name)
       : [];
-    const key = catNames.length > 0 ? catNames[0] : "Uncategorised";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(review);
+    if (catNames.length === 0) {
+      if (!acc["Uncategorised"]) acc["Uncategorised"] = [];
+      acc["Uncategorised"].push(review);
+    } else {
+      catNames.forEach((name) => {
+        if (!acc[name]) acc[name] = [];
+        acc[name].push(review);
+      });
+    }
     return acc;
   }, {});
 
@@ -669,7 +685,7 @@ function ReviewsList({
       </p>
     );
   }
-  if (filtered.length === 0) {
+  if (deduped.length === 0) {
     return (
       <p className="wine-management__empty-state">
         {reviews.length === 0
@@ -685,7 +701,7 @@ function ReviewsList({
   if (selectedCategory) {
     return (
       <div className="content-grid">
-        {filtered.map((review) => (
+        {deduped.map((review) => (
           <div
             key={review.id}
             className="wine-management__card"

@@ -145,6 +145,19 @@ export const imagesApi = {
       auth: true,
     });
   },
+  reorder(imageableType, imageableId, orderedIds) {
+    return request(`/images/reorder?imageable_type=${imageableType}&imageable_id=${imageableId}`, {
+      method: "PATCH",
+      auth: true,
+      body: { image_ids: orderedIds },
+    });
+  },
+  setPrimary(imageableType, imageableId, imageId) {
+    return request(`/images/${imageId}/primary?imageable_type=${imageableType}&imageable_id=${imageableId}`, {
+      method: "PATCH",
+      auth: true,
+    });
+  },
 };
 
 export const winesApi = {

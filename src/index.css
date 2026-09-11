@@ -3232,4 +3232,30 @@ textarea {
   max-width: 420px;
 }
 
+/* --- Admin logs: per-line clipboard copy button --- */
+.logCopyBtn {
+  background: #2a2d2e;
+  color: #9cdcfe;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.logCopyBtn:hover {
+  background: #35393b;
+  color: #cfe8ff;
+}
+.logCopyBtn[data-copied="true"] {
+  color: #6ecf8e;
+  border-color: #2e7d43;
+}
+.logCopyBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 
