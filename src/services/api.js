@@ -60,6 +60,7 @@ async function request(
     method,
     headers: requestHeaders,
     body: payload,
+    credentials: 'include',
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -704,6 +705,27 @@ export const logsApi = {
   // A single audit entry with its associated objects and alive flags.
   fetchAuditLog(id) {
     return request(`/logs/${id}`, { auth: true });
+  },
+};
+
+export const impersonationApi = {
+  // Start impersonating a user. Returns { token, impersonating, effective_user, real_user }.
+  // The new token (with impersonated_user_id claim) must be persisted via setAuthToken.
+  start(userId) {
+    return request("/impersonation", {
+      method: "POST",
+      auth: true,
+      body: { user_id: userId },
+    });
+  },
+  // Stop impersonating. Returns { token, impersonating, effective_user, real_user }.
+  // The fresh token (without the claim) must be persisted via setAuthToken.
+  stop() {
+    return request("/impersonation", { method: "DELETE", auth: true });
+  },
+  // Check current impersonation status. Returns { impersonating, effective_user, real_user }.
+  status() {
+    return request("/impersonation/status", { auth: true });
   },
 };
 

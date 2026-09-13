@@ -60,14 +60,31 @@ function getInitials(name) {
 }
 
 function Header() {
-  const { user, session, signOut } = useAuth();
+  const {
+    user,
+    realUser,
+    isImpersonating,
+    session,
+    signOut,
+    stopImpersonation,
+  } = useAuth();
   const navigate = useNavigate();
 
-  const isAdminUser = isAdmin(user);
+  // Admin nav links are gated on the REAL user (the admin), not the effective
+  // impersonated user, so an admin never loses access to the admin interface
+  // while impersonating a non-admin user.
+  // Admin nav links are gated on the REAL user (the admin), not the effective
+  // impersonated user, so an admin never loses access to the admin interface
+  // while impersonating a non-admin user.
+  //
+  // When not impersonating, realUser is null; fall back to user so menus
+  // render normally for the signed-in identity.
+  const effectiveIdentity = realUser ?? user;
+  const isAdminUser = isAdmin(effectiveIdentity);
   // Editors (and reviewers/admins) may manage categories, so show the
   // Settings menu for them too. The "Admin" menu (Users & Roles, API Health,
   // Subscriptions) is admin-only only.
-  const canManageSettings = isAdminUser || canManageWinesRole(user);
+  const canManageSettings = isAdminUser || canManageWinesRole(effectiveIdentity);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
@@ -132,6 +149,31 @@ function Header() {
 
   return (
     <header className="site-header">
+      {isImpersonating && user && (
+        <div className="impersonation-banner" role="status">
+          <span className="impersonation-banner__text">
+            <strong>Acting as {user.user_name || user.email}</strong>
+            <span className="impersonation-banner__sub">
+              You are currently operating as this user. Actions will be
+              attributed to them.
+            </span>
+          </span>
+          <button
+            type="button"
+            className="impersonation-banner__stop"
+            onClick={async () => {
+              try {
+                await stopImpersonation();
+              } catch (err) {
+                // Surface the error but don't crash — the admin can retry.
+                console.error("Failed to stop impersonation:", err);
+              }
+            }}
+          >
+            Return to Admin
+          </button>
+        </div>
+      )}
       <NavLink className="site-logo" to="/">
         <img
           src="/wine_words.jpg"

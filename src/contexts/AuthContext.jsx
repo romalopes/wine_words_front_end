@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { authApi, setAuthToken } from "../services/api.js";
+import { authApi, impersonationApi, setAuthToken } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
@@ -21,6 +21,9 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => readStoredToken());
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(readStoredToken()));
+  // Impersonation state: the real admin user (when impersonating) so the UI can
+  // show a banner and gate admin-only actions on the real identity.
+  const [realUser, setRealUser] = useState(null);
 
   // Restore the session on mount when a token is stored.
   useEffect(() => {
@@ -30,6 +33,17 @@ export function AuthProvider({ children }) {
       try {
         const result = await authApi.me();
         if (!cancelled) setUser(result.user ?? null);
+        // If the token carries an impersonation claim, restore realUser too.
+        if (!cancelled) {
+          try {
+            const status = await impersonationApi.status();
+            if (status.impersonating && status.real_user) {
+              setRealUser(status.real_user);
+            }
+          } catch {
+            // Ignore — impersonation status is best-effort on restore.
+          }
+        }
       } catch {
         window.localStorage.removeItem(STORAGE_TOKEN_KEY);
         setToken(null);
@@ -115,22 +129,71 @@ export function AuthProvider({ children }) {
     }
     persistToken(null);
     setUser(null);
+    setRealUser(null);
   }, [persistToken]);
+
+  // Start impersonating a user. Persists the new token (with the
+  // impersonated_user_id claim) and updates user/realUser state.
+  const startImpersonation = useCallback(
+    async (userId) => {
+      const result = await impersonationApi.start(userId);
+      const nextToken = extractToken(result);
+      if (nextToken) persistToken(nextToken);
+      setUser(result.effective_user ?? null);
+      setRealUser(result.real_user ?? null);
+      return result;
+    },
+    [persistToken],
+  );
+
+  // Stop impersonating. Persists the fresh token (without the claim) and
+  // restores the admin user.
+  const stopImpersonation = useCallback(async () => {
+    const result = await impersonationApi.stop();
+    const nextToken = extractToken(result);
+    if (nextToken) persistToken(nextToken);
+    setUser(result.effective_user ?? null);
+    setRealUser(null);
+    return result;
+  }, [persistToken]);
+
+  // Check impersonation status (e.g., on mount or after token refresh).
+  const refreshImpersonationStatus = useCallback(async () => {
+    try {
+      const result = await impersonationApi.status();
+      if (result.impersonating) {
+        setRealUser(result.real_user ?? null);
+      } else {
+        setRealUser(null);
+      }
+      return result;
+    } catch {
+      setRealUser(null);
+      return { impersonating: false };
+    }
+  }, []);
+
+  const isImpersonating = Boolean(realUser);
 
   const value = useMemo(
     () => ({
       user,
+      realUser,
       token,
       session: token ? { token } : null,
       isAuthenticated: Boolean(token),
+      isImpersonating,
       loading,
       signIn,
       signUp,
       resetPassword,
       refreshSession,
       signOut,
+      startImpersonation,
+      stopImpersonation,
+      refreshImpersonationStatus,
     }),
-    [user, token, loading, signIn, signUp, resetPassword, refreshSession, signOut],
+    [user, realUser, token, isImpersonating, loading, signIn, signUp, resetPassword, refreshSession, signOut, startImpersonation, stopImpersonation, refreshImpersonationStatus],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3232,6 +3232,50 @@ textarea {
   max-width: 420px;
 }
 
+/* --- User impersonation banner --- */
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.55rem clamp(18px, 5vw, 64px);
+  background: #fef3c7;
+  border-bottom: 2px solid #f59e0b;
+  color: #92400e;
+  font: 0.9rem system-ui, sans-serif;
+}
+
+.impersonation-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.impersonation-banner__text strong {
+  font-size: 0.95rem;
+}
+
+.impersonation-banner__sub {
+  font-size: 0.75rem;
+  color: #a16207;
+}
+
+.impersonation-banner__stop {
+  background: #b91c1c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.85rem;
+  font: 600 0.82rem system-ui, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.impersonation-banner__stop:hover {
+  background: #991b1b;
+}
+
 /* --- Admin logs: per-line clipboard copy button --- */
 .logCopyBtn {
   background: #2a2d2e;

@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 
 function UserRoles() {
-  const { user } = useAuth();
+  const { user, startImpersonation } = useAuth();
   const isAdminUser = isAdmin(user);
 
   const [allRoles, setAllRoles] = useState([]);
@@ -216,6 +216,28 @@ function UserRoles() {
             >
               {saving === u.id ? "Saving…" : "Save roles"}
             </button>
+            {!u.roles?.includes("Admin") && (
+              <button
+                type="button"
+                className="impersonation-banner__stop"
+                style={{ marginLeft: 8 }}
+                title={`Act as ${u.user_name || u.email}`}
+                aria-label={`Act as ${u.user_name || u.email}`}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Act as ${u.user_name || u.email}? You will operate as this user until you stop.`,
+                    )
+                  ) {
+                    startImpersonation(u.id).catch((err) =>
+                      setError(err.message || "Failed to start impersonation"),
+                    );
+                  }
+                }}
+              >
+                Act as user
+              </button>
+            )}
           </div>
         ))}
       </div>

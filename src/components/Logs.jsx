@@ -80,6 +80,49 @@ function filtersFromSearchParams(searchParams) {
   return next;
 }
 
+// A single log line with its own "copy to clipboard" button. Each line manages
+// its own copy state (idle -> copied -> reset) so clicking one button does not
+// affect the others. Mirrors the copy-button pattern used in the API health
+// Response Inspector (idle | copied | failed -> auto-reset).
+function LogLine({ text }) {
+  const [copyState, setCopyState] = useState("idle"); // idle | copied | failed
+  const timerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  function handleCopy() {
+    copyText(text)
+      .then(() => setCopyState("copied"))
+      .catch(() => setCopyState("failed"))
+      .finally(() => {
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => setCopyState("idle"), 1500);
+      });
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{text}</span>
+      <button
+        type="button"
+        className="logCopyBtn"
+        data-copied={copyState === "copied"}
+        disabled={copyState === "copied"}
+        onClick={handleCopy}
+        title="Copy this line to clipboard"
+        aria-label={copyState === "copied" ? "Copied" : "Copy line"}
+        style={{ flex: "0 0 auto", marginTop: 1 }}
+      >
+        {copyState === "copied"
+          ? "Copied ✓"
+          : copyState === "failed"
+          ? "Failed"
+          : "Copy"}
+      </button>
+    </div>
+  );
+}
+
 // Legacy view: raw tail of the Rails log file (log/<env>.log), unchanged.
 function LogFileViewer() {
   const { token } = useAuth();
@@ -177,7 +220,7 @@ function LogFileViewer() {
       }}>
                 {logs.length === 0 && !loading && "No log entries found."}
         {logs.map((line, i) => (
-          <div key={i}>{line}</div>
+          <LogLine key={i} text={line} />
         ))}
       </pre>
     </section>
