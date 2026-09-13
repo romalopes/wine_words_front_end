@@ -3,7 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi } from "../services/api";
 
-const initialForm = { email: "", password: "", user_name: "" };
+const initialForm = {
+  email: "",
+  password: "",
+  password_confirmation: "",
+  user_name: "",
+};
 
 function Login() {
   const { user, signIn, signUp } = useAuth();
@@ -37,7 +42,7 @@ function Login() {
     setSuccess(null);
 
     try {
-      const { email, password, user_name } = form;
+      const { email, password, password_confirmation, user_name } = form;
 
       if (isForgot) {
         if (!email) {
@@ -58,9 +63,18 @@ function Login() {
         setFormError("Password must be at least 6 characters long.");
         return;
       }
+      if (isSignUp && password !== password_confirmation) {
+        setFormError("Passwords do not match.");
+        return;
+      }
 
       if (isSignUp) {
-        await signUp({ email, password, user_name: user_name.trim() });
+        await signUp({
+          email,
+          password,
+          password_confirmation,
+          user_name: user_name.trim(),
+        });
       } else {
         await signIn({ email, password });
       }
@@ -150,6 +164,21 @@ function Login() {
                       required
                       type="password"
                       value={form.password}
+                    />
+                  </label>
+                ) : null}
+
+                {isSignUp ? (
+                  <label className="auth-form__field">
+                    <span>Confirm password</span>
+                    <input
+                      autoComplete="new-password"
+                      minLength={6}
+                      name="password_confirmation"
+                      onChange={updateField("password_confirmation")}
+                      required
+                      type="password"
+                      value={form.password_confirmation}
                     />
                   </label>
                 ) : null}

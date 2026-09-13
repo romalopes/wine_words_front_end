@@ -85,8 +85,13 @@ export function AuthProvider({ children }) {
   );
 
   const signUp = useCallback(
-    async ({ email, password, user_name }) => {
-      const result = await authApi.signUp({ email, password, user_name });
+    async ({ email, password, password_confirmation, user_name }) => {
+      const result = await authApi.signUp({
+        email,
+        password,
+        password_confirmation,
+        user_name,
+      });
       const nextToken = extractToken(result);
       persistToken(nextToken);
       setUser(result.user ?? null);
