@@ -8,11 +8,42 @@ function formatPrice(cents) {
   return `$${(cents / 100).toFixed(0)}`;
 }
 
+function isFreePlan(plan) {
+  return Boolean(
+    plan && (plan.yearly_price_cents === 0 || plan.yearly_price_cents == null),
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "your next renewal";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "your next renewal";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function newIdempotencyKey() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random()}`;
+}
+
 // One card renders every kind of plan — free and paid are just different rows
 // of the same list. The small visual differences (price line, badge, CTA) are
 // derived from the plan itself.
-function PlanCard({ plan, isCurrent, isLowerTier, onChoose, onManage, loadingPlanId }) {
-  const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
+function PlanCard({
+  plan,
+  isCurrent,
+  onChoose,
+  onManage,
+  loadingPlanId,
+}) {
+  const isFree =
+    plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
   const yearly = formatPrice(plan.yearly_price_cents);
   const monthly = formatPrice(plan.monthly_price_cents);
   const busy = loadingPlanId === plan.id;
@@ -43,12 +74,17 @@ function PlanCard({ plan, isCurrent, isLowerTier, onChoose, onManage, loadingPla
         <h2 className="review-card__title">{plan.name}</h2>
       </div>
 
-      {plan.description && <p className="review-card__comment">{plan.description}</p>}
+      {plan.description && (
+        <p className="review-card__comment">{plan.description}</p>
+      )}
 
       <p style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
         {isFree ? "$0" : (yearly ?? "—")}
         {!isFree && (
-          <span style={{ fontSize: 14, fontWeight: 400, color: "#666" }}> / year</span>
+          <span style={{ fontSize: 14, fontWeight: 400, color: "#666" }}>
+            {" "}
+            / year
+          </span>
         )}
       </p>
       {!isFree && monthly && (
@@ -66,33 +102,25 @@ function PlanCard({ plan, isCurrent, isLowerTier, onChoose, onManage, loadingPla
       <button
         type="button"
         className="auth-form__submit"
-        disabled={(!isFree && !onChoose && !onManage) || isLowerTier}
+        disabled={!isFree && !onChoose && !onManage}
         onClick={() => {
           if (isFree && isCurrent) return;
           if (onManage) onManage();
           else if (onChoose) onChoose(plan.id);
         }}
-        title={
-          isLowerTier
-            ? "Downgrading to a lower-priced plan is not available"
-            : isFree
-              ? "FREE is your current plan"
-              : undefined
-        }
+        title={isFree && isCurrent ? "FREE is your current plan" : undefined}
       >
         {busy
           ? "Processing…"
-          : isLowerTier
-            ? "Downgrade not available"
-            : isFree
-              ? isCurrent
-                ? "Current plan"
-                : "Coming soon"
-              : isCurrent
-                ? "Current plan"
-                : onManage
-                  ? "Manage subscription"
-                  : "Choose plan"}
+          : isFree
+            ? isCurrent
+              ? "Current plan"
+              : "Coming soon"
+            : isCurrent
+              ? onManage
+                ? "Manage subscription"
+                : "Current plan"
+              : "Choose plan"}
       </button>
     </article>
   );
@@ -109,6 +137,11 @@ function Subscribe() {
   // Reconciliation with Stripe after returning from Checkout (no webhook needed).
   const [confirmState, setConfirmState] = useState(null); // null | "confirming" | "confirmed" | "error"
   const [confirmError, setConfirmError] = useState(null);
+  // Plan-change (upgrade/downgrade) pre-approval state.
+  const [changePreview, setChangePreview] = useState(null);
+  const [changeError, setChangeError] = useState(null);
+  const [changeBusy, setChangeBusy] = useState(false);
+  const [changeNotice, setChangeNotice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,21 +203,67 @@ function Subscribe() {
     return () => clearTimeout(retry);
   }, [refreshSession]);
 
+  const currentPlanId = user?.subscription?.id;
+  const currentPlan = plans.find((p) => p.id === currentPlanId);
+
+  // Users on a paid plan go through the plan-change (preview/confirm) flow;
+  // users on FREE (or no subscription) still use Checkout.
   const handleChoose = useCallback(
     async (planId) => {
       setError(null);
+      setChangeNotice(null);
       setLoadingPlanId(planId);
       try {
-        const result = await billingApi.checkout(planId);
-        // Redirect to Stripe Checkout.
-        window.location.href = result.url;
+        const onPaidPlan = currentPlan && !isFreePlan(currentPlan);
+        if (onPaidPlan) {
+          const preview = await billingApi.changePreview(planId);
+          setLoadingPlanId(null);
+          setChangeError(null);
+          setChangePreview(preview);
+        } else {
+          const result = await billingApi.checkout(planId);
+          window.location.href = result.url;
+        }
       } catch (err) {
-        setError(err.message || "Could not start checkout.");
+        setError(err.message || "Could not start plan change.");
         setLoadingPlanId(null);
       }
     },
-    [],
+    [currentPlan],
   );
+
+  const handleChangeConfirm = useCallback(
+    async () => {
+      const targetId = changePreview?.target?.id;
+      if (!targetId) return;
+      setChangeBusy(true);
+      setChangeError(null);
+      try {
+        await billingApi.changeConfirm(targetId, newIdempotencyKey());
+        const downgrade = changePreview.direction === "downgrade";
+        const targetName = changePreview.target.name;
+        setChangePreview(null);
+        setChangeNotice(
+          downgrade
+            ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(changePreview.current_period_end)}. Your current plan stays active until then.`
+            : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
+        );
+        await refreshSession();
+        setTimeout(() => refreshSession(), 3000);
+      } catch (err) {
+        setChangeError(err.message || "Could not confirm the change.");
+      } finally {
+        setChangeBusy(false);
+        setLoadingPlanId(null);
+      }
+    },
+    [changePreview, refreshSession],
+  );
+
+  const handleCancelChange = useCallback(() => {
+    setChangePreview(null);
+    setChangeError(null);
+  }, []);
 
   const handleManage = useCallback(async () => {
     setError(null);
@@ -196,8 +275,6 @@ function Subscribe() {
     }
   }, []);
 
-  const currentPlanId = user?.subscription?.id;
-  const currentPlan = plans.find((p) => p.id === currentPlanId);
   const canManageBilling = user?.can_manage_billing; // Stripe is available for this user
 
   // FREE first, then the paid tiers sorted by price.
@@ -238,6 +315,23 @@ function Subscribe() {
           Checkout cancelled — you have not been charged.
         </p>
       )}
+      {changeNotice && (
+        <p className="review-card__comment" style={{ fontWeight: 600 }}>
+          {changeNotice}
+        </p>
+      )}
+      {user?.subscription_change?.change_type === "downgrade" &&
+      user?.subscription_change?.status === "scheduled" && (
+        <p
+          className="review-card__comment"
+          style={{ fontWeight: 600, border: "1px solid #7f4f24", padding: 8 }}
+        >
+          ✅ Downgrade scheduled — you'll move to{" "}
+          {user.subscription_change.to_subscription?.name} on{" "}
+          {formatDate(user.subscription_change.effective_at)}. Your current
+          plan stays active until then.
+        </p>
+      )}
 
       {!loading && !error && (
         <div
@@ -250,23 +344,109 @@ function Subscribe() {
         >
           {orderedPlans.map((plan) => {
             const isCurrent = currentPlanId === plan.id;
-            const isFree = plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
-            const isLowerTier = !isCurrent && currentPlan != null && (plan.yearly_price_cents ?? 0) < (currentPlan.yearly_price_cents ?? 0);
-            // Free plans: no checkout. Paid plans that aren't the current plan
-            // get a "Choose plan" button (only if billing is configured).
-            // The current paid plan gets a "Manage subscription" button.
+            const isFree = isFreePlan(plan);
+            // Paid plans that aren't the current plan get a "Choose plan"
+            // button (which routes to the change flow for existing paid
+            // users). The current paid plan gets "Manage subscription".
             return (
               <PlanCard
                 key={plan.id}
                 plan={plan}
                 isCurrent={isCurrent}
-                isLowerTier={isLowerTier}
-                onChoose={(!isFree && !isCurrent && !isLowerTier && canManageBilling) ? handleChoose : undefined}
-                onManage={(isCurrent && canManageBilling) ? handleManage : undefined}
+                onChoose={
+                  !isFree && !isCurrent && canManageBilling
+                    ? handleChoose
+                    : undefined
+                }
+                onManage={
+                  isCurrent && canManageBilling ? handleManage : undefined
+                }
                 loadingPlanId={loadingPlanId}
               />
             );
           })}
+        </div>
+      )}
+
+      {changePreview && (
+        <div
+          className="review-card"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 460,
+              padding: 24,
+              borderRadius: 12,
+              background: "#fff",
+              boxShadow: "0 12px 40px rgba(0,0,0,.25)",
+            }}
+          >
+            <h2 style={{ margin: 0 }}>
+              {changePreview.direction === "downgrade"
+                ? `Downgrade to ${changePreview.target.name}`
+                : `Upgrade to ${changePreview.target.name}`}
+            </h2>
+            <p className="review-card__comment">
+              Current plan: <strong>{changePreview.current.name}</strong>
+              {changePreview.direction === "downgrade" && (
+                <span> — stays active until {formatDate(changePreview.current_period_end)}</span>
+              )}
+            </p>
+            <ul style={{ padding: 0, margin: "16px 0", listStyle: "none" }}>
+              {changePreview.direction === "upgrade" && (
+                <li>
+                  Amount due today:{" "}
+                  <strong>{formatPrice(changePreview.due_today.amount_cents)}</strong>
+                </li>
+              )}
+              <li>
+                Next renewal:{" "}
+                <strong>
+                  {formatPrice(changePreview.next_renewal.amount_cents)}
+                </strong>{" "}
+                on {formatDate(changePreview.current_period_end)}
+              </li>
+              {changePreview.direction === "downgrade" && (
+                <li>Amount due today: <strong>$0</strong></li>
+              )}
+            </ul>
+            {changeError && (
+              <p className="review-form__error" role="alert">
+                {changeError}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                type="button"
+                className="auth-form__submit"
+                disabled={changeBusy}
+                onClick={handleChangeConfirm}
+              >
+                {changeBusy
+                  ? "Processing…"
+                  : changePreview.direction === "downgrade"
+                    ? "Confirm downgrade"
+                    : `Confirm upgrade — ${formatPrice(changePreview.due_today.amount_cents)}`}
+              </button>
+              <button
+                type="button"
+                className="auth-form__submit"
+                disabled={changeBusy}
+                onClick={handleCancelChange}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

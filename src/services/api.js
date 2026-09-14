@@ -389,6 +389,20 @@ export const billingApi = {
       auth: true,
     });
   },
+  changePreview(subscriptionId) {
+    return request("/billing/change/preview", {
+      method: "POST",
+      auth: true,
+      body: { subscription_id: subscriptionId },
+    });
+  },
+  changeConfirm(subscriptionId, idempotencyKey) {
+    return request("/billing/change/confirm", {
+      method: "POST",
+      auth: true,
+      body: { subscription_id: subscriptionId, idempotency_key: idempotencyKey },
+    });
+  },
 };
 
 export const tasteParametersApi = {
