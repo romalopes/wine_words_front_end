@@ -330,6 +330,12 @@ function Header() {
                 <NavLink to="/admin/logs" onClick={() => setAdminOpen(false)}>
                   Logs
                 </NavLink>
+                <NavLink
+                  to="/admin/configuration"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Configuration
+                </NavLink>
               </div>
             )}
           </div>

@@ -743,4 +743,18 @@ export const impersonationApi = {
   },
 };
 
+export const configurationApi = {
+  // Admin-only global configuration. Returns { logs_saved_to_database }.
+  fetch() {
+    return request("/configuration", { auth: true });
+  },
+  update(logsSavedToDatabase) {
+    return request("/configuration", {
+      method: "PATCH",
+      auth: true,
+      body: { logs_saved_to_database: logsSavedToDatabase },
+    });
+  },
+};
+
 export { API_BASE_URL };

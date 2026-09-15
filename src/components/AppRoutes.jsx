@@ -34,6 +34,7 @@ import Subscribe from "./Subscribe.jsx";
 import SubscriptionAdmin from "./SubscriptionAdmin.jsx";
 import Logs from "./Logs.jsx";
 import LogDetail from "./LogDetail.jsx";
+import Configuration from "./Configuration.jsx";
 
 function AppRoutes({ user, setUser }) {
   return (
@@ -82,6 +83,7 @@ function AppRoutes({ user, setUser }) {
         <Route element={<SubscriptionAdmin />} path="/subscriptions" />
         <Route element={<Logs />} path="/admin/logs" />
         <Route element={<LogDetail />} path="/admin/logs/:id" />
+        <Route element={<Configuration />} path="/admin/configuration" />
       </Routes>
     </>
   );
