@@ -161,6 +161,16 @@ function Subscribe() {
     };
   }, []);
 
+  // Self-heal: some auth paths (password-reset sign-in, impersonation) return a
+  // user payload without the billing fields, which would leave every paid-plan
+  // CTA disabled until a manual refresh. Fetch the full session once in that
+  // case (GET /me always includes them, so this cannot loop).
+  useEffect(() => {
+    if (user && user.can_manage_billing === undefined) {
+      refreshSession();
+    }
+  }, [user, refreshSession]);
+
   // Coming back from Stripe Checkout lands on
   // /subscribe?checkout=success&session_id=cs_... (or checkout=cancelled).
   // The plan is reconciled via POST /billing/confirm, which verifies the
@@ -239,14 +249,28 @@ function Subscribe() {
       setChangeBusy(true);
       setChangeError(null);
       try {
-        await billingApi.changeConfirm(targetId, newIdempotencyKey());
+        const result = await billingApi.changeConfirm(
+          targetId,
+          newIdempotencyKey(),
+        );
         const downgrade = changePreview.direction === "downgrade";
         const targetName = changePreview.target.name;
         setChangePreview(null);
+        // A charge that needs authentication (3DS/SCA) comes back as an open
+        // Stripe invoice: send the customer there to finish paying it.
+        if (result?.hosted_invoice_url) {
+          window.open(
+            result.hosted_invoice_url,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
         setChangeNotice(
           downgrade
             ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(changePreview.current_period_end)}. Your current plan stays active until then.`
-            : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
+            : result?.hosted_invoice_url
+              ? `💳 Almost there — complete the ${formatPrice(changePreview.due_today.amount_cents)} payment to activate ${targetName}.`
+              : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
         );
         await refreshSession();
         setTimeout(() => refreshSession(), 3000);
