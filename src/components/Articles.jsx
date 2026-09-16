@@ -396,6 +396,19 @@ function Articles() {
                 return acc;
               }, {});
 
+              // True per-category totals from the grouped API (the rendered
+              // cards are capped at 12 per group, so counts can't be derived
+              // from `grouped`).
+              const groupCounts =
+                effectiveScope === "mine" || selectedCategory
+                  ? null
+                  : Object.fromEntries(
+                      groups.map((g) => [
+                        g.category,
+                        g.count ?? (g.articles || []).length,
+                      ]),
+                    );
+
               // Sort categories: by admin-defined sort order, Uncategorised last
               const sortedCategories = sortCategoryNames(
                 Object.keys(grouped),
@@ -412,7 +425,7 @@ function Articles() {
                           className="group-show-all"
                           to={`/articles?category=${encodeURIComponent(category)}`}
                         >
-                          Show all ({grouped[category].length})
+                          Show all ({groupCounts?.[category] ?? grouped[category].length})
                         </Link>
                       </h2>
                       <div className="content-grid">
