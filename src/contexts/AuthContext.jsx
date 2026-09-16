@@ -115,6 +115,23 @@ export function AuthProvider({ children }) {
     [persistToken],
   );
 
+  // Social sign-in (Google/Apple/Microsoft/Facebook).
+  //
+  // The provider SDK hands back a credential in the browser; the API verifies
+  // it with the provider and returns the same { user: {...} } payload plus the
+  // same JWT as email/password sign-in. Nothing else in the app needs to know
+  // which method was used.
+  const socialSignIn = useCallback(
+    async (provider, { credential, nonce } = {}) => {
+      const result = await authApi.socialSignIn(provider, { credential, nonce });
+      const nextToken = extractToken(result);
+      persistToken(nextToken);
+      setUser(result.user ?? null);
+      return result.user;
+    },
+    [persistToken],
+  );
+
   const refreshSession = useCallback(async () => {
     try {
       const result = await authApi.me();
@@ -191,6 +208,7 @@ export function AuthProvider({ children }) {
       loading,
       signIn,
       signUp,
+      socialSignIn,
       resetPassword,
       refreshSession,
       signOut,
@@ -198,7 +216,7 @@ export function AuthProvider({ children }) {
       stopImpersonation,
       refreshImpersonationStatus,
     }),
-    [user, realUser, token, isImpersonating, loading, signIn, signUp, resetPassword, refreshSession, signOut, startImpersonation, stopImpersonation, refreshImpersonationStatus],
+    [user, realUser, token, isImpersonating, loading, signIn, signUp, socialSignIn, resetPassword, refreshSession, signOut, startImpersonation, stopImpersonation, refreshImpersonationStatus],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

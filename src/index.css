@@ -1040,7 +1040,8 @@ textarea {
 
 .auth-card__social-buttons {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .auth-card__social-btn {
@@ -1082,8 +1083,84 @@ textarea {
   border-color: #4285f4;
 }
 
+.auth-card__social-btn--apple:hover:not(:disabled) {
+  border-color: #111;
+}
+
+.auth-card__social-btn--microsoft:hover:not(:disabled) {
+  border-color: #00a4ef;
+}
+
+.auth-card__social-btn--facebook:hover:not(:disabled) {
+  border-color: #1877f2;
+}
+
 .auth-card__social-btn--github:hover:not(:disabled) {
   border-color: #241b19;
+}
+
+.auth-card__social-btn--apple:hover:not(:disabled) {
+  border-color: #241b19;
+}
+
+.auth-card__social-btn--microsoft:hover:not(:disabled) {
+  border-color: #2f6fd0;
+}
+
+.auth-card__social-btn--facebook:hover:not(:disabled) {
+  border-color: #1877f2;
+}
+
+/* Connected sign-in methods (Account settings) */
+.account-identities {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.account-identity {
+  align-items: center;
+  border-bottom: 1px solid #e4d9cd;
+  display: grid;
+  gap: 4px 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 12px 0;
+}
+
+.account-identity:first-child {
+  border-top: 1px solid #e4d9cd;
+}
+
+.account-identity__label {
+  font-weight: 700;
+}
+
+.account-identity__meta {
+  color: #5d514b;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-identity__action {
+  background: none;
+  border: 1px solid #d7c8bb;
+  border-radius: 8px;
+  color: #8a2238;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 12px;
+}
+
+.account-identity__action:hover:not(:disabled) {
+  border-color: #8a2238;
+}
+
+.account-identity__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* ===== Wine Management Styles ===== */

@@ -126,6 +126,36 @@ export const authApi = {
   me() {
     return request("/me", { auth: true });
   },
+
+  // Social sign-in. `credential` is whatever the provider SDK issued (a
+  // Google/Microsoft ID token, an Apple identity token, a Facebook access
+  // token) — never an email or user id, which the backend would not trust.
+  // The response is the same { user: {...} } payload as signIn/signUp, with
+  // the JWT in the Authorization header.
+  socialSignIn(provider, { credential, nonce } = {}) {
+    return request(`/auth/${provider}`, {
+      method: "POST",
+      body: { credential, nonce },
+    });
+  },
+};
+
+// Connected authentication methods for the signed-in user (Account settings):
+// list, connect an additional provider, and disconnect one.
+export const identitiesApi = {
+  list() {
+    return request("/auth/identities", { auth: true });
+  },
+  connect(provider, { credential, nonce } = {}) {
+    return request(`/auth/identities/${provider}`, {
+      method: "POST",
+      auth: true,
+      body: { credential, nonce },
+    });
+  },
+  disconnect(id) {
+    return request(`/auth/identities/${id}`, { method: "DELETE", auth: true });
+  },
 };
 
 export const imagesApi = {

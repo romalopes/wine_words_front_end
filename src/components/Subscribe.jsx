@@ -35,13 +35,7 @@ function newIdempotencyKey() {
 // One card renders every kind of plan — free and paid are just different rows
 // of the same list. The small visual differences (price line, badge, CTA) are
 // derived from the plan itself.
-function PlanCard({
-  plan,
-  isCurrent,
-  onChoose,
-  onManage,
-  loadingPlanId,
-}) {
+function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
   const isFree =
     plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
   const yearly = formatPrice(plan.yearly_price_cents);
@@ -115,7 +109,7 @@ function PlanCard({
           : isFree
             ? isCurrent
               ? "Current plan"
-              : "Coming soon"
+              : "Login to choose"
             : isCurrent
               ? onManage
                 ? "Manage subscription"
@@ -242,47 +236,40 @@ function Subscribe() {
     [currentPlan],
   );
 
-  const handleChangeConfirm = useCallback(
-    async () => {
-      const targetId = changePreview?.target?.id;
-      if (!targetId) return;
-      setChangeBusy(true);
-      setChangeError(null);
-      try {
-        const result = await billingApi.changeConfirm(
-          targetId,
-          newIdempotencyKey(),
-        );
-        const downgrade = changePreview.direction === "downgrade";
-        const targetName = changePreview.target.name;
-        setChangePreview(null);
-        // A charge that needs authentication (3DS/SCA) comes back as an open
-        // Stripe invoice: send the customer there to finish paying it.
-        if (result?.hosted_invoice_url) {
-          window.open(
-            result.hosted_invoice_url,
-            "_blank",
-            "noopener,noreferrer",
-          );
-        }
-        setChangeNotice(
-          downgrade
-            ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(changePreview.current_period_end)}. Your current plan stays active until then.`
-            : result?.hosted_invoice_url
-              ? `💳 Almost there — complete the ${formatPrice(changePreview.due_today.amount_cents)} payment to activate ${targetName}.`
-              : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
-        );
-        await refreshSession();
-        setTimeout(() => refreshSession(), 3000);
-      } catch (err) {
-        setChangeError(err.message || "Could not confirm the change.");
-      } finally {
-        setChangeBusy(false);
-        setLoadingPlanId(null);
+  const handleChangeConfirm = useCallback(async () => {
+    const targetId = changePreview?.target?.id;
+    if (!targetId) return;
+    setChangeBusy(true);
+    setChangeError(null);
+    try {
+      const result = await billingApi.changeConfirm(
+        targetId,
+        newIdempotencyKey(),
+      );
+      const downgrade = changePreview.direction === "downgrade";
+      const targetName = changePreview.target.name;
+      setChangePreview(null);
+      // A charge that needs authentication (3DS/SCA) comes back as an open
+      // Stripe invoice: send the customer there to finish paying it.
+      if (result?.hosted_invoice_url) {
+        window.open(result.hosted_invoice_url, "_blank", "noopener,noreferrer");
       }
-    },
-    [changePreview, refreshSession],
-  );
+      setChangeNotice(
+        downgrade
+          ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(changePreview.current_period_end)}. Your current plan stays active until then.`
+          : result?.hosted_invoice_url
+            ? `💳 Almost there — complete the ${formatPrice(changePreview.due_today.amount_cents)} payment to activate ${targetName}.`
+            : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
+      );
+      await refreshSession();
+      setTimeout(() => refreshSession(), 3000);
+    } catch (err) {
+      setChangeError(err.message || "Could not confirm the change.");
+    } finally {
+      setChangeBusy(false);
+      setLoadingPlanId(null);
+    }
+  }, [changePreview, refreshSession]);
 
   const handleCancelChange = useCallback(() => {
     setChangePreview(null);
@@ -345,17 +332,17 @@ function Subscribe() {
         </p>
       )}
       {user?.subscription_change?.change_type === "downgrade" &&
-      user?.subscription_change?.status === "scheduled" && (
-        <p
-          className="review-card__comment"
-          style={{ fontWeight: 600, border: "1px solid #7f4f24", padding: 8 }}
-        >
-          ✅ Downgrade scheduled — you'll move to{" "}
-          {user.subscription_change.to_subscription?.name} on{" "}
-          {formatDate(user.subscription_change.effective_at)}. Your current
-          plan stays active until then.
-        </p>
-      )}
+        user?.subscription_change?.status === "scheduled" && (
+          <p
+            className="review-card__comment"
+            style={{ fontWeight: 600, border: "1px solid #7f4f24", padding: 8 }}
+          >
+            ✅ Downgrade scheduled — you'll move to{" "}
+            {user.subscription_change.to_subscription?.name} on{" "}
+            {formatDate(user.subscription_change.effective_at)}. Your current
+            plan stays active until then.
+          </p>
+        )}
 
       {!loading && !error && (
         <div
@@ -422,14 +409,20 @@ function Subscribe() {
             <p className="review-card__comment">
               Current plan: <strong>{changePreview.current.name}</strong>
               {changePreview.direction === "downgrade" && (
-                <span> — stays active until {formatDate(changePreview.current_period_end)}</span>
+                <span>
+                  {" "}
+                  — stays active until{" "}
+                  {formatDate(changePreview.current_period_end)}
+                </span>
               )}
             </p>
             <ul style={{ padding: 0, margin: "16px 0", listStyle: "none" }}>
               {changePreview.direction === "upgrade" && (
                 <li>
                   Amount due today:{" "}
-                  <strong>{formatPrice(changePreview.due_today.amount_cents)}</strong>
+                  <strong>
+                    {formatPrice(changePreview.due_today.amount_cents)}
+                  </strong>
                 </li>
               )}
               <li>
@@ -440,7 +433,9 @@ function Subscribe() {
                 on {formatDate(changePreview.current_period_end)}
               </li>
               {changePreview.direction === "downgrade" && (
-                <li>Amount due today: <strong>$0</strong></li>
+                <li>
+                  Amount due today: <strong>$0</strong>
+                </li>
               )}
             </ul>
             {changeError && (

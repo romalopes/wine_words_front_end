@@ -420,7 +420,9 @@ function Articles() {
                           <div
                             key={article.id}
                             className="wine-management__card"
-                            onClick={() => navigate(`/articles/${article.slug}`)}
+                            onClick={() =>
+                              navigate(`/articles/${article.slug}`)
+                            }
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => {

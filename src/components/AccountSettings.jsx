@@ -1,6 +1,12 @@
-import { useEffect, useState } from "react";
-import { accountApi, countriesApi } from "../services/api";
+import { useCallback, useEffect, useState } from "react";
+import { accountApi, countriesApi, identitiesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
+import {
+  PROVIDER_LABELS,
+  ProviderCancelledError,
+  availableProviders,
+  signInWith,
+} from "../services/socialProviders";
 
 const emptyAccount = {
   user_name: "",
@@ -69,6 +75,14 @@ export default function AccountSettings() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordNotice, setPasswordNotice] = useState(null);
   const [passwordError, setPasswordError] = useState(null);
+  // Connected sign-in methods (Google / Apple / Microsoft / Facebook).
+  const [identities, setIdentities] = useState([]);
+  const [passwordAuthentication, setPasswordAuthentication] = useState(true);
+  const [identitiesLoading, setIdentitiesLoading] = useState(true);
+  const [identitiesNotice, setIdentitiesNotice] = useState(null);
+  const [identitiesError, setIdentitiesError] = useState(null);
+  const [connectingProvider, setConnectingProvider] = useState(null);
+  const [disconnectingId, setDisconnectingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +115,24 @@ export default function AccountSettings() {
       cancelled = true;
     };
   }, []);
+
+  const loadIdentities = useCallback(async () => {
+    setIdentitiesLoading(true);
+    setIdentitiesError(null);
+    try {
+      const data = await identitiesApi.list();
+      setIdentities(Array.isArray(data?.identities) ? data.identities : []);
+      setPasswordAuthentication(data?.password_authentication !== false);
+    } catch (err) {
+      setIdentitiesError(err.message || "Failed to load sign-in methods.");
+    } finally {
+      setIdentitiesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadIdentities();
+  }, [loadIdentities]);
 
   function setField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -154,6 +186,52 @@ export default function AccountSettings() {
       setSavingPassword(false);
     }
   }
+
+  // Runs the provider popup and hands the resulting credential to the API.
+  // The frontend never asserts who the user is — the backend verifies it.
+  async function handleConnect(provider) {
+    setConnectingProvider(provider);
+    setIdentitiesNotice(null);
+    setIdentitiesError(null);
+    try {
+      const { credential, nonce } = await signInWith(provider);
+      await identitiesApi.connect(provider, { credential, nonce });
+      setIdentitiesNotice(`${PROVIDER_LABELS[provider] || provider} connected.`);
+      await loadIdentities();
+    } catch (err) {
+      // Dismissing the provider popup is not an error worth showing.
+      if (err instanceof ProviderCancelledError) return;
+      setIdentitiesError(
+        err.message || `Could not connect ${PROVIDER_LABELS[provider] || provider}.`
+      );
+    } finally {
+      setConnectingProvider(null);
+    }
+  }
+
+  async function handleDisconnect(identity) {
+    setDisconnectingId(identity.id);
+    setIdentitiesNotice(null);
+    setIdentitiesError(null);
+    try {
+      await identitiesApi.disconnect(identity.id);
+      setIdentitiesNotice(
+        `${PROVIDER_LABELS[identity.provider] || identity.provider} disconnected.`
+      );
+      await loadIdentities();
+    } catch (err) {
+      // The API refuses to remove the last remaining sign-in method.
+      setIdentitiesError(err.message || "Could not disconnect that sign-in method.");
+    } finally {
+      setDisconnectingId(null);
+    }
+  }
+
+  // Providers this deployment exposes that are not connected yet.
+  const connectedProviders = identities.map((identity) => identity.provider);
+  const connectable = availableProviders().filter(
+    (provider) => !connectedProviders.includes(provider)
+  );
 
   return (
     <main className="wine-app">
@@ -345,6 +423,81 @@ export default function AccountSettings() {
                 {savingPassword ? "Updating…" : "Change password"}
               </button>
             </form>
+          </section>
+
+          <section className="account-card">
+            <div className="auth-form account-security-form">
+              <h2 className="account-card__title">Sign-in methods</h2>
+              <p className="account-card__lede">
+                Use a social account as well as your password. Connecting a
+                provider never changes your plan or your permissions.
+              </p>
+
+              {identitiesNotice && (
+                <p className="review-form__success">{identitiesNotice}</p>
+              )}
+              {identitiesError && (
+                <p className="review-form__error">{identitiesError}</p>
+              )}
+
+              {identitiesLoading ? (
+                <p className="wine-management__loading">Loading sign-in methods…</p>
+              ) : (
+                <>
+                  <ul className="account-identities">
+                    {passwordAuthentication && (
+                      <li className="account-identity">
+                        <span className="account-identity__label">
+                          Email &amp; password
+                        </span>
+                        <span className="account-identity__meta">Connected</span>
+                      </li>
+                    )}
+                    {identities.map((identity) => (
+                      <li className="account-identity" key={identity.id}>
+                        <span className="account-identity__label">
+                          {PROVIDER_LABELS[identity.provider] || identity.provider}
+                        </span>
+                        <span className="account-identity__meta">
+                          {identity.email || "Connected"}
+                        </span>
+                        <button
+                          type="button"
+                          className="account-identity__action"
+                          onClick={() => handleDisconnect(identity)}
+                          disabled={disconnectingId === identity.id}
+                        >
+                          {disconnectingId === identity.id
+                            ? "Disconnecting…"
+                            : "Disconnect"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {connectable.length > 0 && (
+                    <>
+                      <h3 className="account-section-title">Connect another</h3>
+                      <div className="auth-card__social-buttons">
+                        {connectable.map((provider) => (
+                          <button
+                            key={provider}
+                            type="button"
+                            className={`auth-card__social-btn auth-card__social-btn--${provider}`}
+                            onClick={() => handleConnect(provider)}
+                            disabled={connectingProvider !== null}
+                          >
+                            {connectingProvider === provider
+                              ? `Connecting ${PROVIDER_LABELS[provider]}…`
+                              : `Connect ${PROVIDER_LABELS[provider]}`}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </section>
         </div>
       )}
