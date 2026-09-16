@@ -27,6 +27,9 @@ function Articles() {
   const categoryOrder = useCategoryOrder("sort_order_article");
   const selectedCategory = useSelectedCategory();
   const [myArticles, setMyArticles] = useState([]);
+  // False until the first load of "my articles" completes (avoids flashing
+  // the "You haven't written any articles yet." empty state while loading).
+  const [mineLoaded, setMineLoaded] = useState(false);
   // Category name -> id map for resolving ?category= to category_id
   const [categoryNameToId, setCategoryNameToId] = useState({});
 
@@ -101,13 +104,18 @@ function Articles() {
       setMyArticles(Array.isArray(data) ? data : []);
     } catch {
       setMyArticles([]);
+    } finally {
+      setMineLoaded(true);
     }
   }, []);
 
   useEffect(() => {
     reloadArticles();
     if (user) loadMyArticles();
-    else setMyArticles([]);
+    else {
+      setMyArticles([]);
+      setMineLoaded(true);
+    }
   }, [user, selectedCategory]);
 
   function canManage(article) {
@@ -172,7 +180,7 @@ function Articles() {
       )}
 
       {!showForm &&
-        (loading ? (
+        (loading || loadingGroups ? (
           <p className="wine-management__loading">Loading articles…</p>
         ) : (
           <>
@@ -275,6 +283,11 @@ function Articles() {
                   <p className="wine-management__empty-state">
                     Sign in to see your articles.
                   </p>
+                );
+              }
+              if (effectiveScope === "mine" && !mineLoaded) {
+                return (
+                  <p className="wine-management__loading">Loading articles…</p>
                 );
               }
               if (deduped.length === 0) {

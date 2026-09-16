@@ -50,6 +50,9 @@ function Reviews() {
   // add button; Guests/Readers only see published reviews.
   const canManageContent = canManageWinesRole(user);
   const [myReviews, setMyReviews] = useState([]);
+  // False until the first load of "my reviews" completes (avoids flashing
+  // the "You haven't written any reviews yet." empty state while loading).
+  const [mineLoaded, setMineLoaded] = useState(false);
   const selectedCategory = useSelectedCategory();
   // Category name -> id map for resolving ?category= to category_id
   const [categoryNameToId, setCategoryNameToId] = useState({});
@@ -143,13 +146,18 @@ function Reviews() {
       setMyReviews(Array.isArray(data) ? data : []);
     } catch {
       setMyReviews([]);
+    } finally {
+      setMineLoaded(true);
     }
   }
 
   useEffect(() => {
     reloadReviews();
     if (user) loadMyReviews();
-    else setMyReviews([]);
+    else {
+      setMyReviews([]);
+      setMineLoaded(true);
+    }
   }, [user, selectedCategory]);
 
   function canManage(review) {
@@ -521,7 +529,7 @@ function Reviews() {
       )}
 
       {!showForm &&
-        (loading ? (
+        (loading || loadingGroups ? (
           <p className="wine-management__loading">Loading reviews…</p>
         ) : (
           <>
@@ -588,6 +596,7 @@ function Reviews() {
 
             <ReviewsList
               reviews={scope === "mine" ? myReviews : (selectedCategory ? feed.items : groups.flatMap((g) => g.reviews || []))}
+              mineLoading={!mineLoaded}
               groupCounts={
                 scope === "mine" || selectedCategory
                   ? null
@@ -630,6 +639,7 @@ function Reviews() {
 function ReviewsList({
   reviews,
   groupCounts,
+  mineLoading,
   scope,
   user,
   statusFilter,
@@ -697,6 +707,9 @@ function ReviewsList({
     );
   }
   if (deduped.length === 0) {
+    if (scope === "mine" && mineLoading) {
+      return <p className="wine-management__loading">Loading reviews…</p>;
+    }
     return (
       <p className="wine-management__empty-state">
         {reviews.length === 0
