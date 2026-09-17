@@ -44,9 +44,15 @@ export function AuthProvider({ children }) {
             // Ignore — impersonation status is best-effort on restore.
           }
         }
-      } catch {
-        window.localStorage.removeItem(STORAGE_TOKEN_KEY);
-        setToken(null);
+      } catch (error) {
+        // Only discard the stored token when the API explicitly says it is
+        // invalid (401). A 500 / network / DB failure is transient — wiping it
+        // here silently signs the admin out and strips the Authorization header
+        // from the API-health checks even though the session is still valid.
+        if (error?.status === 401) {
+          window.localStorage.removeItem(STORAGE_TOKEN_KEY);
+          setToken(null);
+        }
         if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setLoading(false);

@@ -10,8 +10,9 @@ import {
   runWriteFlow,
 } from "../../services/apiHealth/healthRunner.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
+import { getAuthToken } from "../../services/api.js";
 import { isAdmin } from "../../constants/roles.js";
-import { BACK_END_VERSION } from "../../constants/versions.js";
+import { APP_VERSION } from "../../constants/versions.js";
 import ResponseInspector from "./components/ResponseInspector.jsx";
 import WriteSandbox from "./components/WriteSandbox.jsx";
 
@@ -159,7 +160,7 @@ function InfrastructurePanel({ detailed }) {
 }
 
 export default function ApiHealth() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const isAdminUser = isAdmin(user);
 
   const [results, setResults] = useState({});
@@ -192,8 +193,6 @@ export default function ApiHealth() {
       </main>
     );
   }
-
-  const getAuthToken = () => token || null;
 
   async function runSingle(check) {
     setRunning((prev) => ({ ...prev, [check.id]: true }));
@@ -270,7 +269,7 @@ export default function ApiHealth() {
   const detailed = results["system-detailed"];
   const backendVersion = detailed?.payload?.version;
   const versionMatched = backendVersion
-    ? backendVersion === BACK_END_VERSION
+    ? backendVersion === APP_VERSION
     : null;
   return (
     <main className={styles.container}>
@@ -279,7 +278,7 @@ export default function ApiHealth() {
           <h1 className={styles.headerTitle}>API Health &amp; Diagnostics</h1>
           <p className={styles.headerMeta}>
             {API_CHECKS.length} checks configured · backend{" "}
-            <code>{BACK_END_VERSION}</code> · {new Date().toLocaleString()}
+            <code>{backendVersion ?? "…"}&nbsp;</code> · {new Date().toLocaleString()}
           </p>
         </div>
         <div className={styles.toolbar}>
@@ -300,7 +299,7 @@ export default function ApiHealth() {
         >
           {versionMatched
             ? `✓ Version match: backend ${backendVersion}`
-            : `⚠ Version mismatch: backend reports ${backendVersion} but frontend expects ${BACK_END_VERSION}`}
+            : `⚠ Version mismatch: backend reports ${backendVersion} but frontend expects ${APP_VERSION}`}
         </div>
       )}
 

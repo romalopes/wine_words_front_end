@@ -21,6 +21,15 @@ if (typeof window !== "undefined") {
   authToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
+// Raw bearer token for callers that manage their own fetch (e.g. the API-health
+// runner). Read straight from storage — the single source of truth — rather
+// than from React state, so a health check always uses the token that is
+// actually persisted.
+export function getAuthToken() {
+  if (typeof window === "undefined") return authToken;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
 // Serialize a params object into a "?a=1&b=2" query string, skipping
 // undefined/null/empty values.
 function buildQuery(params) {
