@@ -5,6 +5,7 @@ import { authApi } from "../services/api";
 import {
   PROVIDER_LABELS,
   ProviderCancelledError,
+  ProviderConfigurationError,
   ProviderUnavailableError,
   availableProviders,
   signInWith,
@@ -162,8 +163,13 @@ function Login() {
       await socialSignIn(provider, { credential, nonce });
       navigate("/wines", { replace: true });
     } catch (error) {
-      // Closing the popup is a normal thing to do, not a failure.
-      if (!(error instanceof ProviderCancelledError)) {
+      // Closing the popup is a normal thing to do, not a failure. A
+      // misconfigured provider (e.g. an unauthorised Google origin) IS a
+      // failure worth showing, with the actionable detail attached.
+      if (error instanceof ProviderConfigurationError) {
+        console.error(error);
+        setFormError(error.message);
+      } else if (!(error instanceof ProviderCancelledError)) {
         console.error(error);
         setFormError(
           error instanceof ProviderUnavailableError

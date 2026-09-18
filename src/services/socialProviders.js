@@ -31,6 +31,18 @@ export class ProviderUnavailableError extends Error {
   }
 }
 
+// The provider itself refused to run — almost always a dashboard
+// configuration problem (origin/client ID), not something the person using the
+// app can fix. Surfaced to the UI, unlike a cancelled popup.
+export class ProviderConfigurationError extends Error {
+  constructor(provider, detail) {
+    super(`${provider} sign-in isn't available on this address. ${detail}`);
+    this.name = "ProviderConfigurationError";
+    this.provider = provider;
+    this.detail = detail;
+  }
+}
+
 // The person closed the provider popup without finishing, or the provider
 // declined the request. Not an error worth showing as a failure.
 export class ProviderCancelledError extends Error {
@@ -49,7 +61,8 @@ const publicConfig = {
   }),
   apple: () => ({
     clientId: import.meta.env.VITE_APPLE_CLIENT_ID,
-    redirectURI: import.meta.env.VITE_APPLE_REDIRECT_URI || window.location.origin,
+    redirectURI:
+      import.meta.env.VITE_APPLE_REDIRECT_URI || window.location.origin,
   }),
   microsoft: () => ({
     clientId: import.meta.env.VITE_MICROSOFT_CLIENT_ID,
@@ -176,6 +189,24 @@ async function sha256Hex(value) {
 // verifies the signature against Google's JWKS and re-checks issuer, audience,
 // expiry and the email_verified claim. The email shown in the browser is never
 // treated as proof of anything.
+// GSI's `getNotDisplayedReason()` values that mean the *client configuration*
+// is wrong (checked before any account chooser appears). Everything else —
+// `browser_not_supported`, `suppressed_by_user`, `opt_out_or_no_session`, … —
+// is an environment/personal choice, not a bug in our setup.
+const GOOGLE_CONFIG_ERRORS = {
+  unregistered_origin:
+    "The page's address isn't authorised for this Google client ID — add " +
+    "it under 'Authorized JavaScript origins' in Google Cloud Console " +
+    "(exact scheme + host + port, no trailing slash). Changes can take a " +
+    "few hours to propagate.",
+  invalid_client:
+    "The Google client ID is invalid or its OAuth client was deleted — " +
+    "check VITE_GOOGLE_CLIENT_ID and the Google Cloud credentials page.",
+  missing_client_id:
+    "No Google client ID was passed to the sign-in prompt — check " +
+    "VITE_GOOGLE_CLIENT_ID and restart the dev server.",
+};
+
 export async function signInWithGoogle() {
   const config = publicConfig.google();
   const clientId = requireClientId("Google", config.clientId);
@@ -185,6 +216,12 @@ export async function signInWithGoogle() {
 
   return new Promise((resolve, reject) => {
     let settled = false;
+
+    console.log("Google OAuth configuration:", {
+      origin: window.location.origin,
+      clientId,
+      mode: import.meta.env.MODE,
+    });
 
     google.accounts.id.initialize({
       client_id: clientId,
@@ -203,8 +240,28 @@ export async function signInWithGoogle() {
     google.accounts.id.prompt((notification) => {
       // The person dismissed One Tap without choosing an account.
       if (settled) return;
+      if (notification?.isNotDisplayed?.()) {
+        // The prompt never showed. Distinguish "user did nothing" from
+        // "our Google Cloud client is misconfigured" — the latter must be
+        // visible, the former must be silent (a 403 from
+        // accounts.google.com/gsi/ plus `unregistered_origin` is exactly the
+        // "origin not allowed for the given client ID" console error).
+        const reason = notification.getNotDisplayedReason?.();
+        if (GOOGLE_CONFIG_ERRORS[reason]) {
+          settled = true;
+          reject(
+            new ProviderConfigurationError(
+              "Google",
+              GOOGLE_CONFIG_ERRORS[reason],
+            ),
+          );
+        } else {
+          settled = true;
+          reject(new ProviderCancelledError("Google"));
+        }
+        return;
+      }
       if (
-        notification?.isNotDisplayed?.() ||
         notification?.isSkippedMoment?.() ||
         notification?.isDismissedMoment?.()
       ) {
@@ -289,7 +346,8 @@ async function microsoftClient() {
 
   await loadScript(MICROSOFT_SDK_URL);
   const msal = await waitForGlobal("msal");
-  if (!msal?.PublicClientApplication) throw new ProviderUnavailableError("Microsoft");
+  if (!msal?.PublicClientApplication)
+    throw new ProviderUnavailableError("Microsoft");
 
   if (!msalInstance || msalClientId !== clientId) {
     msalInstance = new msal.PublicClientApplication({
