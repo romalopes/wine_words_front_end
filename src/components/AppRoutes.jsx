@@ -35,6 +35,10 @@ import SubscriptionAdmin from "./SubscriptionAdmin.jsx";
 import Logs from "./Logs.jsx";
 import LogDetail from "./LogDetail.jsx";
 import Configuration from "./Configuration.jsx";
+import WinePackages from "./WinePackages.jsx";
+import WinePackageDetail from "./WinePackageDetail.jsx";
+import WinePackageForm from "./WinePackageForm.jsx";
+import Notifications from "./Notifications.jsx";
 
 function AppRoutes({ user, setUser }) {
   return (
@@ -84,6 +88,11 @@ function AppRoutes({ user, setUser }) {
         <Route element={<Logs />} path="/admin/logs" />
         <Route element={<LogDetail />} path="/admin/logs/:id" />
         <Route element={<Configuration />} path="/admin/configuration" />
+        <Route element={<WinePackages />} path="/wine-packages" />
+        <Route element={<WinePackageForm />} path="/wine-packages/new" />
+        <Route element={<WinePackageDetail />} path="/wine-packages/:id" />
+        <Route element={<WinePackageForm />} path="/wine-packages/:id/edit" />
+        <Route element={<Notifications />} path="/notifications" />
       </Routes>
     </>
   );

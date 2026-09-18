@@ -3380,3 +3380,23 @@ textarea {
 }
 
 
+/* --- Wine package notifications ----------------------------------------- */
+/* Unread reminder count in the header. */
+.notification-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.notification-bell__count {
+  display: inline-block;
+  min-width: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #b23a3a;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.35rem;
+  text-align: center;
+}

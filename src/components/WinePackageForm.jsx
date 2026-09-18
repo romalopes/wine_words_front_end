@@ -1,0 +1,353 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { producersApi, usersApi, winePackagesApi } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { isAdmin } from "../constants/roles";
+import { sourceLabel } from "../constants/winePackages";
+import { todayInputValue } from "../utils/dates";
+import styles from "./winePackages.module.css";
+
+// The four ways a package enters the workflow. `status` is the entry point the
+// backend expects; the rest is presentation copy.
+const MODES = {
+  arrived: {
+    title: "Record Received Package",
+    help: "Wines that have physically arrived. The review deadline defaults to one month from today.",
+    status: "arrived",
+    source: "unexpected",
+  },
+  announced: {
+    title: "Add Expected Package",
+    help: "Wines a producer says are on their way. Add tracking later from the package page.",
+    status: "announced",
+    source: "manual",
+  },
+  requested: {
+    title: "Add Producer Request",
+    help: "A producer has asked Wine Words to review these wines.",
+    status: "requested",
+    source: "producer_request",
+  },
+  draft: {
+    title: "New Wine Package",
+    help: "Start with the basics and pick the workflow up later.",
+    status: "draft",
+    source: "manual",
+  },
+};
+
+// Create / edit a wine package.
+//
+// On create the entry mode decides the starting status — "arrived" both starts
+// the review clock and schedules the deadline reminders on the backend. On edit
+// the status and source are intentionally not editable: they belong to the
+// workflow actions on the detail page.
+function WinePackageForm() {
+  const { id } = useParams();
+  const editing = Boolean(id);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  // users#search is admin-only, so the reviewer field is only offered to admins.
+  const canPickReviewer = isAdmin(user);
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get("mode");
+
+  const [mode, setMode] = useState(MODES[requestedMode] ? requestedMode : "draft");
+  const [producers, setProducers] = useState([]);
+  const [form, setForm] = useState({
+    producer_id: "",
+    source: MODES[requestedMode]?.source || "manual",
+    expected_at: "",
+    arrived_at: requestedMode === "arrived" ? todayInputValue() : "",
+    review_deadline: "",
+    notes: "",
+  });
+  const [reviewerId, setReviewerId] = useState("");
+  const [reviewerResults, setReviewerResults] = useState([]);
+  const [loading, setLoading] = useState(editing);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    producersApi
+      .list()
+      .then((data) => setProducers(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!editing) return undefined;
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const pkg = await winePackagesApi.show(id);
+        if (cancelled) return;
+        setReviewerId(pkg.reviewer_id || "");
+        setForm({
+          producer_id: pkg.producer_id || "",
+          source: pkg.source || "manual",
+          expected_at: pkg.expected_at || "",
+          arrived_at: pkg.arrived_at ? pkg.arrived_at.slice(0, 10) : "",
+          review_deadline: pkg.review_deadline || "",
+          notes: pkg.notes || "",
+        });
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load wine package");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [editing, id]);
+
+  function updateField(key, value) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  // Switching entry mode also switches the default source, mirroring the
+  // backend's notion of where the package came from.
+  function chooseMode(next) {
+    setMode(next);
+    updateField("source", MODES[next].source);
+  }
+
+  async function searchReviewers() {
+    try {
+      const data = await usersApi.search("");
+      setReviewerResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || "Could not search users");
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const payload = {
+        producer_id: Number(form.producer_id),
+        notes: form.notes,
+      };
+
+      if (editing) {
+        payload.expected_at = form.expected_at || null;
+        payload.arrived_at = form.arrived_at || null;
+        payload.review_deadline = form.review_deadline || null;
+        if (canPickReviewer && reviewerId) payload.reviewer_id = Number(reviewerId);
+        await winePackagesApi.update(id, payload);
+        navigate(`/wine-packages/${id}`);
+        return;
+      }
+
+      payload.source = form.source;
+      payload.status = MODES[mode].status;
+      if (form.expected_at) payload.expected_at = form.expected_at;
+      if (mode === "arrived") {
+        payload.arrived_at = form.arrived_at || todayInputValue();
+        if (form.review_deadline) payload.review_deadline = form.review_deadline;
+      }
+
+      const created = await winePackagesApi.create(payload);
+      navigate(`/wine-packages/${created.id}`);
+    } catch (err) {
+      setError(err.message || "Failed to save wine package");
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="wine-app">
+        <p className="wine-management__loading">Loading wine package…</p>
+      </div>
+    );
+  }
+
+  const modeConfig = MODES[mode];
+
+  return (
+    <div className="wine-app">
+      <Link
+        to={editing ? `/wine-packages/${id}` : "/wine-packages"}
+        className="wine-detail__back"
+      >
+        &larr; Back to Wine Packages
+      </Link>
+
+      <div className={styles.header}>
+        <div>
+          <p className="wine-kicker">Cellar</p>
+          <h1>{editing ? `Edit Package #${id}` : modeConfig.title}</h1>
+          <p className={styles.cellMuted}>{modeConfig.help}</p>
+        </div>
+      </div>
+
+      {error && <p className="wine-management__error">{error}</p>}
+
+      <form onSubmit={handleSubmit}>
+        {!editing && (
+          <fieldset className={styles.filters}>
+            <legend className="visually-hidden">What do these wines represent?</legend>
+            {Object.entries(MODES).map(([key, config]) => (
+              <label key={key} className={styles.checkboxField}>
+                <input
+                  type="radio"
+                  name="package-entry-mode"
+                  value={key}
+                  checked={mode === key}
+                  onChange={() => chooseMode(key)}
+                />
+                {config.title}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
+        <div className={styles.filters}>
+          <div className={styles.filterField}>
+            <label htmlFor="package-producer">Producer</label>
+            <select
+              id="package-producer"
+              required
+              value={form.producer_id}
+              onChange={(event) => updateField("producer_id", event.target.value)}
+            >
+              <option value="">Select a producer…</option>
+              {producers.map((producer) => (
+                <option key={producer.id} value={producer.id}>
+                  {producer.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {editing ? (
+            <div className={styles.filterField}>
+              <label>Source</label>
+              <span className={styles.cellMuted}>{sourceLabel(form.source)}</span>
+            </div>
+          ) : (
+            <div className={styles.filterField}>
+              <label htmlFor="package-source">Source</label>
+              <select
+                id="package-source"
+                value={form.source}
+                onChange={(event) => updateField("source", event.target.value)}
+              >
+                <option value="manual">Manual</option>
+                <option value="unexpected">Unexpected delivery</option>
+                <option value="producer_request">Producer request</option>
+                <option value="producer_announcement">Producer announcement</option>
+              </select>
+            </div>
+          )}
+
+          <div className={styles.filterField}>
+            <label htmlFor="package-expected">Expected date</label>
+            <input
+              id="package-expected"
+              type="date"
+              value={form.expected_at}
+              onChange={(event) => updateField("expected_at", event.target.value)}
+            />
+          </div>
+
+          {(editing || mode === "arrived") && (
+            <div className={styles.filterField}>
+              <label htmlFor="package-arrived">Arrived date</label>
+              <input
+                id="package-arrived"
+                type="date"
+                value={form.arrived_at}
+                onChange={(event) => updateField("arrived_at", event.target.value)}
+              />
+            </div>
+          )}
+
+          {(editing || mode === "arrived") && (
+            <div className={styles.filterField}>
+              <label htmlFor="package-deadline">Review deadline</label>
+              <input
+                id="package-deadline"
+                type="date"
+                value={form.review_deadline}
+                onChange={(event) => updateField("review_deadline", event.target.value)}
+              />
+              {!editing && (
+                <span className={styles.cellMuted}>Defaults to one month after arrival</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {editing && canPickReviewer && (
+          <div className={styles.filters}>
+            <div className={styles.filterField}>
+              <label htmlFor="package-reviewer">Reviewer (user id)</label>
+              <input
+                id="package-reviewer"
+                type="number"
+                min="1"
+                value={reviewerId}
+                onChange={(event) => setReviewerId(event.target.value)}
+              />
+            </div>
+            <button type="button" className={styles.actionButton} onClick={searchReviewers}>
+              Look up users
+            </button>
+            {reviewerResults.length > 0 && (
+              <div className={styles.filterField}>
+                <label htmlFor="package-reviewer-pick">Pick a reviewer</label>
+                <select
+                  id="package-reviewer-pick"
+                  value=""
+                  onChange={(event) => setReviewerId(event.target.value)}
+                >
+                  <option value="">Select…</option>
+                  {reviewerResults.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.user_name || candidate.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={styles.filters}>
+          <div className={styles.filterField} style={{ flex: "1 1 24rem" }}>
+            <label htmlFor="package-notes">Notes</label>
+            <textarea
+              id="package-notes"
+              rows="4"
+              value={form.notes}
+              onChange={(event) => updateField("notes", event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className={styles.inlineFormActions}>
+          <button type="submit" className="auth-form__submit" disabled={saving}>
+            {saving ? "Saving…" : editing ? "Save Changes" : "Create Package"}
+          </button>
+          <Link
+            to={editing ? `/wine-packages/${id}` : "/wine-packages"}
+            className={styles.actionButton}
+          >
+            Cancel
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export default WinePackageForm;

@@ -796,4 +796,171 @@ export const configurationApi = {
   },
 };
 
+// --- Wine packages: the reviewing workflow ---------------------------------
+//
+// A package is a producer shipment that a reviewer is responsible for. The
+// backend exposes CRUD plus explicit workflow actions (never a free-form status
+// write), so each action below maps to one route.
+export const winePackagesApi = {
+  // Paginated envelope when `page` is passed, a plain array otherwise.
+  list(params) {
+    const query = params ? buildQuery(params) : "";
+    return request(`/wine_packages${query}`, { auth: true });
+  },
+  show(id) {
+    return request(`/wine_packages/${id}`, { auth: true });
+  },
+  // `status` selects the entry point: "draft", "announced" (expected package),
+  // "requested" (producer asked for a review) or "arrived" (received today).
+  create(packageData) {
+    return request("/wine_packages", {
+      method: "POST",
+      auth: true,
+      body: { wine_package: packageData },
+    });
+  },
+  // Status and source are workflow-owned and cannot be written here.
+  update(id, packageData) {
+    return request(`/wine_packages/${id}`, {
+      method: "PATCH",
+      auth: true,
+      body: { wine_package: packageData },
+    });
+  },
+  destroy(id) {
+    return request(`/wine_packages/${id}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+  // Arrival starts the review clock (arrived + 1 calendar month) and schedules
+  // the deadline reminders. `params` may carry arrived_at / review_deadline.
+  markArrived(id, params = {}) {
+    return request(`/wine_packages/${id}/mark_arrived`, {
+      method: "POST",
+      auth: true,
+      body: params,
+    });
+  },
+  markInTransit(id) {
+    return request(`/wine_packages/${id}/mark_in_transit`, {
+      method: "POST",
+      auth: true,
+    });
+  },
+  // Deliberate completion, even with reviews still outstanding.
+  markCompleted(id, params = {}) {
+    return request(`/wine_packages/${id}/mark_completed`, {
+      method: "POST",
+      auth: true,
+      body: params,
+    });
+  },
+  reopen(id) {
+    return request(`/wine_packages/${id}/reopen`, {
+      method: "POST",
+      auth: true,
+    });
+  },
+  cancel(id) {
+    return request(`/wine_packages/${id}/cancel`, {
+      method: "POST",
+      auth: true,
+    });
+  },
+  accept(id) {
+    return request(`/wine_packages/${id}/accept`, {
+      method: "POST",
+      auth: true,
+    });
+  },
+  reject(id, reason) {
+    return request(`/wine_packages/${id}/reject`, {
+      method: "POST",
+      auth: true,
+      body: { rejection_reason: reason },
+    });
+  },
+};
+
+// The wine lines inside a package. `review_requested` is what makes a line
+// block the package from completing.
+export const winePackageItemsApi = {
+  create(packageId, itemData) {
+    return request(`/wine_packages/${packageId}/items`, {
+      method: "POST",
+      auth: true,
+      body: { item: itemData },
+    });
+  },
+  update(packageId, itemId, itemData) {
+    return request(`/wine_packages/${packageId}/items/${itemId}`, {
+      method: "PATCH",
+      auth: true,
+      body: { item: itemData },
+    });
+  },
+  destroy(packageId, itemId) {
+    return request(`/wine_packages/${packageId}/items/${itemId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+  // Creates the review through the ordinary review path and links it to the
+  // line. Passing status: "published" creates and completes in one step.
+  createReview(packageId, itemId, reviewData) {
+    return request(
+      `/wine_packages/${packageId}/items/${itemId}/create_review`,
+      {
+        method: "POST",
+        auth: true,
+        body: { review: reviewData },
+      },
+    );
+  },
+};
+
+// Tracking is a singleton per package: read it, upsert it, refresh it from the
+// carrier provider the backend resolves from the carrier name.
+export const shipmentTrackingsApi = {
+  show(packageId) {
+    return request(`/wine_packages/${packageId}/shipment_tracking`, {
+      auth: true,
+    });
+  },
+  update(packageId, trackingData) {
+    return request(`/wine_packages/${packageId}/shipment_tracking`, {
+      method: "PATCH",
+      auth: true,
+      body: { shipment_tracking: trackingData },
+    });
+  },
+  refresh(packageId) {
+    return request(`/wine_packages/${packageId}/shipment_tracking/refresh`, {
+      method: "POST",
+      auth: true,
+    });
+  },
+};
+
+// The signed-in user's own notifications (review-deadline reminders).
+export const notificationsApi = {
+  list(params) {
+    const query = params ? buildQuery(params) : "";
+    return request(`/notifications${query}`, { auth: true });
+  },
+  markRead(id) {
+    return request(`/notifications/${id}/mark_read`, {
+      method: "PATCH",
+      auth: true,
+    });
+  },
+  markAllRead() {
+    return request("/notifications/mark_all_read", {
+      method: "PATCH",
+      auth: true,
+    });
+  },
+};
+
 export { API_BASE_URL };

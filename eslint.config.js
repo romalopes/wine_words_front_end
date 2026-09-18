@@ -30,4 +30,14 @@ export default [
       ],
     },
   },
+  {
+    // Test files run under Vitest with `globals: true` (see vite.config.js), so
+    // describe/it/expect/vi really are globals there. Declaring them keeps
+    // `npm run lint` meaningful for specs instead of reporting every helper as
+    // an undefined variable.
+    files: ['**/*.{test,spec}.{js,mjs,jsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.vitest },
+    },
+  },
 ]

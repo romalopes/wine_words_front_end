@@ -28,3 +28,16 @@ export function isAdmin(user) {
 export function canManageGrapes(user) {
   return user?.roles.some((role) => role === ROLES.ADMIN || role === ROLES.EDITOR) ?? false;
 }
+
+// Wine packages (receiving wines and reviewing them) are visible to content
+// managers and to the Reviewer role: the person who physically opens the box is
+// exactly who needs to record it. Reviewers only ever manage the packages they
+// are responsible for — the backend enforces that, this only gates the UI.
+const WINE_PACKAGE_ROLES = [...WINE_MANAGER_ROLES, ROLES.REVIEWER];
+
+export function canAccessPackages(user) {
+  return user?.roles.some((role) => WINE_PACKAGE_ROLES.includes(role)) ?? false;
+}
+
+// Whether the user may record a brand-new package (any package role).
+export const canCreatePackage = canAccessPackages;

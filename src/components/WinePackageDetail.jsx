@@ -1,0 +1,467 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { winePackageItemsApi, winePackagesApi } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { canManageWinesRole } from "../constants/roles";
+import { sourceLabel } from "../constants/winePackages";
+import { formatDate, formatDateTime, deadlineLabel } from "../utils/dates";
+import PackageStatusBadge from "./PackageStatusBadge";
+import WinePackageItemForm from "./WinePackageItemForm";
+import PackageReviewForm from "./PackageReviewForm";
+import ShipmentTrackingPanel from "./ShipmentTrackingPanel";
+import styles from "./winePackages.module.css";
+
+// One wine package: what arrived, who is responsible, how the reviews are
+// going, and the workflow actions available right now.
+//
+// Every action button comes from the `can` map the API returns, so the UI can
+// never offer a move the backend would reject. Completion is shown as automatic
+// or deliberate, because only automatic completions reopen by themselves.
+function WinePackageDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [pkg, setPkg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [reviewItemId, setReviewItemId] = useState(null);
+  const [showReject, setShowReject] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const data = await winePackagesApi.show(id);
+      setPkg(data);
+    } catch (err) {
+      setError(err.message || "Failed to load wine package");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Mirrors the backend's ownership rule: Admins/Editors manage everything a
+  // Reviewer only manages their own.
+  const canManage = Boolean(
+    pkg && (canManageWinesRole(user) || Number(pkg.reviewer_id) === Number(user?.id)),
+  );
+
+  async function runAction(action, options = {}) {
+    if (options.confirm && !window.confirm(options.confirm)) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await load();
+    } catch (err) {
+      setError(err.message || "That action could not be completed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Delete this wine package? This cannot be undone.")) return;
+
+    setBusy(true);
+    try {
+      await winePackagesApi.destroy(pkg.id);
+      navigate("/wine-packages");
+    } catch (err) {
+      setError(err.message || "Failed to delete wine package");
+      setBusy(false);
+    }
+  }
+
+  async function handleRemoveItem(item) {
+    if (!window.confirm(`Remove “${item.label}” from this package?`)) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await winePackageItemsApi.destroy(pkg.id, item.id);
+      await load();
+    } catch (err) {
+      setError(err.message || "Failed to remove this wine line");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="wine-app">
+        <p className="wine-management__loading">Loading wine package…</p>
+      </div>
+    );
+  }
+
+  if (error && !pkg) {
+    return (
+      <div className="wine-app">
+        <p className="wine-management__error">{error}</p>
+        <Link to="/wine-packages" className="auth-form__submit">
+          Back to Wine Packages
+        </Link>
+      </div>
+    );
+  }
+
+  const progress = pkg.review_progress || { requested: 0, reviewed: 0, pending: 0, percent: 100 };
+
+  return (
+    <div className="wine-app">
+      <Link to="/wine-packages" className="wine-detail__back">
+        &larr; Back to Wine Packages
+      </Link>
+
+      {error && <p className="wine-management__error">{error}</p>}
+
+      <div className={styles.detailHeader}>
+        <h1>{pkg.producer_name || `Package #${pkg.id}`}</h1>
+        <PackageStatusBadge status={pkg.status} />
+        {canManage && (
+          <Link to={`/wine-packages/${pkg.id}/edit`} className={styles.actionButton}>
+            Edit package
+          </Link>
+        )}
+      </div>
+
+      <p className={styles.meta}>
+        <span>Source: {sourceLabel(pkg.source)}</span>
+        <span>Reviewer: {pkg.reviewer_name || "unassigned"}</span>
+        {pkg.expected_at && <span>Expected {formatDate(pkg.expected_at)}</span>}
+        {pkg.arrived_at && <span>Arrived {formatDateTime(pkg.arrived_at)}</span>}
+        {pkg.review_deadline && (
+          <span className={pkg.overdue ? styles.overdue : undefined}>
+            Deadline {formatDate(pkg.review_deadline)} · {deadlineLabel(pkg.review_deadline)}
+          </span>
+        )}
+        {pkg.reviewed_at && <span>Reviewed {formatDate(pkg.reviewed_at)}</span>}
+        {pkg.auto_completed && <span>Completed automatically</span>}
+        {pkg.status === "completed" && !pkg.auto_completed && (
+          <span>Completed deliberately</span>
+        )}
+      </p>
+
+      {pkg.status === "rejected" && pkg.rejection_reason && (
+        <p className={styles.cellMuted}>Rejected: {pkg.rejection_reason}</p>
+      )}
+
+      {pkg.notes && <p className={styles.cellMuted}>{pkg.notes}</p>}
+
+      <div className={styles.section}>
+        <h2>Review progress</h2>
+        <div className={styles.progressRow}>
+          <div
+            className={styles.progressBar}
+            role="progressbar"
+            aria-valuenow={progress.percent}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Review progress"
+          >
+            <div className={styles.progressFill} style={{ width: `${progress.percent}%` }} />
+          </div>
+          <span>
+            {progress.reviewed}/{progress.requested} reviewed ({progress.percent}%)
+          </span>
+          {progress.pending > 0 && (
+            <span className={styles.overdue}>{progress.pending} pending</span>
+          )}
+        </div>
+      </div>
+
+      {canManage && (
+        <div className={styles.actions}>
+          {pkg.can?.accept && (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={busy}
+              onClick={() => runAction(() => winePackagesApi.accept(pkg.id))}
+            >
+              Accept request
+            </button>
+          )}
+          {pkg.can?.reject && (
+            <button
+              type="button"
+              className={`${styles.actionButton} ${styles.actionDanger}`}
+              disabled={busy}
+              onClick={() => setShowReject((open) => !open)}
+            >
+              Reject request
+            </button>
+          )}
+          {pkg.can?.mark_in_transit && (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={busy}
+              onClick={() => runAction(() => winePackagesApi.markInTransit(pkg.id))}
+            >
+              Mark in transit
+            </button>
+          )}
+          {pkg.can?.mark_arrived && (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={busy}
+              onClick={() =>
+                runAction(() => winePackagesApi.markArrived(pkg.id), {
+                  confirm: "Confirm these wines have physically arrived?",
+                })
+              }
+            >
+              Mark arrived
+            </button>
+          )}
+          {pkg.can?.mark_completed && (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={busy}
+              onClick={() =>
+                runAction(() => winePackagesApi.markCompleted(pkg.id), {
+                  confirm:
+                    progress.pending > 0
+                      ? `${progress.pending} review(s) are still outstanding. Complete this package anyway?`
+                      : undefined,
+                })
+              }
+            >
+              Mark completed
+            </button>
+          )}
+          {pkg.can?.reopen && (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={busy}
+              onClick={() => runAction(() => winePackagesApi.reopen(pkg.id))}
+            >
+              Reopen
+            </button>
+          )}
+          {pkg.can?.cancel && (
+            <button
+              type="button"
+              className={`${styles.actionButton} ${styles.actionDanger}`}
+              disabled={busy}
+              onClick={() =>
+                runAction(() => winePackagesApi.cancel(pkg.id), {
+                  confirm: "Cancel this package?",
+                })
+              }
+            >
+              Cancel package
+            </button>
+          )}
+        </div>
+      )}
+
+      {showReject && (
+        <form
+          className={styles.inlineForm}
+          onSubmit={(event) => {
+            event.preventDefault();
+            setShowReject(false);
+            runAction(() => winePackagesApi.reject(pkg.id, rejectionReason));
+          }}
+        >
+          <div className={styles.filterField} style={{ flex: "1 1 20rem" }}>
+            <label htmlFor="rejection-reason">Reason for rejecting</label>
+            <input
+              id="rejection-reason"
+              type="text"
+              required
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+            />
+          </div>
+          <div className={styles.inlineFormActions}>
+            <button type="submit" className="auth-form__submit" disabled={busy}>
+              Reject package
+            </button>
+            <button
+              type="button"
+              className={styles.actionButton}
+              onClick={() => setShowReject(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className={styles.section}>
+        <h2>Wines in this package</h2>
+
+        {pkg.items?.length > 0 ? (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Wine</th>
+                  <th scope="col">Bottles</th>
+                  <th scope="col">Condition</th>
+                  <th scope="col">Review</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pkg.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.wine_slug ? (
+                        <Link to={`/wines/${item.wine_slug}`}>{item.label}</Link>
+                      ) : (
+                        <span>{item.label}</span>
+                      )}
+                      {item.notes && <div className={styles.cellMuted}>{item.notes}</div>}
+                    </td>
+                    <td>{item.quantity}</td>
+                    <td className={styles.cellMuted}>{item.condition || "—"}</td>
+                    <td>
+                      {!item.review_requested && (
+                        <span className={styles.cellMuted}>Not requested</span>
+                      )}
+                      {item.review_requested && item.reviewed && <span>Reviewed</span>}
+                      {item.review_requested && !item.reviewed && <span>Pending</span>}
+                      {item.review_id && item.review_status === "draft" && (
+                        <div className={styles.cellMuted}>Draft review in progress</div>
+                      )}
+                      {item.review_slug && (
+                        <div>
+                          <Link to={`/reviews/${item.review_slug}`}>View review</Link>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {canManage && (
+                        <div className={styles.actions}>
+                          {item.reviewable && !item.review_id && (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() =>
+                                setReviewItemId(reviewItemId === item.id ? null : item.id)
+                              }
+                            >
+                              Create review
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.actionButton}
+                            onClick={() =>
+                              setEditingItem(editingItem === item.id ? null : item.id)
+                            }
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.actionDanger}`}
+                            disabled={busy}
+                            onClick={() => handleRemoveItem(item)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className={styles.cellMuted}>
+            No wines recorded yet. Add the bottles that came in this package.
+          </p>
+        )}
+
+        {canManage && (
+          <>
+            {editingItem && (
+              <WinePackageItemForm
+                packageId={pkg.id}
+                item={pkg.items.find((candidate) => candidate.id === editingItem)}
+                onSaved={() => {
+                  setEditingItem(null);
+                  load();
+                }}
+                onCancel={() => setEditingItem(null)}
+              />
+            )}
+
+            {reviewItemId && (
+              <PackageReviewForm
+                packageId={pkg.id}
+                item={pkg.items.find((candidate) => candidate.id === reviewItemId)}
+                onSaved={(review) => {
+                  setReviewItemId(null);
+                  load();
+                  if (review?.slug) navigate(`/reviews/${review.slug}`);
+                }}
+                onCancel={() => setReviewItemId(null)}
+              />
+            )}
+
+            {showAddItem ? (
+              <WinePackageItemForm
+                packageId={pkg.id}
+                onSaved={() => {
+                  setShowAddItem(false);
+                  load();
+                }}
+                onCancel={() => setShowAddItem(false)}
+              />
+            ) : (
+              <div className={styles.inlineFormActions}>
+                <button
+                  type="button"
+                  className="auth-form__submit"
+                  onClick={() => setShowAddItem(true)}
+                >
+                  + Add a wine
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <ShipmentTrackingPanel packageId={pkg.id} canManage={canManage} onChanged={load} />
+
+      {canManage && (
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.actionDanger}`}
+            disabled={busy}
+            onClick={handleDelete}
+          >
+            Delete package
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default WinePackageDetail;

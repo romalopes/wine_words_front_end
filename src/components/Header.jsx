@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isAdmin, canManageWinesRole } from "../constants/roles";
+import { isAdmin, canManageWinesRole, canAccessPackages } from "../constants/roles";
 import { categoriesApi } from "../services/api";
+import NotificationBell from "./NotificationBell.jsx";
 
 function NavDropdown({ label, items }) {
   const [open, setOpen] = useState(false);
@@ -85,6 +86,9 @@ function Header() {
   // Settings menu for them too. The "Admin" menu (Users & Roles, API Health,
   // Subscriptions) is admin-only only.
   const canManageSettings = isAdminUser || canManageWinesRole(effectiveIdentity);
+  // Wine packages are for content managers and Reviewers (the people who
+  // receive and review the wines).
+  const canSeePackages = canAccessPackages(effectiveIdentity);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
@@ -218,6 +222,7 @@ function Header() {
             ...navCategories("for_article", "sort_order_article"),
           ]}
         />
+        {canSeePackages && <NavLink to="/wine-packages">Wine Packages</NavLink>}
         <div
           className="settings-menu"
           onMouseEnter={() => setExtrasOpen(true)}
@@ -248,6 +253,7 @@ function Header() {
         </div>
         <NavLink to="/about">About</NavLink>
         <NavLink to="/subscribe">Subscribe</NavLink>
+        {user && <NotificationBell />}
         {canManageSettings && (
           <div
             className="settings-menu"

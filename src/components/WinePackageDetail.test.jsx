@@ -1,0 +1,236 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import WinePackageDetail from "./WinePackageDetail.jsx";
+
+const mockShow = vi.fn();
+const mockMarkCompleted = vi.fn();
+const mockMarkArrived = vi.fn();
+const mockDestroy = vi.fn();
+const mockItemDestroy = vi.fn();
+const mockCreateReview = vi.fn();
+const mockTrackingShow = vi.fn();
+
+vi.mock("../services/api", () => ({
+  winePackagesApi: {
+    show: (...args) => mockShow(...args),
+    markCompleted: (...args) => mockMarkCompleted(...args),
+    markArrived: (...args) => mockMarkArrived(...args),
+    destroy: (...args) => mockDestroy(...args),
+  },
+  winePackageItemsApi: {
+    destroy: (...args) => mockItemDestroy(...args),
+    createReview: (...args) => mockCreateReview(...args),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+  shipmentTrackingsApi: { show: (...args) => mockTrackingShow(...args) },
+  notificationsApi: { list: vi.fn() },
+  winesApi: { search: vi.fn() },
+  producersApi: { list: vi.fn() },
+  usersApi: { search: vi.fn() },
+}));
+
+let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+
+vi.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({ user: currentUser, loading: false }),
+}));
+
+function isoDaysFromNow(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+const packageDetail = {
+  id: 7,
+  producer_id: 3,
+  producer_name: "Penfolds",
+  producer_slug: "penfolds",
+  reviewer_id: 1,
+  reviewer_name: "Reviewer",
+  created_by_id: 1,
+  status: "arrived",
+  source: "unexpected",
+  arrived_at: "2026-09-01T09:00:00Z",
+  review_deadline: isoDaysFromNow(5),
+  reviewed_at: null,
+  auto_completed: false,
+  notes: "Left at reception",
+  review_progress: { requested: 2, reviewed: 1, pending: 1, percent: 50 },
+  pending_review_count: 1,
+  reviews_complete: false,
+  overdue: false,
+  days_until_deadline: 5,
+  can: {
+    mark_in_transit: false,
+    mark_arrived: false,
+    start_reviewing: false,
+    mark_completed: true,
+    reopen: false,
+    cancel: true,
+    accept: false,
+    reject: false,
+  },
+  items: [
+    {
+      id: 11,
+      label: "Bin 389 2020",
+      wine_slug: "bin-389",
+      quantity: 2,
+      review_requested: true,
+      reviewed: true,
+      reviewable: true,
+      review_id: 5,
+      review_status: "published",
+      review_slug: "bin-389-2020",
+      pending_review: false,
+      condition: "sealed",
+      notes: null,
+    },
+    {
+      id: 12,
+      label: "Grange 2018",
+      wine_slug: "grange",
+      quantity: 1,
+      review_requested: true,
+      reviewed: false,
+      reviewable: true,
+      review_id: null,
+      review_status: null,
+      review_slug: null,
+      pending_review: true,
+      condition: null,
+      notes: "label torn",
+    },
+    {
+      id: 13,
+      label: "Unmatched wine",
+      wine_slug: null,
+      quantity: 1,
+      review_requested: false,
+      reviewed: false,
+      reviewable: false,
+      review_id: null,
+      review_status: null,
+      review_slug: null,
+      pending_review: false,
+      condition: null,
+      notes: null,
+    },
+  ],
+};
+
+function renderDetail() {
+  return render(
+    <MemoryRouter initialEntries={["/wine-packages/7"]}>
+      <Routes>
+        <Route element={<WinePackageDetail />} path="/wine-packages/:id" />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe("WinePackageDetail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+    mockShow.mockResolvedValue(packageDetail);
+    mockTrackingShow.mockRejectedValue(
+      Object.assign(new Error("No tracking recorded for this package"), { status: 404 }),
+    );
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows the producer, status, source and deadline countdown", async () => {
+    renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "Penfolds" })).toBeInTheDocument();
+    expect(screen.getByText("Arrived")).toBeInTheDocument();
+    expect(screen.getByText("Source: Unexpected delivery")).toBeInTheDocument();
+    expect(screen.getByText("Reviewer: Reviewer")).toBeInTheDocument();
+    expect(screen.getByText(/Due in 5 days/)).toBeInTheDocument();
+    expect(screen.getByText("Left at reception")).toBeInTheDocument();
+  });
+
+  it("reports review progress from the API payload", async () => {
+    renderDetail();
+
+    expect(await screen.findByText("1/2 reviewed (50%)")).toBeInTheDocument();
+    expect(screen.getByText("1 pending")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
+  });
+
+  it("renders each wine line with its review state", async () => {
+    renderDetail();
+
+    await screen.findByText("Bin 389 2020");
+    const table = screen.getByRole("table");
+
+    expect(within(table).getByText("Reviewed")).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "View review" })).toHaveAttribute(
+      "href",
+      "/reviews/bin-389-2020",
+    );
+    expect(within(table).getByText("Pending")).toBeInTheDocument();
+    expect(within(table).getByText("Not requested")).toBeInTheDocument();
+    expect(within(table).getByText("label torn")).toBeInTheDocument();
+  });
+
+  it("offers exactly the workflow actions the API allows", async () => {
+    renderDetail();
+
+    expect(await screen.findByRole("button", { name: "Mark completed" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel package" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark arrived" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept request" })).not.toBeInTheDocument();
+  });
+
+  it("completes the package, warning about outstanding reviews, then reloads", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "Mark completed" }));
+
+    await waitFor(() => expect(mockMarkCompleted).toHaveBeenCalledWith(7));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining("1 review(s) are still outstanding"),
+    );
+    expect(mockShow).toHaveBeenCalledTimes(2);
+  });
+
+  it("only offers Create review for a requested line with no review yet", async () => {
+    renderDetail();
+
+    await screen.findByText("Grange 2018");
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("button", { name: "Create review" })).toHaveLength(1);
+  });
+
+  it("reports when no tracking has been recorded yet", async () => {
+    renderDetail();
+
+    expect(
+      await screen.findByText("No tracking recorded for this package yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("hides every management control from a user who is not the reviewer", async () => {
+    currentUser = { id: 42, user_name: "Someone else", roles: ["Reviewer"] };
+    renderDetail();
+
+    await screen.findByRole("heading", { name: "Penfolds" });
+    expect(screen.queryByRole("button", { name: "Mark completed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit package" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add a wine" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete package" })).not.toBeInTheDocument();
+  });
+});
