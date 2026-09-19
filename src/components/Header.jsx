@@ -258,7 +258,6 @@ function Header() {
         </div>
         <NavLink to="/about">About</NavLink>
         <NavLink to="/subscribe">Subscribe</NavLink>
-        {user && <NotificationBell />}
         {canManageSettings && (
           <div
             className="settings-menu"
@@ -389,6 +388,7 @@ function Header() {
           </NavLink>
         )}
       </nav>
+      {user && <NotificationBell />}
     </header>
   );
 }

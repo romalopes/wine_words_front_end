@@ -9,6 +9,7 @@ const DETAIL_RESOURCES = [
   "regions",
   "countries",
   "categories",
+  "wine-packages",
 ];
 
 function isDetailPath(path) {

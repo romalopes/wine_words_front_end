@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { notificationsApi } from "../services/api";
+import { emitNotificationsChanged } from "../services/notificationEvents";
 import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import PackageStatusBadge from "./PackageStatusBadge";
@@ -34,6 +35,7 @@ function Notifications() {
     try {
       await notificationsApi.markRead(notification.id);
       list.reload();
+      emitNotificationsChanged();
     } finally {
       setBusy(false);
     }
@@ -44,6 +46,7 @@ function Notifications() {
     try {
       await notificationsApi.markAllRead();
       list.reload();
+      emitNotificationsChanged();
     } finally {
       setBusy(false);
     }
@@ -75,11 +78,15 @@ function Notifications() {
           <p className="wine-kicker">Cellar</p>
           <h1>Notifications</h1>
           <p className={styles.cellMuted}>
-            Review-deadline reminders for the wine packages you are responsible for.
+            Review-deadline reminders for the wine packages you are responsible
+            for.
           </p>
         </div>
         <div className={styles.headerActions}>
-          <label className={styles.checkboxField} htmlFor="notifications-unread">
+          <label
+            className={styles.checkboxField}
+            htmlFor="notifications-unread"
+          >
             <input
               id="notifications-unread"
               type="checkbox"
@@ -133,15 +140,20 @@ function Notifications() {
                     </td>
                     <td>
                       {notification.wine_package_id ? (
-                        <Link to={`/wine-packages/${notification.wine_package_id}`}>
-                          {notification.producer_name || `Package #${notification.wine_package_id}`}
+                        <Link
+                          to={`/wine-packages/${notification.wine_package_id}`}
+                        >
+                          {notification.producer_name ||
+                            `Package #${notification.wine_package_id}`}
                         </Link>
                       ) : (
                         <span className={styles.cellMuted}>—</span>
                       )}
                     </td>
                     <td>
-                      <PackageStatusBadge status={notification.package_status} />
+                      <PackageStatusBadge
+                        status={notification.package_status}
+                      />
                     </td>
                     <td>
                       {!notification.read && (

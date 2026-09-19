@@ -3386,18 +3386,32 @@ textarea {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: #5d514b;
+  text-decoration: none;
+}
+.notification-bell:hover,
+.notification-bell.active {
+  background: #681a2a;
+  color: #fff8f2;
 }
 .notification-bell__count {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.15rem;
   display: inline-block;
-  min-width: 1.35rem;
-  padding: 0 0.35rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
   border-radius: 999px;
   background: #b23a3a;
   color: #fff;
   font-size: 0.7rem;
   font-weight: 700;
-  line-height: 1.35rem;
+  line-height: 1.25rem;
   text-align: center;
 }
 /* ===== Shared buttons, badges and links ==================================

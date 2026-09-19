@@ -13,6 +13,7 @@ import styles from "./winePackages.module.css";
 function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
   const [tracking, setTracking] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [form, setForm] = useState({
     carrier: "",
     number: "",
@@ -40,7 +41,8 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
       });
     } catch (err) {
       // 404 simply means no tracking has been recorded yet.
-      if (err?.status !== 404) setError(err.message || "Failed to load tracking");
+      if (err?.status !== 404)
+        setError(err.message || "Failed to load tracking");
     } finally {
       setLoaded(true);
     }
@@ -115,106 +117,139 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
 
   return (
     <div className={styles.section}>
-      <h2>Shipment tracking</h2>
+      <h2>
+        Shipment tracking{" "}
+        <button
+          type="button"
+          className="wine-btn wine-btn--secondary wine-btn--sm"
+          aria-expanded={!collapsed}
+          aria-controls="wp-tracking-list"
+          aria-label={
+            collapsed ? "Show shipment tracking" : "Hide shipment tracking"
+          }
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          {collapsed ? "Show" : "Hide"}
+        </button>
+      </h2>
 
-      {error && <p className="wine-management__error">{error}</p>}
-      {message && <p className={styles.cellMuted}>{message}</p>}
+      {!collapsed && (
+        <div id="wp-tracking-list">
+          {error && <p className="wine-management__error">{error}</p>}
+          {message && <p className={styles.cellMuted}>{message}</p>}
 
-      {tracking ? (
-        <p className={styles.meta}>
-          <span>
-            <strong>{tracking.carrier || "Unknown carrier"}</strong>
-            {tracking.number ? ` · ${tracking.number}` : ""}
-          </span>
-          <span>Status: {tracking.status || "—"}</span>
-          {tracking.estimated_delivery_at && (
-            <span>ETA {formatDate(tracking.estimated_delivery_at)}</span>
+          {tracking ? (
+            <p className={styles.meta}>
+              <span>
+                <strong>{tracking.carrier || "Unknown carrier"}</strong>
+                {tracking.number ? ` · ${tracking.number}` : ""}
+              </span>
+              <span>Status: {tracking.status || "—"}</span>
+              {tracking.estimated_delivery_at && (
+                <span>ETA {formatDate(tracking.estimated_delivery_at)}</span>
+              )}
+              {tracking.delivered_at && (
+                <span className={styles.overdue}>
+                  Carrier reports delivered{" "}
+                  {formatDateTime(tracking.delivered_at)} — confirm arrival
+                </span>
+              )}
+              {tracking.url && (
+                <a href={tracking.url} target="_blank" rel="noreferrer">
+                  Track on carrier site
+                </a>
+              )}
+              {!tracking.provider_configured && (
+                <span className={styles.cellMuted}>
+                  No live carrier credentials — status is maintained by hand
+                </span>
+              )}
+            </p>
+          ) : (
+            <p className={styles.cellMuted}>
+              No tracking recorded for this package yet.
+            </p>
           )}
-          {tracking.delivered_at && (
-            <span className={styles.overdue}>
-              Carrier reports delivered {formatDateTime(tracking.delivered_at)} — confirm arrival
-            </span>
-          )}
-          {tracking.url && (
-            <a href={tracking.url} target="_blank" rel="noreferrer">
-              Track on carrier site
-            </a>
-          )}
-          {!tracking.provider_configured && (
-            <span className={styles.cellMuted}>
-              No live carrier credentials — status is maintained by hand
-            </span>
-          )}
-        </p>
-      ) : (
-        <p className={styles.cellMuted}>No tracking recorded for this package yet.</p>
-      )}
 
-      {Array.isArray(tracking?.events) && tracking.events.length > 0 && (
-        <ul className={styles.cellMuted}>
-          {tracking.events.map((event) => (
-            <li key={event.id}>
-              {formatDateTime(event.event_at) || "—"} · {event.status}
-              {event.location ? ` · ${event.location}` : ""}
-            </li>
-          ))}
-        </ul>
-      )}
+          {Array.isArray(tracking?.events) && tracking.events.length > 0 && (
+            <ul className={styles.cellMuted}>
+              {tracking.events.map((event) => (
+                <li key={event.id}>
+                  {formatDateTime(event.event_at) || "—"} · {event.status}
+                  {event.location ? ` · ${event.location}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
 
-      {canManage && (
-        <form className={styles.inlineForm} onSubmit={handleSave}>
-          <div className={styles.filterField}>
-            <label htmlFor="tracking-carrier">Carrier</label>
-            <input
-              id="tracking-carrier"
-              type="text"
-              placeholder="Australia Post"
-              value={form.carrier}
-              onChange={(event) => updateField("carrier", event.target.value)}
-            />
-          </div>
-          <div className={styles.filterField}>
-            <label htmlFor="tracking-number">Consignment number</label>
-            <input
-              id="tracking-number"
-              type="text"
-              value={form.number}
-              onChange={(event) => updateField("number", event.target.value)}
-            />
-          </div>
-          <div className={styles.filterField}>
-            <label htmlFor="tracking-status">Status</label>
-            <input
-              id="tracking-status"
-              type="text"
-              placeholder="In transit"
-              value={form.status}
-              onChange={(event) => updateField("status", event.target.value)}
-            />
-          </div>
-          <div className={styles.filterField}>
-            <label htmlFor="tracking-eta">Estimated delivery</label>
-            <input
-              id="tracking-eta"
-              type="date"
-              value={form.estimated_delivery_at}
-              onChange={(event) => updateField("estimated_delivery_at", event.target.value)}
-            />
-          </div>
-          <div className={styles.inlineFormActions}>
-            <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={saving}>
-              {saving ? "Saving…" : "Save tracking"}
-            </button>
-            <button
-              type="button"
-              className="wine-btn wine-btn--secondary"
-              onClick={handleRefresh}
-              disabled={refreshing || !tracking?.number}
-            >
-              {refreshing ? "Refreshing…" : "Refresh from carrier"}
-            </button>
-          </div>
-        </form>
+          {canManage && (
+            <form className={styles.inlineForm} onSubmit={handleSave}>
+              <div className={styles.filterField}>
+                <label htmlFor="tracking-carrier">Carrier</label>
+                <input
+                  id="tracking-carrier"
+                  type="text"
+                  placeholder="Australia Post"
+                  value={form.carrier}
+                  onChange={(event) =>
+                    updateField("carrier", event.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.filterField}>
+                <label htmlFor="tracking-number">Consignment number</label>
+                <input
+                  id="tracking-number"
+                  type="text"
+                  value={form.number}
+                  onChange={(event) =>
+                    updateField("number", event.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.filterField}>
+                <label htmlFor="tracking-status">Status</label>
+                <input
+                  id="tracking-status"
+                  type="text"
+                  placeholder="In transit"
+                  value={form.status}
+                  onChange={(event) =>
+                    updateField("status", event.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.filterField}>
+                <label htmlFor="tracking-eta">Estimated delivery</label>
+                <input
+                  id="tracking-eta"
+                  type="date"
+                  value={form.estimated_delivery_at}
+                  onChange={(event) =>
+                    updateField("estimated_delivery_at", event.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.inlineFormActions}>
+                <button
+                  type="submit"
+                  className="wine-btn wine-btn--primary wine-btn--lg"
+                  disabled={saving}
+                >
+                  {saving ? "Saving…" : "Save tracking"}
+                </button>
+                <button
+                  type="button"
+                  className="wine-btn wine-btn--secondary"
+                  onClick={handleRefresh}
+                  disabled={refreshing || !tracking?.number}
+                >
+                  {refreshing ? "Refreshing…" : "Refresh from carrier"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
     </div>
   );

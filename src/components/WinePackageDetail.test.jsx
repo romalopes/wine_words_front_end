@@ -150,7 +150,9 @@ describe("WinePackageDetail", () => {
     currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
     mockShow.mockResolvedValue(packageDetail);
     mockTrackingShow.mockRejectedValue(
-      Object.assign(new Error("No tracking recorded for this package"), { status: 404 }),
+      Object.assign(new Error("No tracking recorded for this package"), {
+        status: 404,
+      }),
     );
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
@@ -162,7 +164,9 @@ describe("WinePackageDetail", () => {
   it("shows the producer, status, source and deadline countdown", async () => {
     renderDetail();
 
-    expect(await screen.findByRole("heading", { name: "Penfolds" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Penfolds" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Arrived")).toBeInTheDocument();
     expect(screen.getByText("Source: Unexpected delivery")).toBeInTheDocument();
     expect(screen.getByText("Reviewer: Reviewer")).toBeInTheDocument();
@@ -175,7 +179,10 @@ describe("WinePackageDetail", () => {
 
     expect(await screen.findByText("1/2 reviewed (50%)")).toBeInTheDocument();
     expect(screen.getByText("1 pending")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "50",
+    );
   });
 
   it("renders each wine line with its review state", async () => {
@@ -185,9 +192,11 @@ describe("WinePackageDetail", () => {
     const table = screen.getByRole("table");
 
     expect(within(table).getByText("Reviewed")).toBeInTheDocument();
-    expect(within(table).getByRole("link", { name: "View review" })).toHaveAttribute(
+    expect(
+      within(table).getByRole("link", { name: "View review" }),
+    ).toHaveAttribute(
       "href",
-      "/reviews/bin-389-2020",
+      "/reviews/bin-389-2020?returnTo=%2Fwine-packages%2F7",
     );
     expect(within(table).getByText("Pending")).toBeInTheDocument();
     expect(within(table).getByText("Not requested")).toBeInTheDocument();
@@ -197,18 +206,30 @@ describe("WinePackageDetail", () => {
   it("offers exactly the workflow actions the API allows", async () => {
     renderDetail();
 
-    expect(await screen.findByRole("button", { name: "Mark completed" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancel package" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mark arrived" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept request" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Mark completed" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cancel package" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark arrived" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Reopen" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Accept request" }),
+    ).not.toBeInTheDocument();
   });
 
   it("completes the package, warning about outstanding reviews, then reloads", async () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.click(await screen.findByRole("button", { name: "Mark completed" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Mark completed" }),
+    );
 
     await waitFor(() => expect(mockMarkCompleted).toHaveBeenCalledWith(7));
     expect(window.confirm).toHaveBeenCalledWith(
@@ -222,14 +243,18 @@ describe("WinePackageDetail", () => {
 
     await screen.findByText("Grange 2018");
     const table = screen.getByRole("table");
-    expect(within(table).getAllByRole("button", { name: "Create review" })).toHaveLength(1);
+    expect(
+      within(table).getAllByRole("button", { name: "Create review" }),
+    ).toHaveLength(1);
   });
 
   it("scopes the add-wine line form to the package's producer", async () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.click(await screen.findByRole("button", { name: "+ Add a wine" }));
+    await user.click(
+      await screen.findByRole("button", { name: "+ Add a wine" }),
+    );
 
     // The picker lists one producer's catalogue on mount, so the reviewer
     // chooses a bottle instead of typing a wine name.
@@ -265,7 +290,9 @@ describe("WinePackageDetail", () => {
     mockCreateReview.mockResolvedValue({ id: 99, slug: "grange-2018" });
     renderDetail();
 
-    await user.click(await screen.findByRole("button", { name: "Create review" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Create review" }),
+    );
 
     // The reused review form mounts in package mode with the line's vintage.
     // Score is a range slider here (label "Score", value shown alongside).
@@ -304,9 +331,17 @@ describe("WinePackageDetail", () => {
     renderDetail();
 
     await screen.findByRole("heading", { name: "Penfolds" });
-    expect(screen.queryByRole("button", { name: "Mark completed" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Edit package" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "+ Add a wine" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete package" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark completed" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Edit package" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "+ Add a wine" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete package" }),
+    ).not.toBeInTheDocument();
   });
 });

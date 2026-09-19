@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Notifications from "./Notifications.jsx";
+import { onNotificationsChanged } from "../services/notificationEvents";
 
 const mockList = vi.fn();
 const mockMarkRead = vi.fn();
@@ -22,13 +23,17 @@ vi.mock("../services/api", () => ({
 }));
 
 vi.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 1, user_name: "Reviewer", roles: ["Editor"] }, loading: false }),
+  useAuth: () => ({
+    user: { id: 1, user_name: "Reviewer", roles: ["Editor"] },
+    loading: false,
+  }),
 }));
 
 const notification = {
   id: 21,
   notification_type: "wine_package_deadline",
-  message: "Penfolds: 2 review(s) still pending; the review deadline is in 5 days (2026-10-01).",
+  message:
+    "Penfolds: 2 review(s) still pending; the review deadline is in 5 days (2026-10-01).",
   wine_package_id: 7,
   producer_name: "Penfolds",
   package_status: "arrived",
@@ -65,7 +70,9 @@ describe("Notifications", () => {
   it("lists the reminder with a link back to its package", async () => {
     renderNotifications();
 
-    expect(await screen.findByText(/2 review\(s\) still pending/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/2 review\(s\) still pending/),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Penfolds" })).toHaveAttribute(
       "href",
       "/wine-packages/7",
@@ -88,9 +95,43 @@ describe("Notifications", () => {
     const user = userEvent.setup();
     renderNotifications();
 
-    await user.click(await screen.findByRole("button", { name: "Mark all read" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Mark all read" }),
+    );
 
     await waitFor(() => expect(mockMarkAllRead).toHaveBeenCalled());
+  });
+
+  it("tells the header bell after marking one notification read", async () => {
+    const user = userEvent.setup();
+    const listener = vi.fn();
+    const unsubscribe = onNotificationsChanged(listener);
+    renderNotifications();
+
+    try {
+      await user.click(
+        await screen.findByRole("button", { name: "Mark read" }),
+      );
+      await waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("tells the header bell after marking all read", async () => {
+    const user = userEvent.setup();
+    const listener = vi.fn();
+    const unsubscribe = onNotificationsChanged(listener);
+    renderNotifications();
+
+    try {
+      await user.click(
+        await screen.findByRole("button", { name: "Mark all read" }),
+      );
+      await waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+    } finally {
+      unsubscribe();
+    }
   });
 
   it("filters to unread notifications", async () => {
@@ -101,7 +142,9 @@ describe("Notifications", () => {
     await user.click(screen.getByLabelText("Unread only"));
 
     await waitFor(() =>
-      expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ unread: "true" })),
+      expect(mockList).toHaveBeenCalledWith(
+        expect.objectContaining({ unread: "true" }),
+      ),
     );
   });
 

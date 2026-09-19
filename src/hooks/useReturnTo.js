@@ -8,7 +8,7 @@ const LABELS = {
   grapes: "Grape",
   regions: "Region",
   countries: "Country",
-  categories: "Category",
+  "wine-packages": "Wine Package",
 };
 
 export function useReturnTo() {

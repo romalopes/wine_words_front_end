@@ -3,7 +3,12 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { winePackageItemsApi, winePackagesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageAllPackages } from "../constants/roles";
-import { badgeClass, itemReviewState, sourceLabel } from "../constants/winePackages";
+import { useReturnToLink } from "../hooks/useReturnToLink";
+import {
+  badgeClass,
+  itemReviewState,
+  sourceLabel,
+} from "../constants/winePackages";
 import { formatDate, formatDateTime, deadlineLabel } from "../utils/dates";
 import PackageStatusBadge from "./PackageStatusBadge";
 import WinePackageItemForm from "./WinePackageItemForm";
@@ -21,6 +26,7 @@ function WinePackageDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const returnToLink = useReturnToLink();
 
   const [pkg, setPkg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +57,9 @@ function WinePackageDetail() {
   // Mirrors the backend's ownership rule: catalogue managers (Admin/Editor)
   // manage everything; a Reviewer only manages their own packages.
   const canManage = Boolean(
-    pkg && (canManageAllPackages(user) || Number(pkg.reviewer_id) === Number(user?.id)),
+    pkg &&
+    (canManageAllPackages(user) ||
+      Number(pkg.reviewer_id) === Number(user?.id)),
   );
 
   async function runAction(action, options = {}) {
@@ -70,7 +78,8 @@ function WinePackageDetail() {
   }
 
   async function handleDelete() {
-    if (!window.confirm("Delete this wine package? This cannot be undone.")) return;
+    if (!window.confirm("Delete this wine package? This cannot be undone."))
+      return;
 
     setBusy(true);
     try {
@@ -116,7 +125,12 @@ function WinePackageDetail() {
     );
   }
 
-  const progress = pkg.review_progress || { requested: 0, reviewed: 0, pending: 0, percent: 100 };
+  const progress = pkg.review_progress || {
+    requested: 0,
+    reviewed: 0,
+    pending: 0,
+    percent: 100,
+  };
 
   return (
     <div className="wine-app">
@@ -143,10 +157,13 @@ function WinePackageDetail() {
         <span>Source: {sourceLabel(pkg.source)}</span>
         <span>Reviewer: {pkg.reviewer_name || "unassigned"}</span>
         {pkg.expected_at && <span>Expected {formatDate(pkg.expected_at)}</span>}
-        {pkg.arrived_at && <span>Arrived {formatDateTime(pkg.arrived_at)}</span>}
+        {pkg.arrived_at && (
+          <span>Arrived {formatDateTime(pkg.arrived_at)}</span>
+        )}
         {pkg.review_deadline && (
           <span className={pkg.overdue ? styles.overdue : undefined}>
-            Deadline {formatDate(pkg.review_deadline)} · {deadlineLabel(pkg.review_deadline)}
+            Deadline {formatDate(pkg.review_deadline)} ·{" "}
+            {deadlineLabel(pkg.review_deadline)}
           </span>
         )}
         {pkg.reviewed_at && <span>Reviewed {formatDate(pkg.reviewed_at)}</span>}
@@ -173,10 +190,14 @@ function WinePackageDetail() {
             aria-valuemax="100"
             aria-label="Review progress"
           >
-            <div className={styles.progressFill} style={{ width: `${progress.percent}%` }} />
+            <div
+              className={styles.progressFill}
+              style={{ width: `${progress.percent}%` }}
+            />
           </div>
           <span>
-            {progress.reviewed}/{progress.requested} reviewed ({progress.percent}%)
+            {progress.reviewed}/{progress.requested} reviewed (
+            {progress.percent}%)
           </span>
           {progress.pending > 0 && (
             <span className={styles.overdue}>{progress.pending} pending</span>
@@ -211,7 +232,9 @@ function WinePackageDetail() {
               type="button"
               className="wine-btn wine-btn--secondary"
               disabled={busy}
-              onClick={() => runAction(() => winePackagesApi.markInTransit(pkg.id))}
+              onClick={() =>
+                runAction(() => winePackagesApi.markInTransit(pkg.id))
+              }
             >
               Mark in transit
             </button>
@@ -294,7 +317,11 @@ function WinePackageDetail() {
             />
           </div>
           <div className={styles.inlineFormActions}>
-            <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={busy}>
+            <button
+              type="submit"
+              className="wine-btn wine-btn--primary wine-btn--lg"
+              disabled={busy}
+            >
               Reject package
             </button>
             <button
@@ -330,21 +357,30 @@ function WinePackageDetail() {
                   <tr key={item.id}>
                     <td>
                       {item.wine_slug ? (
-                        <Link to={`/wines/${item.wine_slug}`}>{item.label}</Link>
+                        <Link to={`/wines/${item.wine_slug}`}>
+                          {item.label}
+                        </Link>
                       ) : (
                         <span>{item.label}</span>
                       )}
-                      {item.notes && <div className={styles.cellMuted}>{item.notes}</div>}
+                      {item.notes && (
+                        <div className={styles.cellMuted}>{item.notes}</div>
+                      )}
                     </td>
                     <td>{item.quantity}</td>
-                    <td className={styles.cellMuted}>{item.condition || "—"}</td>
+                    <td className={styles.cellMuted}>
+                      {item.condition || "—"}
+                    </td>
                     <td>
                       <span className={badgeClass(itemReviewState(item).tone)}>
                         {itemReviewState(item).label}
                       </span>
                       {item.review_slug && (
                         <div>
-                          <Link to={`/reviews/${item.review_slug}`} className="wine-link">
+                          <Link
+                            to={returnToLink(`/reviews/${item.review_slug}`)}
+                            className="wine-link"
+                          >
                             View review
                           </Link>
                         </div>
@@ -358,7 +394,9 @@ function WinePackageDetail() {
                               type="button"
                               className="wine-btn wine-btn--primary wine-btn--sm"
                               onClick={() =>
-                                setReviewItemId(reviewItemId === item.id ? null : item.id)
+                                setReviewItemId(
+                                  reviewItemId === item.id ? null : item.id,
+                                )
                               }
                             >
                               Create review
@@ -368,7 +406,9 @@ function WinePackageDetail() {
                             type="button"
                             className="wine-btn wine-btn--ghost wine-btn--sm"
                             onClick={() =>
-                              setEditingItem(editingItem === item.id ? null : item.id)
+                              setEditingItem(
+                                editingItem === item.id ? null : item.id,
+                              )
                             }
                           >
                             Edit
@@ -400,7 +440,9 @@ function WinePackageDetail() {
             {editingItem && (
               <WinePackageItemForm
                 packageId={pkg.id}
-                item={pkg.items.find((candidate) => candidate.id === editingItem)}
+                item={pkg.items.find(
+                  (candidate) => candidate.id === editingItem,
+                )}
                 producerId={pkg.producer_id}
                 producerName={pkg.producer_name}
                 onSaved={() => {
@@ -430,7 +472,8 @@ function WinePackageDetail() {
                       onSaved={(review) => {
                         setReviewItemId(null);
                         load();
-                        if (review?.slug) navigate(`/reviews/${review.slug}`);
+                        if (review?.slug)
+                          navigate(returnToLink(`/reviews/${review.slug}`));
                       }}
                       onCancel={() => setReviewItemId(null)}
                     />
@@ -464,7 +507,11 @@ function WinePackageDetail() {
         )}
       </div>
 
-      <ShipmentTrackingPanel packageId={pkg.id} canManage={canManage} onChanged={load} />
+      <ShipmentTrackingPanel
+        packageId={pkg.id}
+        canManage={canManage}
+        onChanged={load}
+      />
 
       {canManage && (
         <div className={styles.actions}>
