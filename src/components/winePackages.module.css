@@ -1,6 +1,12 @@
 /* Wine packages: list, detail, items and tracking panels.
-   Scoped as a CSS module so the feature stays self-contained and can never
-   collide with the global `wine-management__*` styles. */
+   Layout only. Buttons, badges and text links come from the shared `.wine-btn`,
+   `.wine-badge` and `.wine-link` classes in index.css so this feature cannot
+   drift away from the rest of the app. The module stays scoped so its layout
+   can never collide with the global `wine-management__*` styles.
+
+   Colours follow the app's light theme (cream surfaces #fffaf4, borders
+   #e4d9cd / #d7c8bb, text #241b19), not the dark palette this file was first
+   written against. */
 
 .header {
   display: flex;
@@ -30,9 +36,9 @@
   gap: 0.75rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #e4d9cd;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #fffaf4;
 }
 
 .filterField {
@@ -46,16 +52,27 @@
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.7;
+  color: #766963;
 }
 
 .filterField select,
 .filterField input {
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.25);
-  color: inherit;
+  border: 1px solid #d7c8bb;
+  background: #fff;
+  color: #241b19;
+}
+
+.filterField select:focus,
+.filterField input:focus {
+  border-color: #27615e;
+  outline: 2px solid rgba(39, 97, 94, 0.22);
+  outline-offset: 1px;
+}
+
+.filterField input::placeholder {
+  color: #9c8d86;
 }
 
 .checkboxField {
@@ -64,6 +81,7 @@
   gap: 0.4rem;
   padding-bottom: 0.4rem;
   font-size: 0.9rem;
+  color: #4f4440;
 }
 
 /* --- Table ------------------------------------------------------------- */
@@ -82,42 +100,38 @@
   padding: 0.6rem 0.65rem;
   text-align: left;
   vertical-align: top;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #eee4db;
 }
 
-.badge {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+.table th {
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #766963;
 }
 
-.badgeNeutral {
-  opacity: 0.85;
+.table tbody tr:hover {
+  background: #faf3ec;
 }
 
-.badgeInfo {
-  border-color: rgba(120, 180, 255, 0.5);
-  background: rgba(120, 180, 255, 0.15);
+.producerLink {
+  color: #6b2834;
+  font-weight: 700;
+  text-decoration: none;
 }
 
-.badgeWarn {
-  border-color: rgba(255, 190, 90, 0.55);
-  background: rgba(255, 190, 90, 0.15);
+.producerLink:hover {
+  text-decoration: underline;
 }
 
-.badgeOk {
-  border-color: rgba(120, 220, 150, 0.5);
-  background: rgba(120, 220, 150, 0.15);
+.cellMuted {
+  font-size: 0.85rem;
+  color: #766963;
 }
 
-.badgeBad {
-  border-color: rgba(255, 130, 130, 0.55);
-  background: rgba(255, 130, 130, 0.15);
+.overdue {
+  color: #8a2238;
+  font-weight: 700;
 }
 
 /* --- Detail page ------------------------------------------------------- */
@@ -140,7 +154,7 @@
   gap: 0.35rem 1.25rem;
   margin: 0 0 1rem;
   font-size: 0.9rem;
-  opacity: 0.85;
+  color: #5d514b;
 }
 
 .section {
@@ -151,7 +165,7 @@
   font-size: 1rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  opacity: 0.8;
+  color: #766963;
   margin-bottom: 0.6rem;
 }
 
@@ -167,46 +181,34 @@
   flex: 1 1 12rem;
   height: 0.6rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: #efe5dc;
   overflow: hidden;
 }
 
 .progressFill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #7ec8a0;
+  background: #27615e;
 }
 
+/* Page-level toolbar: the workflow actions, and the "+ Add a wine" cluster. */
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
 }
 
-.actionButton {
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.9rem;
+/* The same cluster inside a table cell, which must not add page spacing. */
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.actionButton:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.actionButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.actionDanger {
-  border-color: rgba(255, 130, 130, 0.5);
-  color: #ffb3b3;
-}
+/* --- Inline forms ------------------------------------------------------ */
 
 .inlineForm {
   display: flex;
@@ -215,9 +217,9 @@
   gap: 0.6rem;
   padding: 0.85rem 1rem;
   margin-top: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #e4d9cd;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #fffaf4;
 }
 
 .inlineForm .filterField {
@@ -226,31 +228,7 @@
 
 .inlineFormActions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   padding-bottom: 0.1rem;
-}
-
-.table th {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.producerLink {
-  font-weight: 600;
-}
-
-.cellMuted {
-  font-size: 0.85rem;
-  opacity: 0.75;
-}
-
-.overdue {
-  color: #ff8f8f;
-  font-weight: 600;
 }

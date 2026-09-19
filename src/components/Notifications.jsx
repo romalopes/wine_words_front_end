@@ -4,6 +4,7 @@ import { notificationsApi } from "../services/api";
 import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import PackageStatusBadge from "./PackageStatusBadge";
+import { badgeClass } from "../constants/winePackages";
 import { formatDate } from "../utils/dates";
 import styles from "./winePackages.module.css";
 
@@ -60,7 +61,7 @@ function Notifications() {
     return (
       <div className="wine-app">
         <p className="wine-management__error">{list.error}</p>
-        <button className="auth-form__submit" onClick={list.reload}>
+        <button className="wine-btn wine-btn--primary" onClick={list.reload}>
           Retry
         </button>
       </div>
@@ -89,7 +90,7 @@ function Notifications() {
           </label>
           <button
             type="button"
-            className={styles.actionButton}
+            className="wine-btn wine-btn--secondary"
             disabled={busy}
             onClick={markAllRead}
           >
@@ -127,7 +128,7 @@ function Notifications() {
                     <td>
                       {notification.message}
                       {!notification.read && (
-                        <div className={styles.cellMuted}>Unread</div>
+                        <span className={badgeClass("info")}>Unread</span>
                       )}
                     </td>
                     <td>
@@ -146,7 +147,7 @@ function Notifications() {
                       {!notification.read && (
                         <button
                           type="button"
-                          className={styles.actionButton}
+                          className="wine-btn wine-btn--ghost wine-btn--sm"
                           disabled={busy}
                           onClick={() => markRead(notification)}
                         >

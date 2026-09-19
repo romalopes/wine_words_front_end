@@ -202,12 +202,12 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
             />
           </div>
           <div className={styles.inlineFormActions}>
-            <button type="submit" className="auth-form__submit" disabled={saving}>
+            <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={saving}>
               {saving ? "Saving…" : "Save tracking"}
             </button>
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               onClick={handleRefresh}
               disabled={refreshing || !tracking?.number}
             >

@@ -3400,3 +3400,178 @@ textarea {
   line-height: 1.35rem;
   text-align: center;
 }
+/* ===== Shared buttons, badges and links ==================================
+   One opt-in set for the whole app. `.wine-btn` / `.wine-badge` are the base
+   classes and the modifiers pick the intent. Nothing existing is redefined, so
+   screens still on `.btn-*` or `.auth-form__submit` keep their current look and
+   can migrate one at a time.
+
+   Tones follow the palette the newer screens already use: wine red #681a2a for
+   the decisive action, teal #27615e for the everyday one, crimson #8a2238 /
+   #b9475f for anything destructive, on the cream #fffaf4 / #e4d9cd surfaces. */
+
+/* Hide text visually but keep it for screen readers — a table's "Actions"
+   column header, a fieldset legend. Without this the label renders as an
+   ordinary table cell. */
+.visually-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
+
+.wine-btn {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  justify-content: center;
+  line-height: 1.2;
+  padding: 0.45rem 0.95rem;
+  text-decoration: none;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+  white-space: nowrap;
+}
+
+.wine-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wine-btn:focus-visible {
+  outline: 2px solid #27615e;
+  outline-offset: 2px;
+}
+
+/* Primary — the one decisive action in a panel. */
+.wine-btn--primary {
+  background: #681a2a;
+  border-color: #681a2a;
+  color: #fff8f2;
+}
+
+.wine-btn--primary:hover:not(:disabled) {
+  background: #4d1320;
+  border-color: #4d1320;
+}
+
+/* Secondary — the everyday action: outlined and calm. */
+.wine-btn--secondary {
+  background: #fffaf4;
+  border-color: #d7c8bb;
+  color: #4f4440;
+}
+
+.wine-btn--secondary:hover:not(:disabled) {
+  background: #27615e;
+  border-color: #27615e;
+  color: #f7fff9;
+}
+
+/* Ghost — quiet actions, mostly inside dense table rows. */
+.wine-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #27615e;
+}
+
+.wine-btn--ghost:hover:not(:disabled) {
+  background: rgba(39, 97, 94, 0.1);
+}
+
+/* Danger — destructive moves stay outlined so they never shout. */
+.wine-btn--danger {
+  background: transparent;
+  border-color: rgba(185, 71, 95, 0.5);
+  color: #8a2238;
+}
+
+.wine-btn--danger:hover:not(:disabled) {
+  background: rgba(185, 71, 95, 0.12);
+  border-color: #b9475f;
+}
+
+/* Small — table rows and inline toolbars. */
+.wine-btn--sm {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.7rem;
+}
+
+/* Large — the submit in an inline form footer, so it reads as the CTA. */
+.wine-btn--lg {
+  font-size: 0.95rem;
+  min-height: 44px;
+  padding: 0.6rem 1.25rem;
+}
+
+/* --- Badges ------------------------------------------------------------- */
+
+.wine-badge {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.55rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wine-badge--neutral {
+  background: rgba(118, 105, 99, 0.15);
+  border-color: rgba(118, 105, 99, 0.32);
+  color: #766963;
+}
+
+.wine-badge--info {
+  background: rgba(61, 107, 131, 0.14);
+  border-color: rgba(61, 107, 131, 0.34);
+  color: #3d6b83;
+}
+
+.wine-badge--warn {
+  background: rgba(184, 108, 0, 0.14);
+  border-color: rgba(184, 108, 0, 0.34);
+  color: #b86c00;
+}
+
+.wine-badge--ok {
+  background: rgba(39, 97, 94, 0.15);
+  border-color: rgba(39, 97, 94, 0.38);
+  color: #27615e;
+}
+
+.wine-badge--bad {
+  background: rgba(185, 71, 95, 0.15);
+  border-color: rgba(185, 71, 95, 0.38);
+  color: #8a2238;
+}
+
+/* --- Text links --------------------------------------------------------- */
+
+.wine-link {
+  color: #6b2834;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.wine-link:hover {
+  text-decoration: underline;
+}
+

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import WinePackageDetail from "./WinePackageDetail.jsx";
+import { winesApi } from "../services/api";
 
 const mockShow = vi.fn();
 const mockMarkCompleted = vi.fn();
@@ -222,6 +223,40 @@ describe("WinePackageDetail", () => {
     await screen.findByText("Grange 2018");
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("button", { name: "Create review" })).toHaveLength(1);
+  });
+
+  it("scopes the add-wine line form to the package's producer", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "+ Add a wine" }));
+
+    // The picker lists one producer's catalogue on mount, so the reviewer
+    // chooses a bottle instead of typing a wine name.
+    await waitFor(() =>
+      expect(winesApi.search).toHaveBeenCalledWith({ producerId: 3 }),
+    );
+    expect(await screen.findByText(/Wines from/i)).toHaveTextContent(
+      /Wines from Penfolds/,
+    );
+  });
+
+  it("scopes the edit-line form to the package's producer too", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText("Grange 2018");
+    const table = screen.getByRole("table");
+    // The second row is the matched line (it carries a vintage_id), so the
+    // picker — and therefore the producer scope — is visible.
+    await user.click(within(table).getAllByRole("button", { name: "Edit" })[1]);
+
+    await waitFor(() =>
+      expect(winesApi.search).toHaveBeenCalledWith({ producerId: 3 }),
+    );
+    expect(await screen.findByText(/Wines from/i)).toHaveTextContent(
+      /Wines from Penfolds/,
+    );
   });
 
   it("creates the review through the package endpoint with the full form", async () => {

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { winePackageItemsApi, winePackagesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageAllPackages } from "../constants/roles";
-import { sourceLabel } from "../constants/winePackages";
+import { badgeClass, itemReviewState, sourceLabel } from "../constants/winePackages";
 import { formatDate, formatDateTime, deadlineLabel } from "../utils/dates";
 import PackageStatusBadge from "./PackageStatusBadge";
 import WinePackageItemForm from "./WinePackageItemForm";
@@ -109,7 +109,7 @@ function WinePackageDetail() {
     return (
       <div className="wine-app">
         <p className="wine-management__error">{error}</p>
-        <Link to="/wine-packages" className="auth-form__submit">
+        <Link to="/wine-packages" className="wine-btn wine-btn--primary">
           Back to Wine Packages
         </Link>
       </div>
@@ -130,7 +130,10 @@ function WinePackageDetail() {
         <h1>{pkg.producer_name || `Package #${pkg.id}`}</h1>
         <PackageStatusBadge status={pkg.status} />
         {canManage && (
-          <Link to={`/wine-packages/${pkg.id}/edit`} className={styles.actionButton}>
+          <Link
+            to={`/wine-packages/${pkg.id}/edit`}
+            className="wine-btn wine-btn--secondary wine-btn--sm"
+          >
             Edit package
           </Link>
         )}
@@ -186,7 +189,7 @@ function WinePackageDetail() {
           {pkg.can?.accept && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               disabled={busy}
               onClick={() => runAction(() => winePackagesApi.accept(pkg.id))}
             >
@@ -196,7 +199,7 @@ function WinePackageDetail() {
           {pkg.can?.reject && (
             <button
               type="button"
-              className={`${styles.actionButton} ${styles.actionDanger}`}
+              className="wine-btn wine-btn--danger"
               disabled={busy}
               onClick={() => setShowReject((open) => !open)}
             >
@@ -206,7 +209,7 @@ function WinePackageDetail() {
           {pkg.can?.mark_in_transit && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               disabled={busy}
               onClick={() => runAction(() => winePackagesApi.markInTransit(pkg.id))}
             >
@@ -216,7 +219,7 @@ function WinePackageDetail() {
           {pkg.can?.mark_arrived && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               disabled={busy}
               onClick={() =>
                 runAction(() => winePackagesApi.markArrived(pkg.id), {
@@ -230,7 +233,7 @@ function WinePackageDetail() {
           {pkg.can?.mark_completed && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--primary"
               disabled={busy}
               onClick={() =>
                 runAction(() => winePackagesApi.markCompleted(pkg.id), {
@@ -247,7 +250,7 @@ function WinePackageDetail() {
           {pkg.can?.reopen && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               disabled={busy}
               onClick={() => runAction(() => winePackagesApi.reopen(pkg.id))}
             >
@@ -257,7 +260,7 @@ function WinePackageDetail() {
           {pkg.can?.cancel && (
             <button
               type="button"
-              className={`${styles.actionButton} ${styles.actionDanger}`}
+              className="wine-btn wine-btn--danger"
               disabled={busy}
               onClick={() =>
                 runAction(() => winePackagesApi.cancel(pkg.id), {
@@ -291,12 +294,12 @@ function WinePackageDetail() {
             />
           </div>
           <div className={styles.inlineFormActions}>
-            <button type="submit" className="auth-form__submit" disabled={busy}>
+            <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={busy}>
               Reject package
             </button>
             <button
               type="button"
-              className={styles.actionButton}
+              className="wine-btn wine-btn--secondary"
               onClick={() => setShowReject(false)}
             >
               Cancel
@@ -336,27 +339,24 @@ function WinePackageDetail() {
                     <td>{item.quantity}</td>
                     <td className={styles.cellMuted}>{item.condition || "—"}</td>
                     <td>
-                      {!item.review_requested && (
-                        <span className={styles.cellMuted}>Not requested</span>
-                      )}
-                      {item.review_requested && item.reviewed && <span>Reviewed</span>}
-                      {item.review_requested && !item.reviewed && <span>Pending</span>}
-                      {item.review_id && item.review_status === "draft" && (
-                        <div className={styles.cellMuted}>Draft review in progress</div>
-                      )}
+                      <span className={badgeClass(itemReviewState(item).tone)}>
+                        {itemReviewState(item).label}
+                      </span>
                       {item.review_slug && (
                         <div>
-                          <Link to={`/reviews/${item.review_slug}`}>View review</Link>
+                          <Link to={`/reviews/${item.review_slug}`} className="wine-link">
+                            View review
+                          </Link>
                         </div>
                       )}
                     </td>
                     <td>
                       {canManage && (
-                        <div className={styles.actions}>
+                        <div className={styles.rowActions}>
                           {item.reviewable && !item.review_id && (
                             <button
                               type="button"
-                              className={styles.actionButton}
+                              className="wine-btn wine-btn--primary wine-btn--sm"
                               onClick={() =>
                                 setReviewItemId(reviewItemId === item.id ? null : item.id)
                               }
@@ -366,7 +366,7 @@ function WinePackageDetail() {
                           )}
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="wine-btn wine-btn--ghost wine-btn--sm"
                             onClick={() =>
                               setEditingItem(editingItem === item.id ? null : item.id)
                             }
@@ -375,7 +375,7 @@ function WinePackageDetail() {
                           </button>
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.actionDanger}`}
+                            className="wine-btn wine-btn--danger"
                             disabled={busy}
                             onClick={() => handleRemoveItem(item)}
                           >
@@ -401,6 +401,8 @@ function WinePackageDetail() {
               <WinePackageItemForm
                 packageId={pkg.id}
                 item={pkg.items.find((candidate) => candidate.id === editingItem)}
+                producerId={pkg.producer_id}
+                producerName={pkg.producer_name}
                 onSaved={() => {
                   setEditingItem(null);
                   load();
@@ -439,6 +441,8 @@ function WinePackageDetail() {
             {showAddItem ? (
               <WinePackageItemForm
                 packageId={pkg.id}
+                producerId={pkg.producer_id}
+                producerName={pkg.producer_name}
                 onSaved={() => {
                   setShowAddItem(false);
                   load();
@@ -449,7 +453,7 @@ function WinePackageDetail() {
               <div className={styles.inlineFormActions}>
                 <button
                   type="button"
-                  className="auth-form__submit"
+                  className="wine-btn wine-btn--primary"
                   onClick={() => setShowAddItem(true)}
                 >
                   + Add a wine
@@ -466,7 +470,7 @@ function WinePackageDetail() {
         <div className={styles.actions}>
           <button
             type="button"
-            className={`${styles.actionButton} ${styles.actionDanger}`}
+            className="wine-btn wine-btn--danger"
             disabled={busy}
             onClick={handleDelete}
           >

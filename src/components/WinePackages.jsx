@@ -61,7 +61,7 @@ function WinePackages() {
     return (
       <div className="wine-app">
         <p className="wine-management__error">{list.error}</p>
-        <button className="auth-form__submit" onClick={list.reload}>
+        <button className="wine-btn wine-btn--primary" onClick={list.reload}>
           Retry
         </button>
       </div>
@@ -82,13 +82,13 @@ function WinePackages() {
           <div className={styles.headerActions}>
             <Link
               to="/wine-packages/new?mode=arrived"
-              className="auth-form__submit wine-management__add-btn"
+              className="wine-btn wine-btn--primary"
             >
               + Record Received Package
             </Link>
             <Link
               to="/wine-packages/new?mode=announced"
-              className="auth-form__submit wine-management__add-btn"
+              className="wine-btn wine-btn--primary"
             >
               + Add Expected Package
             </Link>
@@ -155,7 +155,7 @@ function WinePackages() {
         <div className="wine-management__empty">
           <p>No wine packages found.</p>
           {canCreate && (
-            <Link to="/wine-packages/new?mode=arrived" className="auth-form__submit">
+            <Link to="/wine-packages/new?mode=arrived" className="wine-btn wine-btn--primary">
               Record Your First Package
             </Link>
           )}
@@ -236,7 +236,12 @@ function WinePackages() {
                       )}
                     </td>
                     <td>
-                      <Link to={`/wine-packages/${pkg.id}`}>Open</Link>
+                      <Link
+                        to={`/wine-packages/${pkg.id}`}
+                        className="wine-btn wine-btn--ghost wine-btn--sm"
+                      >
+                        Open
+                      </Link>
                     </td>
                   </tr>
                 ))}

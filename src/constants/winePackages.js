@@ -68,3 +68,34 @@ export function sourceLabel(source) {
 export function statusTone(status) {
   return STATUS_TONES[status] || "neutral";
 }
+
+// Presentation for the shared `.wine-badge` pill in index.css. Kept beside the
+// tones for the same reason the labels live here: one place to change.
+const BADGE_TONE_CLASSES = {
+  neutral: "wine-badge--neutral",
+  info: "wine-badge--info",
+  warn: "wine-badge--warn",
+  ok: "wine-badge--ok",
+  bad: "wine-badge--bad",
+};
+
+export function badgeClass(tone) {
+  return `wine-badge ${BADGE_TONE_CLASSES[tone] || BADGE_TONE_CLASSES.neutral}`;
+}
+
+// The review state of one line in a package. A line is reviewed as a VINTAGE of
+// a wine, so it reads: not requested → pending → draft in progress → reviewed.
+export const ITEM_REVIEW_STATES = {
+  notRequested: { label: "Not requested", tone: "neutral" },
+  pending: { label: "Pending", tone: "warn" },
+  draft: { label: "Draft in progress", tone: "info" },
+  reviewed: { label: "Reviewed", tone: "ok" },
+};
+
+export function itemReviewState(item) {
+  if (!item || !item.review_requested) return ITEM_REVIEW_STATES.notRequested;
+  if (item.reviewed) return ITEM_REVIEW_STATES.reviewed;
+  if (item.review_id && item.review_status === "draft") return ITEM_REVIEW_STATES.draft;
+  return ITEM_REVIEW_STATES.pending;
+}
+

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isAdmin, canManageWinesRole, canAccessPackages } from "../constants/roles";
+import {
+  isAdmin,
+  canManageWinesRole,
+  canAccessPackages,
+} from "../constants/roles";
 import { categoriesApi } from "../services/api";
 import NotificationBell from "./NotificationBell.jsx";
 
@@ -85,7 +89,8 @@ function Header() {
   // Editors (and reviewers/admins) may manage categories, so show the
   // Settings menu for them too. The "Admin" menu (Users & Roles, API Health,
   // Subscriptions) is admin-only only.
-  const canManageSettings = isAdminUser || canManageWinesRole(effectiveIdentity);
+  const canManageSettings =
+    isAdminUser || canManageWinesRole(effectiveIdentity);
   // Wine packages are for content managers and Reviewers (the people who
   // receive and review the wines).
   const canSeePackages = canAccessPackages(effectiveIdentity);
@@ -289,14 +294,6 @@ function Header() {
                 <NavLink to="/regions" onClick={() => setSettingsOpen(false)}>
                   Regions
                 </NavLink>
-                {isAdminUser && (
-                  <NavLink
-                    to="/admin/logs"
-                    onClick={() => setSettingsOpen(false)}
-                  >
-                    Logs
-                  </NavLink>
-                )}
               </div>
             )}
           </div>

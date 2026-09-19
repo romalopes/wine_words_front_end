@@ -289,7 +289,7 @@ function WinePackageForm() {
                 onChange={(event) => setReviewerId(event.target.value)}
               />
             </div>
-            <button type="button" className={styles.actionButton} onClick={searchReviewers}>
+            <button type="button" className="wine-btn wine-btn--secondary" onClick={searchReviewers}>
               Look up users
             </button>
             {reviewerResults.length > 0 && (
@@ -325,12 +325,12 @@ function WinePackageForm() {
         </div>
 
         <div className={styles.inlineFormActions}>
-          <button type="submit" className="auth-form__submit" disabled={saving}>
+          <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={saving}>
             {saving ? "Saving…" : editing ? "Save Changes" : "Create Package"}
           </button>
           <Link
             to={editing ? `/wine-packages/${id}` : "/wine-packages"}
-            className={styles.actionButton}
+            className="wine-btn wine-btn--secondary"
           >
             Cancel
           </Link>
