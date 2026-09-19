@@ -4,6 +4,7 @@ import {
   imagesApi,
   categoriesApi,
   winesApi,
+  winePackageItemsApi,
 } from "../services/api";
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
@@ -17,7 +18,13 @@ function ReviewForm({
   review,
   onSaved,
   onCancel,
+  // Package mode: when both are present the review is created through the
+  // package item endpoint, which creates it via the ordinary Review path and
+  // links it back to the line in the same request.
+  packageId,
+  packageItemId,
 }) {
+  const packageMode = packageId != null && packageItemId != null;
   const isEditing = Boolean(review);
 
   // Auto-generated title: "Review of {Wine} - {Year|NV}" (create only).
@@ -171,6 +178,11 @@ function ReviewForm({
       };
 
       if (isEditing) {
+        if (packageMode) {
+          throw new Error(
+            "A package review cannot be edited here. Open the review page instead.",
+          );
+        }
         await reviewsApi.update(review.id, {
           ...payload,
           vintage_id: pickedVintage?.id ?? review.vintage_id,
@@ -178,14 +190,22 @@ function ReviewForm({
         if (images && images.length > 0) {
           await imagesApi.upload("review", review.id, images);
         }
+        onSaved();
+      } else if (packageMode) {
+        // Package mode is create-only: the backend creates the review through
+        // the ordinary Review path and links it to the line atomically.
+        const saved = await winePackageItemsApi.createReview(packageId, packageItemId, payload);
+        if (images && images.length > 0 && saved?.id) {
+          await imagesApi.upload("review", saved.id, images);
+        }
+        onSaved(saved);
       } else {
         const saved = await reviewsApi.create(wineSlug, vintageId, payload);
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
         }
+        onSaved(saved);
       }
-
-      onSaved();
     } catch (err) {
       setError(err.message || "Failed to save review");
     } finally {

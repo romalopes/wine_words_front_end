@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { winePackageItemsApi, winePackagesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { canManageWinesRole } from "../constants/roles";
+import { canManageAllPackages } from "../constants/roles";
 import { sourceLabel } from "../constants/winePackages";
 import { formatDate, formatDateTime, deadlineLabel } from "../utils/dates";
 import PackageStatusBadge from "./PackageStatusBadge";
 import WinePackageItemForm from "./WinePackageItemForm";
-import PackageReviewForm from "./PackageReviewForm";
+import ReviewForm from "./ReviewForm";
 import ShipmentTrackingPanel from "./ShipmentTrackingPanel";
 import styles from "./winePackages.module.css";
 
@@ -48,10 +48,10 @@ function WinePackageDetail() {
     load();
   }, [load]);
 
-  // Mirrors the backend's ownership rule: Admins/Editors manage everything a
-  // Reviewer only manages their own.
+  // Mirrors the backend's ownership rule: catalogue managers (Admin/Editor)
+  // manage everything; a Reviewer only manages their own packages.
   const canManage = Boolean(
-    pkg && (canManageWinesRole(user) || Number(pkg.reviewer_id) === Number(user?.id)),
+    pkg && (canManageAllPackages(user) || Number(pkg.reviewer_id) === Number(user?.id)),
   );
 
   async function runAction(action, options = {}) {
@@ -409,18 +409,32 @@ function WinePackageDetail() {
               />
             )}
 
-            {reviewItemId && (
-              <PackageReviewForm
-                packageId={pkg.id}
-                item={pkg.items.find((candidate) => candidate.id === reviewItemId)}
-                onSaved={(review) => {
-                  setReviewItemId(null);
-                  load();
-                  if (review?.slug) navigate(`/reviews/${review.slug}`);
-                }}
-                onCancel={() => setReviewItemId(null)}
-              />
-            )}
+            {reviewItemId &&
+              (() => {
+                const reviewItem = pkg.items.find(
+                  (candidate) => candidate.id === reviewItemId,
+                );
+                if (!reviewItem) return null;
+                return (
+                  <div className="review-form-wrapper">
+                    <ReviewForm
+                      wineSlug={reviewItem.wine_slug}
+                      vintageId={reviewItem.vintage_id}
+                      vintageYear={reviewItem.vintage_year}
+                      wineName={reviewItem.wine_name}
+                      vintageNoVintage={reviewItem.vintage_no_vintage}
+                      packageId={pkg.id}
+                      packageItemId={reviewItem.id}
+                      onSaved={(review) => {
+                        setReviewItemId(null);
+                        load();
+                        if (review?.slug) navigate(`/reviews/${review.slug}`);
+                      }}
+                      onCancel={() => setReviewItemId(null)}
+                    />
+                  </div>
+                );
+              })()}
 
             {showAddItem ? (
               <WinePackageItemForm

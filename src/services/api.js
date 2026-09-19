@@ -209,8 +209,18 @@ export const winesApi = {
     const query = params ? buildQuery(params) : "";
     return request(`/wines/grouped${query}`, { auth: false });
   },
-  search(query) {
-    return request(`/wines/search?q=${encodeURIComponent(query)}`, {
+  search(query, options = {}) {
+    // Also accepts { q, producerId } so a picker can list one producer's wines
+    // without making the user guess a wine name. Plain-string callers stay working.
+    const q = typeof query === "object" && query !== null ? query.q : query;
+    const producerId =
+      typeof query === "object" && query !== null
+        ? query.producerId
+        : options.producerId;
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (producerId) params.set("producer_id", String(producerId));
+    return request(`/wines/search?${params.toString()}`, {
       auth: true,
     });
   },

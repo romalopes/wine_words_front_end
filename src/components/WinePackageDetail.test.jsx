@@ -10,6 +10,8 @@ const mockDestroy = vi.fn();
 const mockItemDestroy = vi.fn();
 const mockCreateReview = vi.fn();
 const mockTrackingShow = vi.fn();
+const mockCategoriesList = vi.fn().mockResolvedValue([]);
+const mockImagesUpload = vi.fn().mockResolvedValue({});
 
 vi.mock("../services/api", () => ({
   winePackagesApi: {
@@ -29,6 +31,9 @@ vi.mock("../services/api", () => ({
   winesApi: { search: vi.fn() },
   producersApi: { list: vi.fn() },
   usersApi: { search: vi.fn() },
+  categoriesApi: { list: (...args) => mockCategoriesList(...args) },
+  imagesApi: { upload: (...args) => mockImagesUpload(...args) },
+  reviewsApi: { update: vi.fn(), show: vi.fn() },
 }));
 
 let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
@@ -95,6 +100,10 @@ const packageDetail = {
       id: 12,
       label: "Grange 2018",
       wine_slug: "grange",
+      wine_name: "Grange",
+      vintage_id: 22,
+      vintage_year: 2018,
+      vintage_no_vintage: false,
       quantity: 1,
       review_requested: true,
       reviewed: false,
@@ -213,6 +222,38 @@ describe("WinePackageDetail", () => {
     await screen.findByText("Grange 2018");
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("button", { name: "Create review" })).toHaveLength(1);
+  });
+
+  it("creates the review through the package endpoint with the full form", async () => {
+    const user = userEvent.setup();
+    mockCategoriesList.mockResolvedValue([]);
+    mockCreateReview.mockResolvedValue({ id: 99, slug: "grange-2018" });
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "Create review" }));
+
+    // The reused review form mounts in package mode with the line's vintage.
+    // Score is a range slider here (label "Score", value shown alongside).
+    const titleInput = await screen.findByLabelText("Title");
+    expect(titleInput.value).toMatch(/grange/i);
+    const scoreSlider = await screen.findByLabelText("Score");
+    await user.click(scoreSlider);
+    expect(scoreSlider).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+    await user.click(screen.getByRole("button", { name: "Submit Review" }));
+
+    await waitFor(() =>
+      expect(mockCreateReview).toHaveBeenCalledWith(
+        7,
+        12,
+        expect.objectContaining({
+          score: 80,
+          status: "published",
+          title: expect.stringContaining("Grange"),
+        }),
+      ),
+    );
   });
 
   it("reports when no tracking has been recorded yet", async () => {

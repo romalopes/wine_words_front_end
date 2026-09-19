@@ -6,7 +6,8 @@ import WinePackageForm from "./WinePackageForm.jsx";
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockShow = vi.fn();
-const mockProducersList = vi.fn();
+const mockProducerSearch = vi.fn().mockResolvedValue([]);
+const mockProducerCreate = vi.fn();
 
 vi.mock("../services/api", () => ({
   winePackagesApi: {
@@ -18,7 +19,10 @@ vi.mock("../services/api", () => ({
   shipmentTrackingsApi: { show: vi.fn() },
   notificationsApi: { list: vi.fn() },
   winesApi: { search: vi.fn() },
-  producersApi: { list: (...args) => mockProducersList(...args) },
+  producersApi: {
+    search: (...args) => mockProducerSearch(...args),
+    create: (...args) => mockProducerCreate(...args),
+  },
   usersApi: { search: vi.fn() },
 }));
 
@@ -50,9 +54,17 @@ describe("WinePackageForm (create)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
-    mockProducersList.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
+    mockProducerSearch.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
     mockCreate.mockResolvedValue({ id: 9 });
   });
+
+  // The form uses ProducerSearch (type + pick), not a producer <select>.
+  async function pickProducer(user, name = "Penfolds") {
+    const input = await screen.findByPlaceholderText("Start typing a producer name…");
+    await user.type(input, name.slice(0, 4));
+    await screen.findByRole("button", { name });
+    await user.click(screen.getByRole("button", { name }));
+  }
 
   it("opens in 'Record Received Package' mode with today's arrival date", async () => {
     renderForm();
@@ -69,7 +81,7 @@ describe("WinePackageForm (create)", () => {
     renderForm();
 
     await screen.findByRole("heading", { name: "Record Received Package" });
-    await user.selectOptions(screen.getByLabelText("Producer"), "3");
+    await pickProducer(user);
     await user.click(screen.getByRole("button", { name: "Create Package" }));
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
@@ -90,7 +102,7 @@ describe("WinePackageForm (create)", () => {
     await screen.findByRole("heading", { name: "Add Expected Package" });
     expect(screen.queryByLabelText("Arrived date")).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText("Producer"), "3");
+    await pickProducer(user);
     await user.click(screen.getByRole("button", { name: "Create Package" }));
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
@@ -115,10 +127,11 @@ describe("WinePackageForm (edit)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
-    mockProducersList.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
+    mockProducerSearch.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
     mockShow.mockResolvedValue({
       id: 7,
       producer_id: 3,
+      producer_name: "Penfolds",
       source: "unexpected",
       status: "arrived",
       expected_at: null,

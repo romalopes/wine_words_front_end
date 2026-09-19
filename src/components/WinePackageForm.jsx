@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { producersApi, usersApi, winePackagesApi } from "../services/api";
+import { usersApi, winePackagesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
+import ProducerSearch from "./ProducerSearch";
 import { sourceLabel } from "../constants/winePackages";
 import { todayInputValue } from "../utils/dates";
 import styles from "./winePackages.module.css";
@@ -53,9 +54,9 @@ function WinePackageForm() {
   const requestedMode = searchParams.get("mode");
 
   const [mode, setMode] = useState(MODES[requestedMode] ? requestedMode : "draft");
-  const [producers, setProducers] = useState([]);
   const [form, setForm] = useState({
     producer_id: "",
+    producer_name: "",
     source: MODES[requestedMode]?.source || "manual",
     expected_at: "",
     arrived_at: requestedMode === "arrived" ? todayInputValue() : "",
@@ -69,13 +70,6 @@ function WinePackageForm() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    producersApi
-      .list()
-      .then((data) => setProducers(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (!editing) return undefined;
     let cancelled = false;
 
@@ -86,6 +80,7 @@ function WinePackageForm() {
         setReviewerId(pkg.reviewer_id || "");
         setForm({
           producer_id: pkg.producer_id || "",
+          producer_name: pkg.producer_name || "",
           source: pkg.source || "manual",
           expected_at: pkg.expected_at || "",
           arrived_at: pkg.arrived_at ? pkg.arrived_at.slice(0, 10) : "",
@@ -114,6 +109,14 @@ function WinePackageForm() {
   function chooseMode(next) {
     setMode(next);
     updateField("source", MODES[next].source);
+  }
+
+  function handleProducerChange(id, name) {
+    setForm((current) => ({
+      ...current,
+      producer_id: id ? String(id) : "",
+      producer_name: name || "",
+    }));
   }
 
   async function searchReviewers() {
@@ -212,20 +215,7 @@ function WinePackageForm() {
 
         <div className={styles.filters}>
           <div className={styles.filterField}>
-            <label htmlFor="package-producer">Producer</label>
-            <select
-              id="package-producer"
-              required
-              value={form.producer_id}
-              onChange={(event) => updateField("producer_id", event.target.value)}
-            >
-              <option value="">Select a producer…</option>
-              {producers.map((producer) => (
-                <option key={producer.id} value={producer.id}>
-                  {producer.name}
-                </option>
-              ))}
-            </select>
+            <ProducerSearch value={form.producer_name} onChange={handleProducerChange} />
           </div>
 
           {editing ? (
