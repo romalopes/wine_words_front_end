@@ -7,6 +7,7 @@ import {
   canAccessPackages,
 } from "../constants/roles";
 import { categoriesApi } from "../services/api";
+import { useTestAccess } from "../contexts/TestAccessContext.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 
 function NavDropdown({ label, items }) {
@@ -73,6 +74,7 @@ function Header() {
     signOut,
     stopImpersonation,
   } = useAuth();
+  const { exit: exitTestAccess } = useTestAccess();
   const navigate = useNavigate();
 
   // Admin nav links are gated on the REAL user (the admin), not the effective
@@ -142,6 +144,11 @@ function Header() {
   async function handleSignOut() {
     await signOut();
     navigate("/login");
+  }
+
+  function handleExitTestAccess() {
+    exitTestAccess();
+    navigate("/test-access");
   }
 
   function getDisplayName() {
@@ -387,6 +394,15 @@ function Header() {
             Login / Sign up
           </NavLink>
         )}
+
+        <button
+          type="button"
+          className="test-access-exit"
+          onClick={handleExitTestAccess}
+          title="Clear private test access"
+        >
+          Exit Test Mode
+        </button>
       </nav>
       {user && <NotificationBell />}
     </header>

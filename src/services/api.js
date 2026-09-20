@@ -3,6 +3,40 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:300
 
 const TOKEN_STORAGE_KEY = "wine_prediction_token";
 
+// --- Private test-access gate ---------------------------------------------
+// While the Rails API has TEST_ACCESS_PASSWORD configured, every request must
+// carry a signed test-access token in the X-Test-Access-Token header. The
+// token is exchanged for the password at /test_access (server-side check) and
+// stored in sessionStorage — never the password itself, never localStorage.
+export const TEST_ACCESS_STORAGE_KEY = "wine_words_test_access_token";
+
+export function getTestAccessToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(TEST_ACCESS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setTestAccessToken(token) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      window.sessionStorage.setItem(TEST_ACCESS_STORAGE_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(TEST_ACCESS_STORAGE_KEY);
+    }
+  } catch {
+    // Storage may be unavailable (private mode); access just won't persist
+    // across refreshes.
+  }
+}
+
+export function clearTestAccessToken() {
+  setTestAccessToken(null);
+}
+
 let authToken = null;
 
 export function setAuthToken(token) {
@@ -64,6 +98,13 @@ async function request(
     requestHeaders.Authorization = `Bearer ${authToken}`;
   }
 
+  // Private test-access gate: attach the signed token issued by /test_access
+  // (no-op when absent — e.g. gate disabled).
+  const testAccessToken = getTestAccessToken();
+  if (testAccessToken) {
+    requestHeaders["X-Test-Access-Token"] = testAccessToken;
+  }
+
   const url = API_BASE_URL + path;
   const response = await fetch(url, {
     method,
@@ -79,6 +120,16 @@ async function request(
     : await response.text();
 
   if (!response.ok) {
+    // Test-access token expired or invalidated mid-session: clear it and send
+    // the user back to the gate page.
+    if (
+      response.status === 401 &&
+      data?.code === "test_access_required" &&
+      !window.location.pathname.startsWith("/test-access")
+    ) {
+      clearTestAccessToken();
+      window.location.assign("/test-access?expired=1");
+    }
     const message =
       (isJson && (data?.error || data?.message)) ||
       (Array.isArray(data?.errors) && data.errors.join(", ")) ||
@@ -86,6 +137,7 @@ async function request(
       `Request failed with status ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
+    error.code = data?.code;
     error.data = data;
     throw error;
   }
@@ -970,6 +1022,21 @@ export const notificationsApi = {
       method: "PATCH",
       auth: true,
     });
+  },
+};
+
+// --- Private test-access gate ---------------------------------------------
+// Exchanges the entered password for a signed test-access token, and verifies
+// the stored token on boot (the SPA calls this to detect expiry).
+export const testAccessApi = {
+  submit(password) {
+    return request("/test_access", {
+      method: "POST",
+      body: { password },
+    });
+  },
+  verify() {
+    return request("/test_access");
   },
 };
 

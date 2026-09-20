@@ -1,4 +1,4 @@
-import { Route, Routes, Navigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import About from "./About.jsx";
 import AccountSettings from "./AccountSettings.jsx";
 import Dashboard from "./Dashboard.jsx";
@@ -31,6 +31,7 @@ import Regions from "./Regions.jsx";
 import RegionDetail from "./RegionDetail.jsx";
 import ApiHealth from "./ApiHealth/ApiHealth.jsx";
 import Subscribe from "./Subscribe.jsx";
+import TestAccessPage from "./TestAccess.jsx";
 import SubscriptionAdmin from "./SubscriptionAdmin.jsx";
 import Logs from "./Logs.jsx";
 import LogDetail from "./LogDetail.jsx";
@@ -44,6 +45,7 @@ function AppRoutes({ user, setUser }) {
   return (
     <>
       <Routes>
+        <Route path="/test-access" element={<TestAccessPage />} />
         <Route element={<AccountSettings />} path="/account" />
         <Route element={<Dashboard />} path="/" />
         <Route element={<Home />} path="/finder" />
