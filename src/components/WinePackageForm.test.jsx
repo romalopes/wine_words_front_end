@@ -8,6 +8,7 @@ const mockUpdate = vi.fn();
 const mockShow = vi.fn();
 const mockProducerSearch = vi.fn().mockResolvedValue([]);
 const mockProducerCreate = vi.fn();
+const mockImagesUpload = vi.fn().mockResolvedValue({});
 
 vi.mock("../services/api", () => ({
   winePackagesApi: {
@@ -24,6 +25,12 @@ vi.mock("../services/api", () => ({
     create: (...args) => mockProducerCreate(...args),
   },
   usersApi: { search: vi.fn() },
+  imagesApi: {
+    upload: (...args) => mockImagesUpload(...args),
+    destroy: vi.fn(),
+    reorder: vi.fn(),
+    setPrimary: vi.fn(),
+  },
 }));
 
 let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
@@ -121,6 +128,41 @@ describe("WinePackageForm (create)", () => {
 
     expect(screen.getByLabelText("Source")).toHaveValue("producer_request");
   });
+
+  it("uploads staged images right after creating the package", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await screen.findByRole("heading", { name: "Record Received Package" });
+    await pickProducer(user);
+
+    const fileInput = document.querySelector('input[type="file"]');
+    const first = new File(["a"], "box.jpg", { type: "image/jpeg" });
+    const second = new File(["b"], "label.jpg", { type: "image/jpeg" });
+    await user.upload(fileInput, [first, second]);
+
+    await user.click(screen.getByRole("button", { name: "Create Package" }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockImagesUpload).toHaveBeenCalledWith("wine_package", 9, [
+        first,
+        second,
+      ]),
+    );
+  });
+
+  it("still creates the package when no images are staged", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await screen.findByRole("heading", { name: "Record Received Package" });
+    await pickProducer(user);
+    await user.click(screen.getByRole("button", { name: "Create Package" }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(mockImagesUpload).not.toHaveBeenCalled();
+  });
 });
 
 describe("WinePackageForm (edit)", () => {
@@ -161,6 +203,23 @@ describe("WinePackageForm (edit)", () => {
     // Source and status belong to the workflow, not this form.
     expect(payload).not.toHaveProperty("status");
     expect(payload).not.toHaveProperty("source");
+  });
+
+  it("shows the existing package images when editing", async () => {
+    mockShow.mockResolvedValue({
+      producer_id: 3,
+      producer_name: "Penfolds",
+      source: "manual",
+      notes: "n",
+      images: ["http://img.test/one.png", "http://img.test/two.png"],
+      image_ids: [11, 12],
+    });
+
+    renderForm("/wine-packages/7/edit");
+
+    await screen.findByRole("heading", { name: "Edit Package #7" });
+    const thumbs = await screen.findAllByRole("img", { name: /attachment/ });
+    expect(thumbs).toHaveLength(2);
   });
 
   it("does not offer the reviewer field to a non-admin", async () => {

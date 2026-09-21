@@ -3727,3 +3727,175 @@ textarea {
   opacity: 0.4;
   cursor: default;
 }
+
+/* ===== ImageManager (wine, article, review, wine-package images) ===== */
+.image-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.image-manager__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #4a1020;
+}
+.image-manager__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b3261e;
+}
+.image-manager__error-dismiss {
+  background: none;
+  border: none;
+  color: #b3261e;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.image-manager__dropzone {
+  border: 1.5px dashed #d9c9bf;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  text-align: center;
+  color: #7a6a60;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.image-manager__dropzone:hover,
+.image-manager__dropzone--over {
+  border-color: #4a1020;
+  background: #faf7f2;
+}
+.image-manager__dropzone-text {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  color: #4a1020;
+}
+.image-manager__dropzone-hint {
+  margin: 0;
+  font-size: 0.75rem;
+}
+.image-manager__input {
+  display: none;
+}
+.image-manager__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.image-manager__card {
+  position: relative;
+  width: 8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid #e5ddd5;
+  border-radius: 8px;
+  padding: 0.4rem;
+  background: #fff;
+}
+.image-manager__card--pending {
+  outline: 2px dashed #b3924f;
+  background: #fdf9f0;
+}
+.image-manager__thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+  cursor: zoom-in;
+}
+.image-manager__thumb-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+.image-manager__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.image-manager__control {
+  flex: 1 1 auto;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid #d9c9bf;
+  border-radius: 4px;
+  background: #fff;
+  color: #4a1020;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.image-manager__control:hover:not(:disabled) {
+  background: #f6e8ea;
+}
+.image-manager__control--danger {
+  color: #b3261e;
+}
+.image-manager__control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.image-manager__lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(30, 10, 16, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.image-manager__lightbox-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(90vw, 60rem);
+}
+.image-manager__lightbox-img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.image-manager__lightbox-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.image-manager__lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  font-size: 1.6rem;
+  color: #fff;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.image-manager__lightbox-nav {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.image-manager__lightbox-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ===== WinePackage detail: read-only viewer gallery ===== */
+.image-manager__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.image-manager__thumbs .image-manager__thumb {
+  width: 8rem;
+  height: 8rem;
+}

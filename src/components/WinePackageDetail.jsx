@@ -14,6 +14,7 @@ import PackageStatusBadge from "./PackageStatusBadge";
 import WinePackageItemForm from "./WinePackageItemForm";
 import ReviewForm from "./ReviewForm";
 import ShipmentTrackingPanel from "./ShipmentTrackingPanel";
+import ImageManager from "./ImageManager";
 import styles from "./winePackages.module.css";
 
 // One wine package: what arrived, who is responsible, how the reviews are
@@ -178,6 +179,35 @@ function WinePackageDetail() {
       )}
 
       {pkg.notes && <p className={styles.cellMuted}>{pkg.notes}</p>}
+
+      {(canManage || (Array.isArray(pkg.images) && pkg.images.length > 0)) && (
+        <div className={styles.section}>
+          <h2>Package images</h2>
+          {canManage ? (
+            <ImageManager
+              imageableType="wine_package"
+              imageableId={pkg.id}
+              images={Array.isArray(pkg.images) ? pkg.images : []}
+              imageIds={Array.isArray(pkg.image_ids) ? pkg.image_ids : []}
+              onImagesChange={load}
+            />
+          ) : (
+            <div className="image-manager__thumbs">
+              {pkg.images.map((src) => (
+                <a
+                  key={src}
+                  href={src}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="image-manager__thumb"
+                >
+                  <img src={src} alt="Package image" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.section}>
         <h2>Review progress</h2>

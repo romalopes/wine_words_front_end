@@ -174,6 +174,44 @@ describe("WinePackageDetail", () => {
     expect(screen.getByText("Left at reception")).toBeInTheDocument();
   });
 
+  it("shows the image gallery when the package has images (view-only for non-managers)", async () => {
+    mockShow.mockResolvedValue({
+      ...packageDetail,
+      images: ["http://img.test/a.png", "http://img.test/b.png"],
+      image_ids: [5, 6],
+    });
+    currentUser = { id: 99, user_name: "Viewer", roles: ["Guest"] };
+
+    renderDetail();
+
+    expect(
+      await screen.findByRole("heading", { name: "Package images" }),
+    ).toBeInTheDocument();
+    const thumbs = await screen.findAllByRole("img", { name: "Package image" });
+    expect(thumbs).toHaveLength(2);
+    // No management UI for viewers.
+    expect(screen.queryByText(/Add images/i)).not.toBeInTheDocument();
+  });
+
+  it("does not render the image section for a viewer when the package has no images", async () => {
+    currentUser = { id: 99, user_name: "Viewer", roles: ["Guest"] };
+    renderDetail();
+
+    await screen.findByRole("heading", { name: "Penfolds" });
+    expect(
+      screen.queryByRole("heading", { name: "Package images" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers the image manager to a manager even before any image exists", async () => {
+    renderDetail();
+
+    await screen.findByRole("heading", { name: "Penfolds" });
+    expect(
+      await screen.findByRole("heading", { name: "Package images" }),
+    ).toBeInTheDocument();
+  });
+
   it("reports review progress from the API payload", async () => {
     renderDetail();
 

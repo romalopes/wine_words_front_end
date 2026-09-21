@@ -6,6 +6,9 @@ import { isAdmin } from "../constants/roles";
 import ProducerSearch from "./ProducerSearch";
 import { sourceLabel } from "../constants/winePackages";
 import { todayInputValue } from "../utils/dates";
+import ImageManager from "./ImageManager";
+import { imagesApi } from "../services/api";
+
 import styles from "./winePackages.module.css";
 
 // The four ways a package enters the workflow. `status` is the entry point the
@@ -65,6 +68,11 @@ function WinePackageForm() {
   });
   const [reviewerId, setReviewerId] = useState("");
   const [reviewerResults, setReviewerResults] = useState([]);
+  // Existing server-side images (editing mode) and locally staged files that
+  // upload right after creation (create mode).
+  const [existingImages, setExistingImages] = useState([]);
+  const [existingImageIds, setExistingImageIds] = useState([]);
+  const [stagedImages, setStagedImages] = useState([]);
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -78,6 +86,8 @@ function WinePackageForm() {
         const pkg = await winePackagesApi.show(id);
         if (cancelled) return;
         setReviewerId(pkg.reviewer_id || "");
+        setExistingImages(Array.isArray(pkg.images) ? pkg.images : []);
+        setExistingImageIds(Array.isArray(pkg.image_ids) ? pkg.image_ids : []);
         setForm({
           producer_id: pkg.producer_id || "",
           producer_name: pkg.producer_name || "",
@@ -158,6 +168,22 @@ function WinePackageForm() {
       }
 
       const created = await winePackagesApi.create(payload);
+      // Upload any images staged before creation, then land on the detail
+      // page. A failed image upload does not lose the package — the user can
+      // retry from the detail page.
+      if (stagedImages.length > 0) {
+        try {
+          await imagesApi.upload("wine_package", created.id, stagedImages);
+          setStagedImages([]);
+        } catch (imgErr) {
+          setError(
+            imgErr.message ||
+              "Package created, but some images could not be uploaded. Retry from the package page.",
+          );
+          setSaving(false);
+          return;
+        }
+      }
       navigate(`/wine-packages/${created.id}`);
     } catch (err) {
       setError(err.message || "Failed to save wine package");
@@ -320,6 +346,27 @@ function WinePackageForm() {
               rows="4"
               value={form.notes}
               onChange={(event) => updateField("notes", event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className={styles.filters}>
+          <div style={{ flex: "1 1 24rem" }}>
+            <label className="image-manager__label">
+              Package images (optional — photos of the package, labels, damage…)
+            </label>
+            <ImageManager
+              imageableType="wine_package"
+              imageableId={editing ? id : null}
+              images={existingImages}
+              imageIds={existingImageIds}
+              onFilesChange={(files) => setStagedImages(files)}
+              onImagesChange={async () => {
+                if (!editing) return;
+                const reloaded = await winePackagesApi.show(id);
+                setExistingImages(Array.isArray(reloaded.images) ? reloaded.images : []);
+                setExistingImageIds(Array.isArray(reloaded.image_ids) ? reloaded.image_ids : []);
+              }}
             />
           </div>
         </div>
