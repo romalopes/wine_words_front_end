@@ -3589,3 +3589,141 @@ textarea {
   text-decoration: underline;
 }
 
+
+
+/* ===== Admin users (horizontal cards, cf. beachvolleyballproject) ===== */
+.admin-users {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.admin-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem 2rem;
+  padding: 1.125rem 1.5rem;
+  border: 1px solid #e5ddd5;
+  border-radius: 10px;
+  background: #faf7f2;
+  box-shadow: 0 1px 3px rgba(74, 16, 32, 0.05);
+}
+
+.admin-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 220px;
+  max-width: 300px;
+  flex: 0 1 auto;
+}
+
+.admin-user-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #4a1020;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-email {
+  font-size: 0.8125rem;
+  color: #7a6a60;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 0 1 auto;
+}
+
+.role-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.6rem;
+  background: #f6e8ea;
+  color: #4a1020;
+  border: 1px solid #e8cfd5;
+  border-radius: 999px;
+}
+
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-left: auto;
+}
+
+.admin-user-actions .role-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #4a3540;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.admin-user-subscription {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #4a3540;
+  padding-left: 1rem;
+  border-left: 1px solid #e5ddd5;
+}
+
+.admin-user-subscription select {
+  padding: 0.3rem 0.45rem;
+  font-size: 0.8rem;
+  border: 1px solid #d9c9bf;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.admin-user-actions .admin-pagination__btn {
+  padding: 0.4rem 0.9rem;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  font-weight: 500;
+  color: #4a3540;
+}
+
+.admin-pagination__btn {
+  padding: 0.4rem 0.875rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4a1020;
+  background: #fff;
+  border: 1px solid #d9c9bf;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.admin-pagination__btn:hover:not(:disabled) {
+  background: #f6e8ea;
+}
+
+.admin-pagination__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

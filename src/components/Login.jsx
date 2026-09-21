@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { authApi } from "../services/api";
+import { authApi, emailVerificationsApi } from "../services/api";
 import {
   PROVIDER_LABELS,
   ProviderCancelledError,
@@ -74,6 +74,11 @@ function Login() {
   const [formError, setFormError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Set when the backend says the account exists but is not email-verified:
+  // { email, expired, deadline } → the "check your inbox" banner replaces the
+  // form and offers a resend.
+  const [verificationNotice, setVerificationNotice] = useState(null);
+  const [resendState, setResendState] = useState({ status: "idle", message: null });
   // Provider whose popup is currently open, so only that button shows as busy.
   const [pendingProvider, setPendingProvider] = useState(null);
 
@@ -131,12 +136,23 @@ function Login() {
       }
 
       if (isSignUp) {
-        await signUp({
+        const result = await signUp({
           email,
           password,
           password_confirmation,
           user_name: user_name.trim(),
         });
+        // Email verification required: the account exists but has no session.
+        // Show the "check your inbox" banner with the verification deadline.
+        if (result?.email_verification?.email_verification_pending) {
+          setVerificationNotice({
+            email,
+            expired: result.email_verification.email_verification_expired === true,
+            deadline: result.email_verification.email_verification_deadline,
+          });
+          setResendState({ status: "idle", message: null });
+          return;
+        }
       } else {
         await signIn({ email, password });
       }
@@ -144,11 +160,46 @@ function Login() {
       navigate("/wines", { replace: true });
     } catch (error) {
       console.error(error);
+      // Sign-in blocked by the email-verification lock (403 + payload).
+      if (error.status === 403 && error.data?.email_verification_pending) {
+        setVerificationNotice({
+          email: form.email,
+          expired: error.data.email_verification_expired === true,
+          deadline: error.data.email_verification_deadline,
+        });
+        setResendState({ status: "idle", message: null });
+        return;
+      }
       setFormError(error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  async function handleResendVerification() {
+    if (!verificationNotice?.email) return;
+    setResendState({ status: "sending", message: null });
+    try {
+      const result = await emailVerificationsApi.resend(verificationNotice.email);
+      setVerificationNotice((prev) => ({ ...prev, expired: false }));
+      setResendState({
+        status: "sent",
+        message: result.message || "A new verification email has been sent. Check your inbox — you have 24 hours to click the link.",
+      });
+    } catch (err) {
+      setResendState({ status: "idle", message: err.message || "Could not send the email." });
+    }
+  }
+
+  // Human-readable time remaining until the verification deadline.
+  function describeTimeRemaining(deadline) {
+    if (!deadline) return "24 hours";
+    const secondsLeft = Math.floor((new Date(deadline).getTime() - Date.now()) / 1000);
+    if (secondsLeft <= 0) return "the link has expired";
+    const hours = Math.floor(secondsLeft / 3600);
+    const minutes = Math.floor((secondsLeft % 3600) / 60);
+    return hours > 0 ? `${hours} hour${hours === 1 ? "" : "s"}${minutes ? ` and ${minutes} min` : ""}` : `${minutes} min`;
+  }
 // "Continue with <provider>": run the provider's popup, then hand the
   // provider-issued credential to the API. The API verifies it and returns the
   // same session payload as email/password, so nothing after this point needs
@@ -189,6 +240,38 @@ function Login() {
           <p className="auth-card__status">
             You are already signed in as {user.email}.
           </p>
+        ) : verificationNotice ? (
+          <>
+            <p className="wine-kicker">Verify your email</p>
+            <h1 id="auth-title">Check your inbox</h1>
+            <p className="auth-card__status">
+              We sent a verification link to <strong>{verificationNotice.email}</strong>.
+              {verificationNotice.expired
+                ? " Your previous link has expired, so the account is locked until you verify."
+                : ` You have ${describeTimeRemaining(verificationNotice.deadline)} to click the link — after that the account is locked until you verify.`}
+            </p>
+            <button
+              className="auth-form__submit"
+              disabled={resendState.status === "sending"}
+              onClick={handleResendVerification}
+              type="button"
+            >
+              {resendState.status === "sending" ? "Sending..." : "Resend verification email"}
+            </button>
+            {resendState.message && (
+              <p
+                className={resendState.status === "sent" ? "auth-card__status" : "auth-form__error"}
+                role={resendState.status === "sent" ? "status" : "alert"}
+              >
+                {resendState.message}
+              </p>
+            )}
+            <p className="auth-card__switch">
+              <button onClick={() => { setVerificationNotice(null); setResendState({ status: "idle", message: null }); }} type="button">
+                Back to sign in
+              </button>
+            </p>
+          </>
         ) : (
           <>
             <p className="wine-kicker">

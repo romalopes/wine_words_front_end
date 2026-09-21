@@ -98,6 +98,12 @@ export function AuthProvider({ children }) {
         password_confirmation,
         user_name,
       });
+      // Email verification required: the backend created the account but
+      // issued NO session. Do not set auth state - Login shows the
+      // "check your inbox" banner using the full result returned here.
+      if (result?.email_verification?.email_verification_pending) {
+        return result;
+      }
       const nextToken = extractToken(result);
       persistToken(nextToken);
       setUser(result.user ?? null);

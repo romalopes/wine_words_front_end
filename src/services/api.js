@@ -401,8 +401,8 @@ export const usersApi = {
   roles() {
     return request("/roles", { auth: true });
   },
-  search(q) {
-    return request(`/users/search?q=${encodeURIComponent(q)}`, { auth: true });
+  search(q, page = 1) {
+    return request(`/users/search?q=${encodeURIComponent(q)}&page=${page}`, { auth: true });
   },
   assignRoles(userId, roleIds) {
     return request(`/users/${userId}/assign_roles`, {
@@ -845,15 +845,60 @@ export const impersonationApi = {
 };
 
 export const configurationApi = {
-  // Admin-only global configuration. Returns { logs_saved_to_database }.
+  // Admin-only global configuration. Returns { logs_saved_to_database,
+  // use_test_email, test_email, settings: [...] }.
   fetch() {
     return request("/configuration", { auth: true });
   },
-  update(logsSavedToDatabase) {
+  update(payload) {
     return request("/configuration", {
       method: "PATCH",
       auth: true,
-      body: { logs_saved_to_database: logsSavedToDatabase },
+      body: payload,
+    });
+  },
+};
+
+// Custom (user-added) app_settings rows, nested under the configuration
+// resource. Admin-only.
+export const emailVerificationsApi = {
+  // GET /api/v1/email-verifications/:token — consumes the token clicked from
+  // the verification email. 422 when invalid/expired.
+  verify(token) {
+    return request(`/email-verifications/${encodeURIComponent(token)}`);
+  },
+  // POST /api/v1/email-verifications/resend — uniform 202 regardless of
+  // whether the address exists / is already verified (no user enumeration).
+  resend(emailAddress) {
+    return request("/email-verifications/resend", {
+      method: "POST",
+      body: { email_address: emailAddress },
+    });
+  },
+};
+
+export const settingsApi = {
+  list() {
+    return request("/configuration/settings", { auth: true });
+  },
+  create({ key, value }) {
+    return request("/configuration/settings", {
+      method: "POST",
+      auth: true,
+      body: { key, value },
+    });
+  },
+  update(id, { value }) {
+    return request(`/configuration/settings/${id}`, {
+      method: "PATCH",
+      auth: true,
+      body: { value },
+    });
+  },
+  destroy(id) {
+    return request(`/configuration/settings/${id}`, {
+      method: "DELETE",
+      auth: true,
     });
   },
 };

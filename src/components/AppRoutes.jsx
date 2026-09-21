@@ -40,6 +40,7 @@ import WinePackages from "./WinePackages.jsx";
 import WinePackageDetail from "./WinePackageDetail.jsx";
 import WinePackageForm from "./WinePackageForm.jsx";
 import Notifications from "./Notifications.jsx";
+import VerifyEmail from "./VerifyEmail.jsx";
 
 function AppRoutes({ user, setUser }) {
   return (
@@ -56,6 +57,7 @@ function AppRoutes({ user, setUser }) {
           element={<Login user={user} setUser={setUser} />}
         />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route element={<Navigate replace to="/reviews" />} path="/my-reviews" />
         <Route element={<Reviews />} path="/reviews" />
         <Route element={<ReviewDetail />} path="/reviews/:slug" />

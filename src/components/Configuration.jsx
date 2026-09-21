@@ -1,19 +1,32 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
-import { configurationApi } from "../services/api";
+import { configurationApi, settingsApi } from "../services/api";
 
-// Global Configuration page (admin-only). Edits the runtime settings stored
-// in the backend's app_settings table. Each attribute is rendered as its own
-// row; the first one is the "save logs to database" audit-trail toggle
-// (default: true). New global attributes should follow the same pattern:
-// add the default to the backend AppSetting model, expose it through
-// /api/v1/configuration, then render a control row here.
+// New (unsaved) custom settings carry a client-generated temp id like
+// "new-<timestamp>-<random>"; server rows have numeric ids.
+function isTempId(id) {
+  return typeof id === "string" && id.startsWith("new-");
+}
+
 function Configuration() {
   const { user } = useAuth();
   const isAdminUser = isAdmin(user);
+
   const [logsSaved, setLogsSaved] = useState(true);
   const [savedLogsSaved, setSavedLogsSaved] = useState(true);
+  const [useTestEmail, setUseTestEmail] = useState(false);
+  const [savedUseTestEmail, setSavedUseTestEmail] = useState(false);
+  const [testEmail, setTestEmail] = useState("romalopes@yahoo.com.br");
+  const [savedTestEmail, setSavedTestEmail] = useState("romalopes@yahoo.com.br");
+
+  const [customSettings, setCustomSettings] = useState([]);
+  const [savedCustomSettings, setSavedCustomSettings] = useState([]);
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editingValue, setEditingValue] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -26,9 +39,15 @@ function Configuration() {
       .fetch()
       .then((data) => {
         if (cancelled) return;
-        const value = data?.logs_saved_to_database !== false;
-        setLogsSaved(value);
-        setSavedLogsSaved(value);
+        setLogsSaved(data?.logs_saved_to_database !== false);
+        setSavedLogsSaved(data?.logs_saved_to_database !== false);
+        setUseTestEmail(data?.use_test_email === true);
+        setSavedUseTestEmail(data?.use_test_email === true);
+        setTestEmail(data?.test_email || "romalopes@yahoo.com.br");
+        setSavedTestEmail(data?.test_email || "romalopes@yahoo.com.br");
+        const settings = Array.isArray(data?.settings) ? data.settings : [];
+        setCustomSettings(settings);
+        setSavedCustomSettings(settings);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Failed to load configuration.");
@@ -36,9 +55,7 @@ function Configuration() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isAdminUser]);
 
   if (!isAdminUser) {
@@ -46,25 +63,58 @@ function Configuration() {
       <main className="wine-management">
         <div className="wine-management__container">
           <h1>Configuration</h1>
-          <p className="wine-management__hint">
-            Access denied. Admin role required.
-          </p>
+          <p className="wine-management__hint">Access denied. Admin role required.</p>
         </div>
       </main>
     );
   }
 
-  const dirty = logsSaved !== savedLogsSaved;
+  const logsDirty = logsSaved !== savedLogsSaved;
+  const emailDirty = useTestEmail !== savedUseTestEmail || testEmail !== savedTestEmail;
+  const customDirty = JSON.stringify(customSettings) !== JSON.stringify(savedCustomSettings);
+  const dirty = logsDirty || emailDirty || customDirty;
 
   async function handleSave(event) {
     event.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      const data = await configurationApi.update(logsSaved);
-      const value = data?.logs_saved_to_database !== false;
-      setLogsSaved(value);
-      setSavedLogsSaved(value);
+      const payload = {};
+      if (logsDirty) payload.logs_saved_to_database = logsSaved;
+      if (emailDirty) {
+        payload.use_test_email = useTestEmail;
+        payload.test_email = testEmail;
+      }
+      if (customDirty) {
+        const savedMap = new Map(savedCustomSettings.map((s) => [s.id, s]));
+        const currentMap = new Map(customSettings.map((s) => [s.id, s]));
+        for (const saved of savedCustomSettings) {
+          const current = currentMap.get(saved.id);
+          if (current) {
+            if (current.value !== saved.value) {
+              await settingsApi.update(saved.id, { value: current.value });
+            }
+          } else {
+            await settingsApi.destroy(saved.id);
+          }
+        }
+        for (const current of customSettings) {
+          if (isTempId(current.id)) {
+            const created = await settingsApi.create({ key: current.key, value: current.value });
+            setCustomSettings((prev) => prev.map((s) => (s.id === current.id ? created : s)));
+          }
+        }
+      }
+      const data = await configurationApi.update(payload);
+      setLogsSaved(data?.logs_saved_to_database !== false);
+      setSavedLogsSaved(data?.logs_saved_to_database !== false);
+      setUseTestEmail(data?.use_test_email === true);
+      setSavedUseTestEmail(data?.use_test_email === true);
+      setTestEmail(data?.test_email || "romalopes@yahoo.com.br");
+      setSavedTestEmail(data?.test_email || "romalopes@yahoo.com.br");
+      const settings = Array.isArray(data?.settings) ? data.settings : [];
+      setCustomSettings(settings);
+      setSavedCustomSettings(settings);
       setSavedAt(new Date());
     } catch (err) {
       setError(err.message || "Failed to save configuration.");
@@ -73,73 +123,118 @@ function Configuration() {
     }
   }
 
+  function addCustomSetting() {
+    const key = newKey.trim();
+    if (!key) return;
+    const tempId = "new-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    setCustomSettings((prev) => [...prev, { id: tempId, key, value: newValue.trim() }]);
+    setNewKey("");
+    setNewValue("");
+  }
+
+  function deleteCustomSetting(id) {
+    setCustomSettings((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  function startEdit(setting) {
+    setEditingId(setting.id);
+    setEditingValue(setting.value);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingValue("");
+  }
+
+  function commitEdit(id, newValue) {
+    setCustomSettings((prev) => prev.map((s) => (s.id === id ? { ...s, value: newValue } : s)));
+    setEditingId(null);
+    setEditingValue("");
+  }
+
   return (
     <main className="wine-management">
       <div className="wine-management__container">
         <h1>Configuration</h1>
-        <p className="wine-management__hint">
-          Global application settings. Changes take effect immediately for
-          every user of the system.
-        </p>
-
+        <p className="wine-management__hint">Global application settings. Changes take effect immediately.</p>
         {loading ? (
-          <p className="wine-management__hint">Loading configuration…</p>
+          <p className="wine-management__hint">Loading configuration...</p>
         ) : (
           <form onSubmit={handleSave}>
-            <div className="wine-management__header">
-              <div>
-                <h2>Logs</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+              <div style={{ border: "1px solid #ccc", borderRadius: 6, padding: 16, background: "#fafafa" }}>
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#333", marginBottom: 10 }}>Logs</h2>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input type="checkbox" checked={logsSaved} onChange={(e) => setLogsSaved(e.target.checked)} disabled={saving} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                  <span style={{ fontSize: 14 }}>Save logs to database</span>
+                </label>
+                <p style={{ fontSize: 12, color: "#666", margin: "8px 0 0 0", lineHeight: 1.4 }}>
+                  When enabled (default), audited actions are persisted to the database audit trail. When disabled, no new log entries are written.
+                </p>
+              </div>
+              <div style={{ border: "1px solid #ccc", borderRadius: 6, padding: 16, background: "#fafafa" }}>
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#333", marginBottom: 10 }}>Email testing</h2>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 10 }}>
+                  <input type="checkbox" checked={useTestEmail} onChange={(e) => setUseTestEmail(e.target.checked)} disabled={saving} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                  <span style={{ fontSize: 14 }}>Use test email for all mail</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 0 }}>
+                  <span style={{ fontSize: 13, color: "#555", flexGrow: 1, flexShrink: 1, flexBasis: "0%" }}>Test email address</span>
+                  <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} disabled={saving || !useTestEmail} placeholder="romalopes@yahoo.com.br" style={{ width: 240, padding: "3px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3, background: useTestEmail ? "#fff" : "#f5f5f5" }} />
+                </label>
+                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0 0", lineHeight: 1.4 }}>
+                  When enabled, all outgoing mail is redirected to this address with a [TEST] subject prefix.
+                </p>
               </div>
             </div>
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                margin: "8px 0",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={logsSaved}
-                onChange={(event) => setLogsSaved(event.target.checked)}
-                disabled={saving}
-              />
-              Save logs to database
-            </label>
-            <p className="wine-management__hint">
-              When enabled (default), every audited action is persisted to the
-              database audit trail shown on the Logs page. When disabled, no
-              new database log entries are written — the application log file
-              is unaffected.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-                marginTop: 16,
-              }}
-            >
-              <button
-                type="submit"
-                className="auth-form__submit"
-                disabled={saving || !dirty}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-              {savedAt && !error && (
-                <span className="wine-management__hint">
-                  Saved at {savedAt.toLocaleTimeString()}
-                </span>
+            <div style={{ border: "1px solid #ccc", borderRadius: 6, overflow: "hidden", marginBottom: 16 }}>
+              <div style={{ padding: "10px 14px", background: "#f5f5f5", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#333" }}>Custom settings</h2>
+                <span style={{ fontSize: 11, color: "#888" }}>Arbitrary key/value pairs readable via AppSetting at runtime.</span>
+              </div>
+              <div style={{ padding: "0 14px 10px 14px" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10 }}>
+                  <input type="text" value={newKey} onChange={(e) => setNewKey(e.target.value)} disabled={saving} placeholder="Key" style={{ flexGrow: 0, flexShrink: 0, flexBasis: "140px", padding: "4px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3 }} />
+                  <input type="text" value={newValue} onChange={(e) => setNewValue(e.target.value)} disabled={saving} placeholder="Value" style={{ flexGrow: 1, flexShrink: 1, flexBasis: "0%", padding: "4px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3 }} />
+                  <button type="button" onClick={addCustomSetting} disabled={saving || !newKey.trim()} style={{ padding: "4px 10px", fontSize: 12, background: "#1a73e8", color: "#fff", border: "none", borderRadius: 3, cursor: "pointer", whiteSpace: "nowrap" }}>Add</button>
+                </div>
+              </div>
+              {customSettings.length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#fafafa" }}>
+                      <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em" }}>Key</th>
+                      <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em" }}>Value</th>
+                      <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em", width: 50 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customSettings.map((setting, idx) => (
+                      <tr key={setting.id || idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
+                        <td style={{ padding: "5px 10px", fontWeight: 500 }}>{setting.key}</td>
+                        <td style={{ padding: "5px 10px" }}>
+                          {editingId === setting.id ? (
+                            <input type="text" value={editingValue} onChange={(e) => setEditingValue(e.target.value)} onBlur={() => commitEdit(setting.id, editingValue)} onKeyDown={(e) => { if (e.key === "Enter") commitEdit(setting.id, editingValue); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width: "100%", padding: "2px 4px", fontSize: 13, border: "1px solid #1a73e8", borderRadius: 2, boxSizing: "border-box" }} />
+                          ) : (
+                            <span style={{ cursor: "pointer", color: "#1a73e8", padding: "2px 4px", borderRadius: 2 }} onMouseOver={(e) => (e.target.style.background = "#e8f0fe")} onMouseOut={(e) => (e.target.style.background = "")} onClick={() => startEdit(setting)} title="Click to edit">{setting.value}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "5px 10px", textAlign: "right" }}>
+                          <button type="button" onClick={() => deleteCustomSetting(setting.id)} disabled={saving} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }} title="Delete setting">×</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
-              {error && (
-                <span className="wine-management__hint" role="alert">
-                  {error}
-                </span>
+              {customSettings.length === 0 && (
+                <div style={{ padding: "14px", textAlign: "center", color: "#999", fontSize: 13 }}>No custom settings. Add one above.</div>
               )}
+            </div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 4 }}>
+              <button type="submit" className="auth-form__submit" disabled={saving || !dirty} style={{ padding: "6px 18px", fontSize: 13 }}>{saving ? "Saving..." : "Save changes"}</button>
+              {savedAt && !error && <span style={{ fontSize: 12, color: "#666" }}>Saved at {savedAt.toLocaleTimeString()}</span>}
+              {error && <span style={{ fontSize: 12, color: "#c62828" }} role="alert">{error}</span>}
             </div>
           </form>
         )}
