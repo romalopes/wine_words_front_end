@@ -13,7 +13,7 @@ import styles from "./winePackages.module.css";
 function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
   const [tracking, setTracking] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [form, setForm] = useState({
     carrier: "",
     number: "",
