@@ -197,16 +197,13 @@ function Header() {
           style={{ height: "2.5rem", display: "block", borderRadius: ".35rem" }}
         />
         <div>
-          <div className="site-header__title">Wine Words - React</div>
-          {/* <p className="site-header__subtitle">
+          {/* <div className="site-header__title">Wine Words</div> */}
+          <p className="site-header__subtitle">
             Explore producers, wines and reviews
-          </p> */}
+          </p>
         </div>
       </NavLink>
       <nav aria-label="Primary navigation">
-        <NavLink end to="/">
-          Dashboard
-        </NavLink>
         <NavDropdown
           label="Wines"
           items={[
