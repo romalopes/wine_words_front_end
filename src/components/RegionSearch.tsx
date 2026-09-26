@@ -3,7 +3,8 @@ import type { Region } from "../types/reference";
 import { regionsApi } from "../services/api"
 
 
-interface SelectedRegion {
+/** A region the user has attached to a wine, as carried by the tag list. */
+export interface SelectedRegion {
   id: number
   name: string
 }

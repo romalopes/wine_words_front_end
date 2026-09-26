@@ -1,6 +1,6 @@
 import type { ImagesApi, WineProfilesApi, WineProfileSearchResponse } from "../types/api"
 import type { ImageListResponse, ImageUploadResponse } from "../types/image"
-import type { WineProfile } from "../types/user"
+import type { UserWineProfile } from "../types/user"
 import type { ApiRequester } from "./apiClient"
 
 export function createImagesApi(request: ApiRequester): ImagesApi {
@@ -26,8 +26,8 @@ export function createImagesApi(request: ApiRequester): ImagesApi {
 
 export function createWineProfilesApi(request: ApiRequester): WineProfilesApi {
   return {
-    list: () => request<WineProfile[]>("/wine_profiles"),
-    show: (id) => request<WineProfile>(`/wine_profiles/${id}`),
+    list: () => request<UserWineProfile[]>("/wine_profiles"),
+    show: (id) => request<UserWineProfile>(`/wine_profiles/${id}`),
     search: (query, limit = 10) => request<WineProfileSearchResponse>(`/wine_profiles/search?q=${encodeURIComponent(query)}&limit=${limit}`),
   }
 }

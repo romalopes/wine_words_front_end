@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { subscriptionsApi, billingApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
+import type { Subscription } from "../types/producer";
+import type { ChangePreviewResponse } from "../types/api";
+import { errorMessage } from "../utils/errors";
 
-function formatPrice(cents) {
+function formatPrice(cents: number | null | undefined): string | null {
   if (cents == null) return null;
   if (cents === 0) return "$0";
   return `$${(cents / 100).toFixed(0)}`;
 }
 
-function isFreePlan(plan) {
+function isFreePlan(plan: Subscription): boolean {
   return Boolean(
     plan && (plan.yearly_price_cents === 0 || plan.yearly_price_cents == null),
   );
 }
 
-function formatDate(value) {
+function formatDate(value: string | null | undefined): string {
   if (!value) return "your next renewal";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "your next renewal";
@@ -25,17 +28,38 @@ function formatDate(value) {
   });
 }
 
-function newIdempotencyKey() {
+function newIdempotencyKey(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random()}`;
 }
 
+/**
+ * Where the POST /billing/confirm reconciliation stands. `null` is the initial
+ * state before the confirm call starts, and also covers the window where the
+ * user has returned from Stripe but the webhook already applied the plan.
+ */
+type CheckoutConfirmState = "confirming" | "confirmed" | "error" | null;
+
+interface PlanCardProps {
+  plan: Subscription
+  isCurrent: boolean
+  onChoose?: (planId: number) => void
+  onManage?: () => void
+  loadingPlanId: number | null
+}
+
 // One card renders every kind of plan — free and paid are just different rows
 // of the same list. The small visual differences (price line, badge, CTA) are
 // derived from the plan itself.
-function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
+function PlanCard({
+  plan,
+  isCurrent,
+  onChoose,
+  onManage,
+  loadingPlanId,
+}: PlanCardProps) {
   const isFree =
     plan.yearly_price_cents === 0 || plan.yearly_price_cents == null;
   const yearly = formatPrice(plan.yearly_price_cents);
@@ -122,20 +146,20 @@ function PlanCard({ plan, isCurrent, onChoose, onManage, loadingPlanId }) {
 
 function Subscribe() {
   const { user, refreshSession } = useAuth();
-  const [plans, setPlans] = useState([]);
-  const [error, setError] = useState(null);
+  const [plans, setPlans] = useState<Subscription[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingPlanId, setLoadingPlanId] = useState(null);
+  const [loadingPlanId, setLoadingPlanId] = useState<number | null>(null);
   // Set when the user returns from Stripe Checkout (?checkout=success|cancelled).
-  const [checkoutNotice, setCheckoutNotice] = useState(null);
+  const [checkoutNotice, setCheckoutNotice] = useState<"success" | "cancelled" | null>(null);
   // Reconciliation with Stripe after returning from Checkout (no webhook needed).
-  const [confirmState, setConfirmState] = useState(null); // null | "confirming" | "confirmed" | "error"
-  const [confirmError, setConfirmError] = useState(null);
+  const [confirmState, setConfirmState] = useState<CheckoutConfirmState>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   // Plan-change (upgrade/downgrade) pre-approval state.
-  const [changePreview, setChangePreview] = useState(null);
-  const [changeError, setChangeError] = useState(null);
+  const [changePreview, setChangePreview] = useState<ChangePreviewResponse | null>(null);
+  const [changeError, setChangeError] = useState<string | null>(null);
   const [changeBusy, setChangeBusy] = useState(false);
-  const [changeNotice, setChangeNotice] = useState(null);
+  const [changeNotice, setChangeNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,8 +168,8 @@ function Subscribe() {
       .then((data) => {
         if (!cancelled) setPlans(Array.isArray(data) ? data : []);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load plans");
+      .catch((err: unknown) => {
+        if (!cancelled) setError(errorMessage(err, "Failed to load plans"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -179,7 +203,9 @@ function Subscribe() {
     setCheckoutNotice(state === "success" ? "success" : "cancelled");
     window.history.replaceState({}, "", window.location.pathname);
 
-    let retry;
+    // A single retry timer drives a follow-up session refresh; the cleanup
+    // clears whichever one is pending when the effect re-runs or unmounts.
+    let retry: ReturnType<typeof setTimeout> | undefined;
     if (state === "success" && sessionId) {
       setConfirmState("confirming");
       setConfirmError(null);
@@ -189,11 +215,11 @@ function Subscribe() {
           setConfirmState("confirmed");
           return refreshSession();
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           // Session not paid yet (202) or an error — surface it but still
           // refresh in case the webhook applied the plan in the meantime.
           setConfirmState("error");
-          setConfirmError(err.message || "Could not confirm payment yet.");
+          setConfirmError(errorMessage(err, "Could not confirm payment yet."));
           return refreshSession();
         })
         .then(() => {
@@ -204,7 +230,9 @@ function Subscribe() {
       retry = setTimeout(() => refreshSession(), 3000);
     }
 
-    return () => clearTimeout(retry);
+    return () => {
+      if (retry !== undefined) clearTimeout(retry);
+    };
   }, [refreshSession]);
 
   const currentPlanId = user?.subscription?.id;
@@ -213,7 +241,7 @@ function Subscribe() {
   // Users on a paid plan go through the plan-change (preview/confirm) flow;
   // users on FREE (or no subscription) still use Checkout.
   const handleChoose = useCallback(
-    async (planId) => {
+    async (planId: number) => {
       setError(null);
       setChangeNotice(null);
       setLoadingPlanId(planId);
@@ -229,7 +257,7 @@ function Subscribe() {
           window.location.href = result.url;
         }
       } catch (err) {
-        setError(err.message || "Could not start plan change.");
+        setError(errorMessage(err, "Could not start plan change."));
         setLoadingPlanId(null);
       }
     },
@@ -237,8 +265,9 @@ function Subscribe() {
   );
 
   const handleChangeConfirm = useCallback(async () => {
-    const targetId = changePreview?.target?.id;
-    if (!targetId) return;
+    const preview = changePreview;
+    const targetId = preview?.target.id;
+    if (!preview || !targetId) return;
     setChangeBusy(true);
     setChangeError(null);
     try {
@@ -246,8 +275,8 @@ function Subscribe() {
         targetId,
         newIdempotencyKey(),
       );
-      const downgrade = changePreview.direction === "downgrade";
-      const targetName = changePreview.target.name;
+      const downgrade = preview.direction === "downgrade";
+      const targetName = preview.target.name;
       setChangePreview(null);
       // A charge that needs authentication (3DS/SCA) comes back as an open
       // Stripe invoice: send the customer there to finish paying it.
@@ -256,15 +285,15 @@ function Subscribe() {
       }
       setChangeNotice(
         downgrade
-          ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(changePreview.current_period_end)}. Your current plan stays active until then.`
+          ? `✅ Downgrade scheduled — you'll move to ${targetName} at ${formatDate(preview.current_period_end)}. Your current plan stays active until then.`
           : result?.hosted_invoice_url
-            ? `💳 Almost there — complete the ${formatPrice(changePreview.due_today.amount_cents)} payment to activate ${targetName}.`
+            ? `💳 Almost there — complete the ${formatPrice(preview.due_today.amount_cents)} payment to activate ${targetName}.`
             : `✅ Upgrade started — ${targetName} will take effect as soon as payment is confirmed.`,
       );
       await refreshSession();
       setTimeout(() => refreshSession(), 3000);
     } catch (err) {
-      setChangeError(err.message || "Could not confirm the change.");
+      setChangeError(errorMessage(err, "Could not confirm the change."));
     } finally {
       setChangeBusy(false);
       setLoadingPlanId(null);
@@ -282,7 +311,7 @@ function Subscribe() {
       const result = await billingApi.portal();
       window.location.href = result.url;
     } catch (err) {
-      setError(err.message || "Could not open billing portal.");
+      setError(errorMessage(err, "Could not open billing portal."));
     }
   }, []);
 
@@ -295,7 +324,14 @@ function Subscribe() {
   const paid = plans.filter((p) => p !== free);
   const orderedPlans = [
     ...(free ? [free] : []),
-    ...paid.slice().sort((a, b) => a.yearly_price_cents - b.yearly_price_cents),
+    // Rails allows a null yearly price; the old `null - x` comparison
+    // coerced it to 0, so `?? 0` preserves that exact ordering.
+    ...paid
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.yearly_price_cents ?? 0) - (b.yearly_price_cents ?? 0),
+      ),
   ];
 
   return (
@@ -407,7 +443,8 @@ function Subscribe() {
                 : `Upgrade to ${changePreview.target.name}`}
             </h2>
             <p className="review-card__comment">
-              Current plan: <strong>{changePreview.current.name}</strong>
+              Current plan:{" "}
+              <strong>{changePreview.current?.name ?? "None"}</strong>
               {changePreview.direction === "downgrade" && (
                 <span>
                   {" "}

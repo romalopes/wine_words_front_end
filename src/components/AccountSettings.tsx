@@ -1,14 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { accountApi, countriesApi, identitiesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  PROVIDER_LABELS,
   ProviderCancelledError,
   availableProviders,
+  providerLabel,
   signInWith,
 } from "../services/socialProviders";
+import type { SocialProvider } from "../types/socialAuth";
+import type { PasswordChange } from "../types/account";
+import type { Identity } from "../types/authentication";
+import type { CountryListItem } from "../types/reference";
 
-const emptyAccount = {
+/** The editable profile form. Every field is a string so the inputs stay controlled. */
+interface AccountForm {
+  user_name: string
+  first_name: string
+  last_name: string
+  phone: string
+  date_of_birth: string
+  address: {
+    street_address: string
+    city: string
+    state: string
+    postal_code: string
+    country_id: string
+  }
+}
+
+const emptyAccount: AccountForm = {
   user_name: "",
   first_name: "",
   last_name: "",
@@ -23,11 +44,19 @@ const emptyAccount = {
   },
 };
 
-function str(v) {
+/** Coerce a nullable API field to a string the controlled input can hold. */
+function str(v: unknown): string {
   return v === null || v === undefined ? "" : String(v);
 }
 
-function Field({ label, children, wide }) {
+interface FieldProps {
+  label: string
+  children: ReactNode
+  /** Stretches the field across both columns of the profile grid. */
+  wide?: boolean
+}
+
+function Field({ label, children, wide }: FieldProps) {
   return (
     <label className={`auth-form__field${wide ? " account-fields--wide" : ""}`}>
       <span>{label}</span>
@@ -36,53 +65,60 @@ function Field({ label, children, wide }) {
   );
 }
 
-// Collects every message from the API's errors object (hash of
-// field => [messages]) into one readable line.
-function flattenErrors(errors) {
-  if (!errors) return "";
-  return Object.entries(errors)
-    .map(([field, messages]) => {
-      const list = Array.isArray(messages) ? messages : [messages];
-      return `${field.replace(/_/g, " ")} ${list.join(", ")}`;
-    })
-    .join(" · ");
-}
+/** The API's `errors` hash: field name => message or messages. */
+type FieldErrors = Record<string, string | string[] | null | undefined>;
 
-function parseApiError(err, fallback) {
-  let message = err.message || fallback;
+/** Pull a readable message off an unknown rejection, flattening Rails' errors hash. */
+function parseApiError(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message : fallback;
   try {
-    const parsed = JSON.parse(err.message);
-    if (parsed && parsed.errors) message = flattenErrors(parsed.errors);
+    const parsed: unknown = JSON.parse(message);
+    if (parsed && typeof parsed === "object" && "errors" in parsed) {
+      return flattenErrors((parsed as { errors: FieldErrors }).errors) || message;
+    }
   } catch {
     /* err.message is not JSON — use as-is */
   }
   return message;
 }
 
+// Collects every message from the API's errors object (hash of
+// field => [messages]) into one readable line.
+function flattenErrors(errors: FieldErrors | null | undefined): string {
+  if (!errors) return "";
+  return Object.entries(errors)
+    .map(([field, messages]) => {
+      const list = Array.isArray(messages) ? messages : [messages];
+      return `${field.replace(/_/g, " ")} ${list.filter(Boolean).join(", ")}`;
+    })
+    .join(" · ");
+}
+
 export default function AccountSettings() {
   const { refreshSession } = useAuth();
-  const [form, setForm] = useState(emptyAccount);
-  const [countries, setCountries] = useState([]);
+  const [form, setForm] = useState<AccountForm>(emptyAccount);
+  const [countries, setCountries] = useState<CountryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileNotice, setProfileNotice] = useState(null);
-  const [profileError, setProfileError] = useState(null);
-  const [passwords, setPasswords] = useState({
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [passwords, setPasswords] = useState<PasswordChange>({
     current_password: "",
     password: "",
     password_confirmation: "",
   });
   const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordNotice, setPasswordNotice] = useState(null);
-  const [passwordError, setPasswordError] = useState(null);
+  const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   // Connected sign-in methods (Google / Apple / Microsoft / Facebook).
-  const [identities, setIdentities] = useState([]);
+  const [identities, setIdentities] = useState<Identity[]>([]);
   const [passwordAuthentication, setPasswordAuthentication] = useState(true);
   const [identitiesLoading, setIdentitiesLoading] = useState(true);
-  const [identitiesNotice, setIdentitiesNotice] = useState(null);
-  const [identitiesError, setIdentitiesError] = useState(null);
-  const [connectingProvider, setConnectingProvider] = useState(null);
-  const [disconnectingId, setDisconnectingId] = useState(null);
+  const [identitiesNotice, setIdentitiesNotice] = useState<string | null>(null);
+  const [identitiesError, setIdentitiesError] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] =
+    useState<SocialProvider | null>(null);
+  const [disconnectingId, setDisconnectingId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,8 +141,12 @@ export default function AccountSettings() {
         });
         setCountries(Array.isArray(countryList) ? countryList : []);
       })
-      .catch((err) => {
-        if (!cancelled) setProfileError(err.message || "Failed to load account.");
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setProfileError(
+            err instanceof Error ? err.message : "Failed to load account.",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -124,7 +164,7 @@ export default function AccountSettings() {
       setIdentities(Array.isArray(data?.identities) ? data.identities : []);
       setPasswordAuthentication(data?.password_authentication !== false);
     } catch (err) {
-      setIdentitiesError(err.message || "Failed to load sign-in methods.");
+      setIdentitiesError(parseApiError(err, "Failed to load sign-in methods."));
     } finally {
       setIdentitiesLoading(false);
     }
@@ -134,15 +174,18 @@ export default function AccountSettings() {
     loadIdentities();
   }, [loadIdentities]);
 
-  function setField(key, value) {
+  type ProfileField = Exclude<keyof AccountForm, "address">;
+  type AddressField = keyof AccountForm["address"];
+
+  function setField(key: ProfileField, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function setAddressField(key, value) {
+  function setAddressField(key: AddressField, value: string) {
     setForm((prev) => ({ ...prev, address: { ...prev.address, [key]: value } }));
   }
 
-  async function handleSaveProfile(e) {
+  async function handleSaveProfile(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSavingProfile(true);
     setProfileNotice(null);
@@ -171,7 +214,7 @@ export default function AccountSettings() {
     }
   }
 
-  async function handleChangePassword(e) {
+  async function handleChangePassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSavingPassword(true);
     setPasswordNotice(null);
@@ -189,39 +232,39 @@ export default function AccountSettings() {
 
   // Runs the provider popup and hands the resulting credential to the API.
   // The frontend never asserts who the user is — the backend verifies it.
-  async function handleConnect(provider) {
+  async function handleConnect(provider: SocialProvider) {
     setConnectingProvider(provider);
     setIdentitiesNotice(null);
     setIdentitiesError(null);
     try {
       const { credential, nonce } = await signInWith(provider);
       await identitiesApi.connect(provider, { credential, nonce });
-      setIdentitiesNotice(`${PROVIDER_LABELS[provider] || provider} connected.`);
+      setIdentitiesNotice(`${providerLabel(provider)} connected.`);
       await loadIdentities();
     } catch (err) {
       // Dismissing the provider popup is not an error worth showing.
       if (err instanceof ProviderCancelledError) return;
       setIdentitiesError(
-        err.message || `Could not connect ${PROVIDER_LABELS[provider] || provider}.`
+        parseApiError(err, `Could not connect ${providerLabel(provider)}.`)
       );
     } finally {
       setConnectingProvider(null);
     }
   }
 
-  async function handleDisconnect(identity) {
+  async function handleDisconnect(identity: Identity) {
     setDisconnectingId(identity.id);
     setIdentitiesNotice(null);
     setIdentitiesError(null);
     try {
       await identitiesApi.disconnect(identity.id);
-      setIdentitiesNotice(
-        `${PROVIDER_LABELS[identity.provider] || identity.provider} disconnected.`
-      );
+      setIdentitiesNotice(`${providerLabel(identity.provider)} disconnected.`);
       await loadIdentities();
     } catch (err) {
       // The API refuses to remove the last remaining sign-in method.
-      setIdentitiesError(err.message || "Could not disconnect that sign-in method.");
+      setIdentitiesError(
+        parseApiError(err, "Could not disconnect that sign-in method.")
+      );
     } finally {
       setDisconnectingId(null);
     }
@@ -456,7 +499,7 @@ export default function AccountSettings() {
                     {identities.map((identity) => (
                       <li className="account-identity" key={identity.id}>
                         <span className="account-identity__label">
-                          {PROVIDER_LABELS[identity.provider] || identity.provider}
+                          {providerLabel(identity.provider)}
                         </span>
                         <span className="account-identity__meta">
                           {identity.email || "Connected"}
@@ -488,8 +531,8 @@ export default function AccountSettings() {
                             disabled={connectingProvider !== null}
                           >
                             {connectingProvider === provider
-                              ? `Connecting ${PROVIDER_LABELS[provider]}…`
-                              : `Connect ${PROVIDER_LABELS[provider]}`}
+                              ? `Connecting ${providerLabel(provider)}…`
+                              : `Connect ${providerLabel(provider)}`}
                           </button>
                         ))}
                       </div>

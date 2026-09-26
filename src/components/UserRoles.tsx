@@ -1,25 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { usersApi, subscriptionsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type { AdminUser, AdminUserResults, RoleOption } from "../types/user";
+import type { Subscription } from "../types/producer";
 
 function UserRoles() {
   const { user, startImpersonation } = useAuth();
   const isAdminUser = isAdmin(user);
 
-  const [allRoles, setAllRoles] = useState([]);
-  const [subscriptions, setSubscriptions] = useState([]);
+  const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [query, setQuery] = useState("");
   // Pagination envelope from the API: { items, page, per_page, total_count, total_pages }.
   // null = not loaded yet.
-  const [results, setResults] = useState(null);
+  const [results, setResults] = useState<AdminUserResults | null>(null);
   const [searching, setSearching] = useState(false);
-  const [error, setError] = useState(null);
-  const [selected, setSelected] = useState({}); // userId -> Set(roleId)
-  const [saving, setSaving] = useState(null);
-  const [savingSub, setSavingSub] = useState(null);
-  const timer = useRef(null);
+  const [error, setError] = useState<string | null>(null);
+  /** userId -> Set(roleId): roles toggled but not yet saved. */
+  const [selected, setSelected] = useState<Record<number, Set<number>>>({});
+  const [saving, setSaving] = useState<number | null>(null);
+  const [savingSub, setSavingSub] = useState<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     usersApi
@@ -32,16 +36,28 @@ function UserRoles() {
       .catch(() => ({}));
   }, []);
 
-  async function runSearch(q, page = 1) {
+  async function runSearch(q: string, page = 1) {
     const trimmed = q.trim();
     try {
       setSearching(true);
       setError(null);
-      // Blank query returns the full user list; both shapes are paginated.
+      // With `page` the API returns the pagination envelope; without one it
+      // returns a bare array (legacy shape kept for compatibility). Normalise
+      // both so the table only ever reads one form.
       const data = await usersApi.search(trimmed, page);
-      setResults(data?.items ? data : { items: Array.isArray(data) ? data : [], page: 1, total_pages: 1 });
+      if (Array.isArray(data)) {
+        setResults({
+          items: data,
+          page: 1,
+          per_page: data.length,
+          total_count: data.length,
+          total_pages: 1,
+        });
+      } else {
+        setResults(data);
+      }
     } catch (err) {
-      setError(err.message || "Search failed");
+      setError(errorMessage(err, "Search failed"));
       setResults(null);
     } finally {
       setSearching(false);
@@ -53,18 +69,18 @@ function UserRoles() {
     runSearch("");
   }, []);
 
-  function handleSearchChange(e) {
+  function handleSearchChange(e: ChangeEvent<HTMLInputElement>) {
     setQuery(e.target.value);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => runSearch(e.target.value, 1), 300); // new search → page 1
   }
 
-  function goToPage(page) {
+  function goToPage(page: number) {
     runSearch(query, page);
   }
 
   // Patch one user inside the current page's items.
-  function updateItem(userId, patch) {
+  function updateItem(userId: number, patch: Partial<AdminUser>) {
     setResults((prev) =>
       prev
         ? {
@@ -75,27 +91,26 @@ function UserRoles() {
     );
   }
 
-  function hasRole(u, roleId) {
-    if (selected[u.id]) return selected[u.id].has(roleId);
+  function hasRole(u: AdminUser, roleId: number) {
+    const pending = selected[u.id];
+    if (pending) return pending.has(roleId);
     return (u.role_ids || []).includes(roleId);
   }
 
-  function toggleRole(u, roleId, checked) {
+  function toggleRole(u: AdminUser, roleId: number, checked: boolean) {
     setSelected((prev) => {
-      const set = new Set(prev[u.id] != null ? prev[u.id] : u.role_ids || []);
+      const set = new Set<number>(prev[u.id] ?? u.role_ids ?? []);
       if (checked) set.add(roleId);
       else set.delete(roleId);
       return { ...prev, [u.id]: set };
     });
   }
 
-  async function saveRoles(u) {
+  async function saveRoles(u: AdminUser) {
     setSaving(u.id);
     setError(null);
     try {
-      const roleIds = Array.from(
-        selected[u.id] != null ? selected[u.id] : u.role_ids || [],
-      );
+      const roleIds = Array.from<number>(selected[u.id] ?? u.role_ids ?? []);
       const updated = await usersApi.assignRoles(u.id, roleIds);
       updateItem(u.id, {
         roles: updated.roles,
@@ -107,13 +122,13 @@ function UserRoles() {
         return next;
       });
     } catch (err) {
-      setError(err.message || "Failed to save roles");
+      setError(errorMessage(err, "Failed to save roles"));
     } finally {
       setSaving(null);
     }
   }
 
-  async function changeSubscription(u, subscriptionId) {
+  async function changeSubscription(u: AdminUser, subscriptionId: number) {
     if (
       !window.confirm(
         "Change this user's subscription? This swaps their base role (Guest/Reader).",
@@ -130,7 +145,7 @@ function UserRoles() {
         subscription: updated.subscription,
       });
     } catch (err) {
-      setError(err.message || "Failed to change subscription");
+      setError(errorMessage(err, "Failed to change subscription"));
     } finally {
       setSavingSub(null);
     }

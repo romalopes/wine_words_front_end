@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import { configurationApi, settingsApi } from "../services/api";
+import type { ConfigurationUpdatePayload } from "../types/api";
+import type { Setting } from "../types/notification";
+import { errorMessage } from "../utils/errors";
 
 // New (unsaved) custom settings carry a client-generated temp id like
 // "new-<timestamp>-<random>"; server rows have numeric ids.
-function isTempId(id) {
+function isTempId(id: Setting["id"]): boolean {
   return typeof id === "string" && id.startsWith("new-");
 }
 
@@ -20,17 +24,17 @@ function Configuration() {
   const [testEmail, setTestEmail] = useState("romalopes@yahoo.com.br");
   const [savedTestEmail, setSavedTestEmail] = useState("romalopes@yahoo.com.br");
 
-  const [customSettings, setCustomSettings] = useState([]);
-  const [savedCustomSettings, setSavedCustomSettings] = useState([]);
+  const [customSettings, setCustomSettings] = useState<Setting[]>([]);
+  const [savedCustomSettings, setSavedCustomSettings] = useState<Setting[]>([]);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<Setting["id"] | null>(null);
   const [editingValue, setEditingValue] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [savedAt, setSavedAt] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!isAdminUser) return;
@@ -74,12 +78,12 @@ function Configuration() {
   const customDirty = JSON.stringify(customSettings) !== JSON.stringify(savedCustomSettings);
   const dirty = logsDirty || emailDirty || customDirty;
 
-  async function handleSave(event) {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      const payload = {};
+      const payload: ConfigurationUpdatePayload = {};
       if (logsDirty) payload.logs_saved_to_database = logsSaved;
       if (emailDirty) {
         payload.use_test_email = useTestEmail;
@@ -119,7 +123,7 @@ function Configuration() {
       setSavedCustomSettings(settings);
       setSavedAt(new Date());
     } catch (err) {
-      setError(err.message || "Failed to save configuration.");
+      setError(errorMessage(err, "Failed to save configuration."));
     } finally {
       setSaving(false);
     }
@@ -134,13 +138,13 @@ function Configuration() {
     setNewValue("");
   }
 
-  function deleteCustomSetting(id) {
+  function deleteCustomSetting(id: Setting["id"]) {
     setCustomSettings((prev) => prev.filter((s) => s.id !== id));
   }
 
-  function startEdit(setting) {
+  function startEdit(setting: Setting) {
     setEditingId(setting.id);
-    setEditingValue(setting.value);
+    setEditingValue(String(setting.value ?? ""));
   }
 
   function cancelEdit() {
@@ -148,7 +152,7 @@ function Configuration() {
     setEditingValue("");
   }
 
-  function commitEdit(id, newValue) {
+  function commitEdit(id: Setting["id"], newValue: string) {
     setCustomSettings((prev) => prev.map((s) => (s.id === id ? { ...s, value: newValue } : s)));
     setEditingId(null);
     setEditingValue("");
@@ -218,7 +222,7 @@ function Configuration() {
                           {editingId === setting.id ? (
                             <input type="text" value={editingValue} onChange={(e) => setEditingValue(e.target.value)} onBlur={() => commitEdit(setting.id, editingValue)} onKeyDown={(e) => { if (e.key === "Enter") commitEdit(setting.id, editingValue); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width: "100%", padding: "2px 4px", fontSize: 13, border: "1px solid #1a73e8", borderRadius: 2, boxSizing: "border-box" }} />
                           ) : (
-                            <span style={{ cursor: "pointer", color: "#1a73e8", padding: "2px 4px", borderRadius: 2 }} onMouseOver={(e) => (e.target.style.background = "#e8f0fe")} onMouseOut={(e) => (e.target.style.background = "")} onClick={() => startEdit(setting)} title="Click to edit">{setting.value}</span>
+                            <span style={{ cursor: "pointer", color: "#1a73e8", padding: "2px 4px", borderRadius: 2 }} onMouseOver={(e) => (e.currentTarget.style.background = "#e8f0fe")} onMouseOut={(e) => (e.currentTarget.style.background = "")} onClick={() => startEdit(setting)} title="Click to edit">{String(setting.value ?? "")}</span>
                           )}
                         </td>
                         <td style={{ padding: "5px 10px", textAlign: "right" }}>

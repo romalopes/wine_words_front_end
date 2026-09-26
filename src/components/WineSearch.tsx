@@ -4,7 +4,7 @@ import { wineProfilesApi } from "../services/api";
 import { errorMessage } from "../utils/errors";
 import type { Wine } from "../types/wine";
 import type { WineProfileSearchResponse } from "../types/api";
-import type { WineProfile } from "../types/user";
+import type { UserWineProfile } from "../types/user";
 
 interface LlmInterpretation {
   name_hints?: string[]
@@ -69,7 +69,7 @@ function WineSearch() {
     return wineType;
   }
 
-  function getVarietyGrapes(profile: WineProfile) {
+  function getVarietyGrapes(profile: UserWineProfile) {
     try {
       const grapes =
         typeof profile.grapes === "string"

@@ -2,9 +2,11 @@ import type {
   AuthResponse,
   ForgotPasswordPayload,
   Identity,
+  MessageResponse,
   ResetPasswordPayload,
   SignInPayload,
   SignUpPayload,
+  SignUpResponse,
   SocialSignInInput,
   User,
 } from "./authentication"
@@ -13,9 +15,9 @@ export type SocialProvider = "google" | "apple" | "microsoft" | "facebook"
 
 export interface AuthApi {
   signIn(payload: SignInPayload): Promise<AuthResponse>
-  signUp(payload: SignUpPayload): Promise<AuthResponse>
+  signUp(payload: SignUpPayload): Promise<SignUpResponse>
   signOut(): Promise<unknown>
-  forgotPassword(email: string): Promise<unknown>
+  forgotPassword(email: string): Promise<MessageResponse>
   resetPassword(payload: ResetPasswordPayload): Promise<AuthResponse>
   me(): Promise<AuthResponse>
   socialSignIn(
@@ -49,7 +51,7 @@ export interface ForgotPasswordRequest {
 import type { QueryParams, ResourceResponse } from "./common"
 import type { Account, AccountUpdate, PasswordChange } from "./account"
 import type { Configuration, Setting } from "./notification"
-import type { LogEntry, ImpersonationResponse } from "./user"
+import type { LogEntry, ImpersonationResponse, UserWineProfile } from "./user"
 import type { Article } from "./article"
 import type {
   Category,
@@ -72,7 +74,7 @@ import type { Producer, ProducerSearchResult, Subscription } from "./producer"
 import type { Review } from "./review"
 import type { ShipmentTracking } from "./shipmentTracking"
 import type { ImageableType, ImageListResponse, ImageUploadResponse } from "./image"
-import type { WineProfile } from "./user"
+import type { AdminUser, RoleOption } from "./user"
 import type { Vintage, Wine, WineListItem } from "./wine"
 import type { WinePackage, WinePackageItem } from "./winePackage"
 
@@ -278,10 +280,15 @@ export interface UserApi {
 }
 
 export interface UsersApi {
-  roles(): Promise<unknown>
-  search(query: string, page?: number): Promise<ResourceResponse<User>>
-  assignRoles(userId: number, roleIds: number[]): Promise<unknown>
-  assignSubscription(userId: number, subscriptionId: number | null): Promise<unknown>
+  roles(): Promise<RoleOption[]>
+  /**
+   * With `page` the API returns the pagination envelope; without it, a bare
+   * `AdminUser[]` (legacy shape kept for compatibility). `UserRoles` normalises
+   * both — see `AdminUserResults`.
+   */
+  search(query: string, page?: number): Promise<ResourceResponse<AdminUser>>
+  assignRoles(userId: number, roleIds: number[]): Promise<AdminUser>
+  assignSubscription(userId: number, subscriptionId: number | null): Promise<AdminUser>
 }
 
 export interface SubscriptionsApi {
@@ -292,13 +299,102 @@ export interface SubscriptionsApi {
   destroy(id: string | number): Promise<unknown>
 }
 
-export interface BillingApi {
-  checkout(subscriptionId: number): Promise<unknown>
-  confirm(sessionId: string): Promise<unknown>
-  portal(): Promise<unknown>
-  changePreview(subscriptionId: number): Promise<unknown>
-  changeConfirm(subscriptionId: number, idempotencyKey: string): Promise<unknown>
+/**
+ * Stripe-backed subscription billing.
+ *
+ * Every payload here is a plain hash built by `app/services/billing/**` and
+ * rendered verbatim by `Api::V1::BillingController` — there is no serializer,
+ * so the field names below are snake_case exactly as Rails emits them.
+ */
+
+/** `POST /billing/checkout` — redirect the browser to Stripe Checkout. */
+export interface CheckoutSessionResponse {
+  url: string
+  session_id: string
 }
+
+/** `POST /billing/portal` — redirect to the Stripe Customer Portal. */
+export interface PortalSessionResponse {
+  url: string
+}
+
+/**
+ * `POST /billing/confirm` — reconcile a Checkout Session the user just came
+ * back from. `applied` is false while the session is unpaid or still open (the
+ * controller answers 202 in that case) and true once the plan is active.
+ */
+export interface ConfirmCheckoutResponse {
+  applied: boolean
+  session_id: string
+  payment_status: string | null
+  status: string
+  subscription_id: number | null
+  provider_subscription_id: string | null
+  /** Present only when the webhook had already applied the plan. */
+  already_applied?: boolean
+}
+
+/** The plan fields `changePreview` echoes for the current and target plans. */
+export interface ChangePreviewPlan {
+  id: number | null
+  name: string | null
+  slug: string | null
+  rank: number | null
+  yearly_price_cents: number | null
+}
+
+/** An amount in minor units plus its ISO currency code. */
+export interface MoneyAmount {
+  amount_cents: number
+  currency: string
+}
+
+/** Whether the target plan costs more or less than the current one. */
+export type ChangeDirection = "upgrade" | "downgrade" | "same"
+
+/**
+ * `POST /billing/change/preview` — the proration summary shown before the user
+ * commits. Stripe performs the arithmetic; the app never recomputes it.
+ */
+export interface ChangePreviewResponse {
+  direction: ChangeDirection
+  /** Null when the user has no current subscription (a fresh purchase). */
+  current: ChangePreviewPlan | null
+  target: ChangePreviewPlan
+  due_today: MoneyAmount
+  next_renewal: MoneyAmount & { at: string | null }
+  current_period_end: string | null
+  provider_subscription_id: string | null
+}
+
+/**
+ * `POST /billing/change/confirm` — the outcome of executing the change.
+ * `hosted_invoice_url` is only set for an upgrade whose card needs 3DS/SCA:
+ * Stripe leaves the invoice open and the customer must complete it at that URL
+ * before the new plan activates.
+ */
+export interface ChangeConfirmResponse {
+  status: string
+  subscription_change_id: number
+  effective_at: string | null
+  mode: "upgrade" | "downgrade" | null
+  provider_invoice_id: string | null
+  hosted_invoice_url: string | null
+  /** Set when the idempotency key replayed an earlier request. */
+  already_requested?: boolean
+}
+
+export interface BillingApi {
+  checkout(subscriptionId: number): Promise<CheckoutSessionResponse>
+  confirm(sessionId: string): Promise<ConfirmCheckoutResponse>
+  portal(): Promise<PortalSessionResponse>
+  changePreview(subscriptionId: number): Promise<ChangePreviewResponse>
+  changeConfirm(
+    subscriptionId: number,
+    idempotencyKey: string,
+  ): Promise<ChangeConfirmResponse>
+}
+
 
 export interface TasteParametersApi {
   list(): Promise<TasteParameter[]>
@@ -437,13 +533,13 @@ export interface ImagesApi {
 
 export interface WineProfileSearchResponse {
   wines: Wine[]
-  wine_profiles: WineProfile[]
+  wine_profiles: UserWineProfile[]
   llm_interpreted?: unknown
 }
 
 export interface WineProfilesApi {
-  list(): Promise<WineProfile[]>
-  show(id: string): Promise<WineProfile>
+  list(): Promise<UserWineProfile[]>
+  show(id: string): Promise<UserWineProfile>
   search(query: string, limit?: number): Promise<WineProfileSearchResponse>
 }
 

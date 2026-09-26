@@ -7,6 +7,32 @@ import {
   DEFAULT_CLOSURE,
   DEFAULT_ALCOHOL_PERCENTAGE,
 } from "../data/wineVolumes";
+import { errorMessage } from "../utils/errors";
+import type { Producer } from "../types/producer";
+
+/**
+ * The wine fields this form collects. Numeric inputs are held as strings so a
+ * half-typed value ("13.") doesn't collapse to a number mid-keystroke; they are
+ * parsed once, in `handleSubmit`.
+ */
+interface WineQuickCreateForm {
+  name: string
+  region: string
+  color: string
+  closure: string
+  alcohol_percentage: string
+  volume_ml: string
+  prompt: string
+  producer_id: string
+  vintage_year: string
+}
+
+interface WineQuickCreateProps {
+  defaultName?: string
+  defaultVintageYear?: string
+  onCreated: (result: { slug: string; vintageId: number; name: string }) => void
+  onCancel?: () => void
+}
 
 // Inline wine creation form used by the Reviews page when a searched wine
 // is not found. Creates the wine (with a single vintage) and returns
@@ -16,8 +42,8 @@ function WineQuickCreate({
   defaultVintageYear = "",
   onCreated,
   onCancel,
-}) {
-  const [form, setForm] = useState({
+}: WineQuickCreateProps) {
+  const [form, setForm] = useState<WineQuickCreateForm>({
     name: defaultName,
     region: "",
     color: DEFAULT_COLOR,
@@ -28,9 +54,9 @@ function WineQuickCreate({
     producer_id: "",
     vintage_year: defaultVintageYear,
   });
-  const [producers, setProducers] = useState([]);
+  const [producers, setProducers] = useState<Producer[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     producersApi
@@ -39,13 +65,15 @@ function WineQuickCreate({
       .catch(() => setProducers([]));
   }, []);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
+  // Every input below carries a matching `name`, so the whole form updates
+  // through this one handler.
+  function handleChange(event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+    const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setSubmitting(true);
     setError(null);
 
@@ -83,7 +111,7 @@ function WineQuickCreate({
         name: created.name,
       });
     } catch (err) {
-      setError(err.message || "Failed to create wine");
+      setError(errorMessage(err, "Failed to create wine"));
     } finally {
       setSubmitting(false);
     }

@@ -1,11 +1,77 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import { wineProfilesApi, tasteParametersApi } from "../services/api";
+import type { WineProfileSearchResponse } from "../types/api";
+import type { TasteParameter } from "../types/catalog";
+import type { UserWineProfile } from "../types/user";
+import type { Wine } from "../types/wine";
+import { errorMessage } from "../utils/errors";
 
-function calculateMatch(selectedWineParameters, tasteParams, selectedTaste) {
+/** Slug -> score, the shape `calculateMatch` scores against. */
+type ScoreMap = Record<string, number>;
+
+/** A search hit: the endpoint returns wines and profiles in one response. */
+type QuizHit = Wine | UserWineProfile;
+
+/** The subset of a hit the quiz actually renders and scores. */
+interface QuizSelection {
+  slug: string;
+  name: string | null;
+  color: string | null;
+  regions: string[];
+  notes: string[];
+  scores: ScoreMap;
+}
+
+/**
+ * Normalise a hit's `parameters` into a slug -> score map.
+ *
+ * The two serializers disagree, and both shapes arrive in the same response:
+ *   - `WineSerializer#parameters`         -> array of `{ taste_parameter_slug, score }`
+ *   - `WineProfileSerializer#parameters`  -> Record `{ [slug]: score }`
+ *
+ * The original code called `.forEach` unconditionally, which threw a TypeError
+ * whenever a *profile* was picked — every profile hit crashed the quiz.
+ * Handling both shapes fixes that and leaves the wine path unchanged.
+ */
+function toScoreMap(hit: QuizHit): ScoreMap {
+  const params = hit.parameters;
+  if (Array.isArray(params)) {
+    // Wine shape: WineTasteParameter[]
+    return params.reduce<ScoreMap>((scores, param) => {
+      scores[param.taste_parameter_slug] = param.score;
+      return scores;
+    }, {});
+  }
+  if (params && typeof params === "object") {
+    // UserWineProfile shape: already a slug -> score Record.
+    return { ...params };
+  }
+  return {};
+}
+
+/**
+ * Region names for display. A `Wine` serialises `regions` as `Region[]` while a
+ * `UserWineProfile` serialises them as `string[]`; the original code joined the
+ * raw array, so any wine hit rendered as "[object Object]". Flattening to names
+ * fixes that and leaves profile hits unchanged.
+ */
+function toRegionNames(hit: QuizHit): string[] {
+  return (hit.regions ?? []).map((region) =>
+    typeof region === "string" ? region : region.name,
+  );
+}
+
+function calculateMatch(
+  selectedWineParameters: ScoreMap,
+  tasteParams: TasteParameter[],
+  selectedTaste: ScoreMap,
+): number {
   const params = selectedWineParameters || {};
   const totalDistance = tasteParams.reduce((total, param) => {
     return (
-      total + Math.abs((params[param.slug] ?? 3) - selectedTaste[param.slug])
+      total +
+      Math.abs((params[param.slug] ?? 3) - (selectedTaste[param.slug] ?? 3))
     );
   }, 0);
   const maxDistance = tasteParams.length * 4;
@@ -13,18 +79,20 @@ function calculateMatch(selectedWineParameters, tasteParams, selectedTaste) {
 }
 
 function Quiz() {
-  const [tasteParams, setTasteParams] = useState([]);
+  const [tasteParams, setTasteParams] = useState<TasteParameter[]>([]);
   const [loadingParams, setLoadingParams] = useState(true);
 
   const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] =
+    useState<WineProfileSearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
-  const [error, setError] = useState(null);
-  const timerRef = useRef(null);
+  const [error, setError] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [selectedWine, setSelectedWine] = useState(null);
-  const [selectedWineParameters, setSelectedWineParameters] = useState({});
-  const [testTaste, setTestTaste] = useState({});
+  const [selectedWine, setSelectedWine] = useState<QuizSelection | null>(null);
+  const [selectedWineParameters, setSelectedWineParameters] =
+    useState<ScoreMap>({});
+  const [testTaste, setTestTaste] = useState<ScoreMap>({});
   const [hasSubmittedTest, setHasSubmittedTest] = useState(false);
 
   // Fetch taste parameters from the database
@@ -33,7 +101,7 @@ function Quiz() {
       try {
         const data = await tasteParametersApi.list();
         setTasteParams(data);
-        const defaults = {};
+        const defaults: ScoreMap = {};
         data.forEach((p) => {
           defaults[p.slug] = 3;
         });
@@ -48,7 +116,7 @@ function Quiz() {
   }, []);
 
   // Search using the same API as the main search
-  const performSearch = useCallback(async (q) => {
+  const performSearch = useCallback(async (q: string) => {
     const trimmed = q.trim();
     if (trimmed.length < 2) {
       setSearchResults(null);
@@ -60,56 +128,61 @@ function Quiz() {
       const data = await wineProfilesApi.search(trimmed);
       setSearchResults(data);
     } catch (err) {
-      setError(err.message || "Search failed");
+      setError(errorMessage(err, "Search failed"));
       setSearchResults(null);
     } finally {
       setSearching(false);
     }
   }, []);
 
-  function handleInputChange(e) {
+  function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setQuery(value);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => performSearch(value), 300);
   }
 
-  function handleKeyDown(e) {
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       if (timerRef.current) clearTimeout(timerRef.current);
       performSearch(query);
     }
   }
 
-  function selectWine(wine) {
-    setSelectedWine(wine);
-    const defaults = {};
+  function selectWine(hit: QuizHit) {
+    // The two serializers disagree on `parameters` *and* `notes` (a wine has an
+    // array, a profile a single string), so the hit is normalised into
+    // `QuizSelection` here rather than storing the raw payload.
+    setSelectedWine({
+      slug: hit.slug,
+      name: hit.name ?? null,
+      color: hit.color ?? null,
+      regions: toRegionNames(hit),
+      notes: Array.isArray(hit.notes) ? hit.notes : hit.notes ? [hit.notes] : [],
+      scores: toScoreMap(hit),
+    });
+
+    const defaults: ScoreMap = {};
     tasteParams.forEach((p) => {
       defaults[p.slug] = 3;
     });
 
     // Seed the target-answer map from the selected wine's stored profile.
-    setSelectedWineParameters(() => {
-      const targets = {};
-      wine.parameters.forEach((p) => {
-        targets[p.taste_parameter_slug] = p.score;
-      });
-      return targets;
-    });
-
+    setSelectedWineParameters(toScoreMap(hit));
     setTestTaste(defaults);
     setHasSubmittedTest(false);
     setSearchResults(null);
     setQuery("");
   }
 
-  function handleTestTasteChange(slug, value) {
+  /** `value` is the raw range input's string; the handler coerces it. */
+  function handleTestTasteChange(slug: string, value: string) {
     setTestTaste((prev) => ({ ...prev, [slug]: Number(value) }));
     setHasSubmittedTest(false);
   }
 
   function resetTest() {
-    const defaults = {};
+    const defaults: ScoreMap = {};
     tasteParams.forEach((p) => {
       defaults[p.slug] = 3;
     });
@@ -179,16 +252,16 @@ function Quiz() {
               )}
               {searchResults && allSearchHits.length > 0 && !selectedWine && (
                 <div className="wine-test__search-results">
-                  {allSearchHits.map((wine) => (
+                  {allSearchHits.map((hit) => (
                     <button
-                      key={wine.slug || wine.name}
+                      key={hit.slug || hit.name}
                       type="button"
                       className="wine-test__search-item"
-                      onClick={() => selectWine(wine)}
+                      onClick={() => selectWine(hit)}
                     >
-                      <strong>{wine.name}</strong>
+                      <strong>{hit.name}</strong>
                       <span>
-                        {[wine.color, ...(wine.regions || [])]
+                        {[hit.color, ...toRegionNames(hit)]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

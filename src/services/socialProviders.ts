@@ -152,6 +152,27 @@ function isPresent(value: string | undefined | null): boolean {
 }
 
 /**
+ * Human label for a provider key.
+ *
+ * Accepts a plain `string` because `Identity.provider` is whatever the database
+ * holds — a row written by a future provider must still render, so the raw key
+ * is humanized and returned as the fallback rather than crashing on an
+ * undefined lookup.
+ */
+export function providerLabel(provider: string): string {
+  if (isSocialProvider(provider)) return PROVIDER_LABELS[provider]
+  return provider
+    .split(/[_-]/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function isSocialProvider(value: string): value is SocialProvider {
+  return Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, value)
+}
+
+/**
  * The identifier that decides whether a provider is usable: Google, Apple and
  * Microsoft all need a client id, Facebook needs an app id.
  */

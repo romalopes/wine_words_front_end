@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { winesApi } from "../services/api";
 import { DEFAULT_COLOR } from "../data/wineVolumes";
+import { errorMessage } from "../utils/errors";
+import type { Wine } from "../types/wine";
 import styles from "./winePackages.module.css";
 
 // Mirrors Wine::COLORS (the backend is the source of truth; the model
@@ -16,6 +18,24 @@ const COLOR_OPTIONS = ["Red", "White", "Rosé", "Dessert"];
 
 const currentYear = () => String(new Date().getFullYear());
 
+/** The wine fields this inline form collects, all held as strings for `<input>`. */
+interface WineFormState {
+  name: string
+  color: string
+  designation_name: string
+  vintage_year: string
+}
+
+interface InlineWineCreateFormProps {
+  /** The locked producer — the line belongs to this package's producer. */
+  producerId: number | string | null
+  producerName?: string | null
+  defaultName?: string
+  defaultVintageYear?: string
+  onCreated: (result: { wine: Wine; vintageId: number }) => void
+  onCancel?: () => void
+}
+
 function InlineWineCreateForm({
   producerId,
   producerName,
@@ -23,8 +43,8 @@ function InlineWineCreateForm({
   defaultVintageYear = "",
   onCreated,
   onCancel,
-}) {
-  const [form, setForm] = useState({
+}: InlineWineCreateFormProps) {
+  const [form, setForm] = useState<WineFormState>({
     name: defaultName,
     color: DEFAULT_COLOR,
     designation_name: "",
@@ -32,13 +52,16 @@ function InlineWineCreateForm({
   });
   const [noVintage, setNoVintage] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  function updateField(key, value) {
+  function updateField<Key extends keyof WineFormState>(
+    key: Key,
+    value: WineFormState[Key],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!producerId) {
@@ -72,7 +95,7 @@ function InlineWineCreateForm({
 
       onCreated({ wine: created, vintageId: vintage.id });
     } catch (err) {
-      setError(err.message || "Failed to create wine");
+      setError(errorMessage(err, "Failed to create wine"));
       setSaving(false);
     }
   }

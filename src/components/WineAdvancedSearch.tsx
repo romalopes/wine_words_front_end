@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import RegionSearch from "./RegionSearch";
+import type { SelectedRegion } from "./RegionSearch";
 import GrapeSearch from "./GrapeSearch";
+import type { SelectedGrape } from "./GrapeSearch";
 import { tasteParametersApi } from "../services/api";
 import styles from "./WineAdvancedSearch.module.css";
 
@@ -9,13 +12,30 @@ const COLORS = ["Red", "White", "Rosé", "Dessert"];
 const CLOSURES = [
   "Cork", "Screw cap", "Diam", "Crownseal", "Synthetic",
   "Glass Stopper", "Nomacorc PlantCorc", "Vino-Lok", "Agglomerate",
-];
+] as const;
 
 // Slugs must match Wine::TASTE_PARAMETER_FILTER_SLUGS in the API.
-const TASTE_SLUGS = ["acidity", "alcohol-warmth", "body", "fruit-intensity", "sweetness", "tannin"];
+const TASTE_SLUGS = [
+  "acidity", "alcohol-warmth", "body",
+  "fruit-intensity", "sweetness", "tannin",
+] as const;
+
 const TASTE_MIN = 0;
 const TASTE_MAX = 10;
 
+type TasteSlug = (typeof TASTE_SLUGS)[number];
+
+/** Which end of a taste range a slider moved. */
+type TasteBound = "min" | "max";
+
+/** An inclusive 0-10 range per taste parameter. */
+type TasteRanges = Partial<Record<TasteSlug, { min: number; max: number }>>;
+
+/**
+ * Every field is a string because it is bound directly to an <input>; the API
+ * layer decides which keys to coerce to numbers. The three-valued selects
+ * (sparkling / fortified) use "" for "ignore".
+ */
 const EMPTY_FORM = {
   name: "", producer_name: "", score_min: "", score_max: "",
   vintage_year_min: "", vintage_year_max: "", published_from: "", published_to: "",
@@ -26,12 +46,32 @@ const EMPTY_FORM = {
   fortified: "",
 };
 
-const humanize = (slug) =>
+/** The bound-input keys, derived from EMPTY_FORM so the two cannot drift. */
+type SearchFormField = keyof typeof EMPTY_FORM;
+type SearchForm = Record<SearchFormField, string>;
+
+/**
+ * The query the search actually runs. Blanks are stripped, so this is a mix of
+ * the string form fields, the numeric taste ranges, and the id lists chosen
+ * through the region / grape pickers.
+ */
+type SearchParams = Record<
+  string,
+  string | number | number[]
+>;
+
+const humanize = (slug: string) =>
   slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
 // Sliders for the six searchable taste parameters (0-10 scale). Sliders at
 // the extremes mean the parameter is not filtered.
-function TasteParameterRanges({ taste, labels, onChange }) {
+interface TasteParameterRangesProps {
+  taste: TasteRanges
+  labels: Partial<Record<TasteSlug, string>>
+  onChange: (slug: TasteSlug, bound: TasteBound, value: number) => void
+}
+
+function TasteParameterRanges({ taste, labels, onChange }: TasteParameterRangesProps) {
   return (
     <div className={`${styles.field} ${styles.fieldWide}`}>
       <span className={styles.sectionTitle}>
@@ -39,7 +79,7 @@ function TasteParameterRanges({ taste, labels, onChange }) {
       </span>
       <div className={styles.tasteGrid}>
         {TASTE_SLUGS.map((slug) => {
-          const range = taste[slug] || { min: TASTE_MIN, max: TASTE_MAX };
+          const range = taste[slug] ?? { min: TASTE_MIN, max: TASTE_MAX };
           const active = range.min > TASTE_MIN || range.max < TASTE_MAX;
           return (
             <div key={slug} className={styles.tasteItem} style={active ? { borderColor: "#8a5a44" } : undefined}>
@@ -48,10 +88,12 @@ function TasteParameterRanges({ taste, labels, onChange }) {
               </span>
               <div className={styles.tasteInputs}>
                 <input type="range" min={TASTE_MIN} max={TASTE_MAX} value={range.min}
-                  aria-label={`${slug} minimum`} onChange={(e) => onChange(slug, "min", e.target.value)} />
+                  aria-label={`${slug} minimum`}
+                  onChange={(e) => onChange(slug, "min", Number(e.target.value))} />
                 <span className={styles.tasteValue}>{range.min} – {range.max}</span>
                 <input type="range" min={TASTE_MIN} max={TASTE_MAX} value={range.max}
-                  aria-label={`${slug} maximum`} onChange={(e) => onChange(slug, "max", e.target.value)} />
+                  aria-label={`${slug} maximum`}
+                  onChange={(e) => onChange(slug, "max", Number(e.target.value))} />
               </div>
             </div>
           );
@@ -61,8 +103,25 @@ function TasteParameterRanges({ taste, labels, onChange }) {
   );
 }
 
+/** The `base` names that pair into `<base>_min` / `<base>_max` form keys. */
+type SearchRangeBase =
+  | "score" | "vintage_year" | "price" | "drink_from" | "drink_to" | "alcohol";
+
 // Min/max numeric range field pair for `base` + "_min" / "_max" form keys.
-function RangeField({ base, label, hint, form, onChange, ...inputProps }) {
+interface RangeFieldProps {
+  base: SearchRangeBase
+  label: string
+  hint?: string
+  form: SearchForm
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  // `step` is `string | number` to match React's own input attribute typing —
+  // the price range passes "0.01" so the browser keeps full precision.
+  step?: number | string
+  min?: number
+  max?: number
+}
+
+function RangeField({ base, label, hint, form, onChange, ...inputProps }: RangeFieldProps) {
   return (
     <>
       <span className={styles.sectionTitle}>{label}</span>
@@ -82,31 +141,40 @@ function RangeField({ base, label, hint, form, onChange, ...inputProps }) {
 
 // Complex search form for the wines page. Every field is optional; blank
 // values are stripped before the search runs.
-export default function WineAdvancedSearch({ onSearch, onClear, open, onToggleOpen }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [selectedRegions, setSelectedRegions] = useState([]);
-  const [selectedGrapes, setSelectedGrapes] = useState([]);
+interface WineAdvancedSearchProps {
+  /** Called with the assembled (blank-stripped) query when the form submits. */
+  onSearch: (params: SearchParams) => void
+  onClear: () => void
+  open: boolean
+  onToggleOpen: (open: boolean) => void
+}
+
+export default function WineAdvancedSearch({ onSearch, onClear, open, onToggleOpen }: WineAdvancedSearchProps) {
+  const [form, setForm] = useState<SearchForm>(EMPTY_FORM);
+  const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
+  const [selectedGrapes, setSelectedGrapes] = useState<SelectedGrape[]>([]);
   // slug -> { min, max }; full-range bounds mean "not filtered".
-  const [taste, setTaste] = useState({});
-  const [tasteLabels, setTasteLabels] = useState({});
+  const [taste, setTaste] = useState<TasteRanges>({});
+  const [tasteLabels, setTasteLabels] = useState<Partial<Record<TasteSlug, string>>>({});
 
   // Load the taste parameter catalogue once for friendly labels.
   useEffect(() => {
     let cancelled = false;
     tasteParametersApi.list().then((params) => {
       if (cancelled) return;
-      const labels = {};
+      const labels: Partial<Record<TasteSlug, string>> = {};
       (Array.isArray(params) ? params : []).forEach((tp) => {
-        labels[tp.slug] = tp.label || humanize(tp.slug);
+        labels[tp.slug as TasteSlug] = tp.label || humanize(tp.slug);
       });
       setTasteLabels(labels);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
-  const handleTasteChange = (slug, bound, value) =>
+  const handleTasteChange = (slug: TasteSlug, bound: TasteBound, value: number) =>
     setTaste((prev) => ({
       ...prev,
       [slug]: { min: TASTE_MIN, max: TASTE_MAX, ...prev[slug], [bound]: Number(value) },
@@ -120,12 +188,12 @@ export default function WineAdvancedSearch({ onSearch, onClear, open, onToggleOp
     onClear();
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     // Strip every blank value: only non-empty fields become query params.
     const params = Object.fromEntries(
       Object.entries(form).filter(([, v]) => v !== "" && v != null),
-    );
+    ) as SearchParams;
     if (selectedRegions.length > 0) params.region_ids = selectedRegions.map((r) => r.id);
     if (selectedGrapes.length > 0) params.grape_ids = selectedGrapes.map((g) => g.id);
     TASTE_SLUGS.forEach((slug) => {
@@ -138,11 +206,16 @@ export default function WineAdvancedSearch({ onSearch, onClear, open, onToggleOp
     onToggleOpen(false);
   }
 
-  const numRange = (base, label, hint, extra = {}) => (
+  const numRange = (
+    base: SearchRangeBase,
+    label: string,
+    hint: string,
+    extra: Partial<Omit<RangeFieldProps, "base" | "form" | "onChange">> = {},
+  ) => (
     <RangeField key={base} base={base} label={label} hint={hint} form={form} onChange={handleChange} {...extra} />
   );
 
-  const triSelect = (name, label) => (
+  const triSelect = (name: SearchFormField, label: string) => (
     <label key={name} className={styles.checkbox}>
       {label}
       <select className={styles.select} name={name} value={form[name]} onChange={handleChange} style={{ width: "auto" }}>

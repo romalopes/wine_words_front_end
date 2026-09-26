@@ -2,7 +2,8 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { grapesApi } from "../services/api";
 import type { GrapeSearchResult } from "../types/catalog";
 
-interface SelectedGrape {
+/** A grape the user has attached to a wine, as carried by the tag list. */
+export interface SelectedGrape {
   id: number
   name: string
 }

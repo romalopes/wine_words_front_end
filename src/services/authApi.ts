@@ -8,9 +8,11 @@ import type {
 } from "../types/api"
 import type {
   AuthResponse,
+  MessageResponse,
   ResetPasswordPayload,
   SignInPayload,
   SignUpPayload,
+  SignUpResponse,
   SocialSignInInput,
 } from "../types/authentication"
 
@@ -25,7 +27,7 @@ export function createAuthApi(request: ApiRequester): AuthApi {
       })
     },
 
-    signUp(payload: SignUpPayload): Promise<AuthResponse> {
+    signUp(payload: SignUpPayload): Promise<SignUpResponse> {
       const user = {
         email: payload.email,
         password: payload.password,
@@ -33,7 +35,10 @@ export function createAuthApi(request: ApiRequester): AuthApi {
         ...(payload.user_name ? { user_name: payload.user_name } : {}),
       }
 
-      return request<AuthResponse>("/auth/sign_up", {
+      // The response is a session *or* a pending-verification notice, so this
+      // must be SignUpResponse — `email_verification` drives the "check your
+      // inbox" banner on the client.
+      return request<SignUpResponse>("/auth/sign_up", {
         method: "POST",
         body: { user },
       })
@@ -43,8 +48,8 @@ export function createAuthApi(request: ApiRequester): AuthApi {
       return request("/auth/sign_out", { method: "DELETE", auth: true })
     },
 
-    forgotPassword(email: string): Promise<unknown> {
-      return request("/auth/password", {
+    forgotPassword(email: string): Promise<MessageResponse> {
+      return request<MessageResponse>("/auth/password", {
         method: "POST",
         body: { user: { email } },
       })

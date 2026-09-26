@@ -8,7 +8,7 @@ import {
 } from "react"
 import type { ReactNode } from "react"
 import { authApi, impersonationApi, setAuthToken } from "../services/api"
-import type { AuthResponse, ResetPasswordPayload, SignInPayload, SignUpPayload, SocialSignInInput, User } from "../types/authentication"
+import type { AuthResponse, ResetPasswordPayload, SignInPayload, SignUpPayload, SignUpResponse, SocialSignInInput, User } from "../types/authentication"
 import type { SocialProvider } from "../types/api"
 import type { ImpersonationResponse } from "../types/user"
 import { errorStatus } from "../utils/errors"
@@ -22,7 +22,13 @@ interface AuthContextValue {
   isImpersonating: boolean
   loading: boolean
   signIn: (payload: SignInPayload) => Promise<User>
-  signUp: (payload: SignUpPayload) => Promise<User | AuthResponse>
+  /**
+   * Returns the signed-in `User`, or the whole `SignUpResponse` when the
+   * backend created the account but issued no session pending email
+   * verification — `Login` inspects `email_verification` to show the
+   * "check your inbox" banner.
+   */
+  signUp: (payload: SignUpPayload) => Promise<User | SignUpResponse>
   socialSignIn: (provider: SocialProvider, payload?: SocialSignInInput) => Promise<User>
   resetPassword: (payload: ResetPasswordPayload) => Promise<unknown>
   refreshSession: () => Promise<User | null>
@@ -113,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signUp = useCallback(
-    async ({ email, password, password_confirmation, user_name }: SignUpPayload): Promise<User | AuthResponse> => {
+    async ({ email, password, password_confirmation, user_name }: SignUpPayload): Promise<User | SignUpResponse> => {
       const result = await authApi.signUp({
         email,
         password,
@@ -254,11 +260,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-function isEmailVerificationPending(response: unknown): boolean {
-  if (!response || typeof response !== "object") return false
-  const verification = (response as { email_verification?: unknown }).email_verification
-  if (!verification || typeof verification !== "object") return false
-  return (verification as { email_verification_pending?: unknown }).email_verification_pending === true
+/**
+ * True when the API created the account but withheld the session pending email
+ * verification. Typed rather than probing `unknown` — the response shape is
+ * `SignUpResponse`, and `email_verification_pending` is the documented flag.
+ */
+function isEmailVerificationPending(response: SignUpResponse): boolean {
+  return response.email_verification?.email_verification_pending === true
 }
 
 function extractToken(response: AuthResponse | ImpersonationResponse): string | null {

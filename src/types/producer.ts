@@ -79,6 +79,9 @@ export interface SubscriptionFeature {
 export interface Subscription {
   id: number
   name: string
+  description?: string | null
+  /** Marks the plan highlighted with a "Most popular" badge. */
+  popular?: boolean
   monthly_price_cents?: number | null
   yearly_price_cents?: number | null
   features?: SubscriptionFeature[]

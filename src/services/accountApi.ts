@@ -1,4 +1,18 @@
-import type { AccountApi, AccountUpdatePayload, BillingApi, PasswordUpdatePayload, SubscriptionsApi, UserApi, UsersApi, VintagesApi } from "../types/api"
+import type {
+  AccountApi,
+  AccountUpdatePayload,
+  BillingApi,
+  ChangeConfirmResponse,
+  ChangePreviewResponse,
+  CheckoutSessionResponse,
+  ConfirmCheckoutResponse,
+  PasswordUpdatePayload,
+  PortalSessionResponse,
+  SubscriptionsApi,
+  UserApi,
+  UsersApi,
+  VintagesApi,
+} from "../types/api"
 import type { Account } from "../types/account"
 import type { User } from "../types/authentication"
 import type { Subscription } from "../types/producer"
@@ -38,11 +52,11 @@ export function createAccountApi(request: ApiRequester): AccountApi {
 
 export function createBillingApi(request: ApiRequester): BillingApi {
   return {
-    checkout: (subscriptionId) => request("/billing/checkout", { method: "POST", auth: true, body: { subscription_id: subscriptionId } }),
-    confirm: (sessionId) => request("/billing/confirm", { method: "POST", auth: true, body: { session_id: sessionId } }),
-    portal: () => request("/billing/portal", { method: "POST", auth: true }),
-    changePreview: (subscriptionId) => request("/billing/change/preview", { method: "POST", auth: true, body: { subscription_id: subscriptionId } }),
-    changeConfirm: (subscriptionId, idempotencyKey) => request("/billing/change/confirm", { method: "POST", auth: true, body: { subscription_id: subscriptionId, idempotency_key: idempotencyKey } }),
+    checkout: (subscriptionId) => request<CheckoutSessionResponse>("/billing/checkout", { method: "POST", auth: true, body: { subscription_id: subscriptionId } }),
+    confirm: (sessionId) => request<ConfirmCheckoutResponse>("/billing/confirm", { method: "POST", auth: true, body: { session_id: sessionId } }),
+    portal: () => request<PortalSessionResponse>("/billing/portal", { method: "POST", auth: true }),
+    changePreview: (subscriptionId) => request<ChangePreviewResponse>("/billing/change/preview", { method: "POST", auth: true, body: { subscription_id: subscriptionId } }),
+    changeConfirm: (subscriptionId, idempotencyKey) => request<ChangeConfirmResponse>("/billing/change/confirm", { method: "POST", auth: true, body: { subscription_id: subscriptionId, idempotency_key: idempotencyKey } }),
   }
 }
 

@@ -1,26 +1,72 @@
 import { useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi, emailVerificationsApi } from "../services/api";
+import type { SocialProvider } from "../types/api";
+import type {
+  EmailVerification,
+  SignUpResponse,
+  User,
+} from "../types/authentication";
+import { errorData, errorMessage, errorStatus } from "../utils/errors";
 import {
   PROVIDER_LABELS,
   ProviderCancelledError,
   ProviderConfigurationError,
-  ProviderUnavailableError,
   availableProviders,
   signInWith,
 } from "../services/socialProviders";
 
-const initialForm = {
+/** Which set of fields the card is showing. */
+type AuthMode = "signIn" | "signUp" | "forgot";
+
+/** The four fields the card edits, shared by all three modes. */
+interface LoginForm {
+  email: string
+  password: string
+  password_confirmation: string
+  user_name: string
+}
+
+const initialForm: LoginForm = {
   email: "",
   password: "",
   password_confirmation: "",
   user_name: "",
 };
 
+/**
+ * The "check your inbox" banner state. Set when the backend confirms the
+ * account exists but is not email-verified, so no session was issued.
+ */
+interface VerificationNotice {
+  email: string
+  expired: boolean
+  deadline: string | null
+}
+
+/** Progress of the "resend verification email" button. */
+interface ResendState {
+  status: "idle" | "sending" | "sent"
+  message: string | null
+}
+
+/**
+ * `signUp` hands back either a signed-in `User` or the full `SignUpResponse`
+ * (the account exists, but no session was issued). Pull the verification
+ * sub-object out of whichever arrived, returning null when there isn't one.
+ * `User` carries an index signature, so this reads the field rather than
+ * narrowing on `in` — which would collapse to `{}`.
+ */
+function readEmailVerification(result: User | SignUpResponse): EmailVerification | null {
+  const verification = (result as SignUpResponse).email_verification
+  return verification ?? null
+}
+
 // Minimal brand marks, sized by .auth-card__social-btn svg. Kept inline so the
 // buttons work with no icon dependency.
-const PROVIDER_ICONS = {
+const PROVIDER_ICONS: Record<SocialProvider, React.ReactNode> = {
   google: (
     <svg aria-hidden="true" height="18" viewBox="0 0 18 18" width="18">
       <path
@@ -69,18 +115,18 @@ const PROVIDER_ICONS = {
 
 function Login() {
   const { user, signIn, signUp, socialSignIn } = useAuth();
-  const [mode, setMode] = useState("signIn");
-  const [form, setForm] = useState(initialForm);
-  const [formError, setFormError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [mode, setMode] = useState<AuthMode>("signIn");
+  const [form, setForm] = useState<LoginForm>(initialForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Set when the backend says the account exists but is not email-verified:
   // { email, expired, deadline } → the "check your inbox" banner replaces the
   // form and offers a resend.
-  const [verificationNotice, setVerificationNotice] = useState(null);
-  const [resendState, setResendState] = useState({ status: "idle", message: null });
+  const [verificationNotice, setVerificationNotice] = useState<VerificationNotice | null>(null);
+  const [resendState, setResendState] = useState<ResendState>({ status: "idle", message: null });
   // Provider whose popup is currently open, so only that button shows as busy.
-  const [pendingProvider, setPendingProvider] = useState(null);
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(null);
 
   const isSignUp = mode === "signUp";
   const isForgot = mode === "forgot";
@@ -89,20 +135,20 @@ function Login() {
   const providers = availableProviders();
   const navigate = useNavigate();
 
-  function updateField(field) {
-    return (event) => {
+  function updateField(field: keyof LoginForm) {
+    return (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
     };
   }
 
-  function toggleMode(nextMode) {
+  function toggleMode(nextMode: AuthMode) {
     setMode(nextMode);
     setFormError(null);
     setSuccess(null);
     setForm(initialForm);
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setFormError(null);
@@ -144,11 +190,15 @@ function Login() {
         });
         // Email verification required: the account exists but has no session.
         // Show the "check your inbox" banner with the verification deadline.
-        if (result?.email_verification?.email_verification_pending) {
+        // `signUp` returns the user on success, or the whole response when the
+        // backend withheld the session pending verification. Narrow on the flag
+        // itself rather than assuming which shape came back.
+        const verification = readEmailVerification(result);
+        if (verification?.email_verification_pending) {
           setVerificationNotice({
             email,
-            expired: result.email_verification.email_verification_expired === true,
-            deadline: result.email_verification.email_verification_deadline,
+            expired: verification.email_verification_expired === true,
+            deadline: verification.email_verification_deadline ?? null,
           });
           setResendState({ status: "idle", message: null });
           return;
@@ -161,16 +211,18 @@ function Login() {
     } catch (error) {
       console.error(error);
       // Sign-in blocked by the email-verification lock (403 + payload).
-      if (error.status === 403 && error.data?.email_verification_pending) {
+      const data = errorData(error);
+      if (errorStatus(error) === 403 && data.email_verification_pending) {
+        const deadline = data.email_verification_deadline;
         setVerificationNotice({
           email: form.email,
-          expired: error.data.email_verification_expired === true,
-          deadline: error.data.email_verification_deadline,
+          expired: data.email_verification_expired === true,
+          deadline: typeof deadline === "string" ? deadline : null,
         });
         setResendState({ status: "idle", message: null });
         return;
       }
-      setFormError(error.message);
+      setFormError(errorMessage(error, "Could not sign you in."));
     } finally {
       setIsSubmitting(false);
     }
@@ -181,18 +233,21 @@ function Login() {
     setResendState({ status: "sending", message: null });
     try {
       const result = await emailVerificationsApi.resend(verificationNotice.email);
-      setVerificationNotice((prev) => ({ ...prev, expired: false }));
+      // A fresh link was issued, so the notice is live again. Read from the
+      // already-narrowed value rather than the updater's `prev`, which is
+      // nullable (the banner can be dismissed while the request is in flight).
+      setVerificationNotice({ ...verificationNotice, expired: false });
       setResendState({
         status: "sent",
         message: result.message || "A new verification email has been sent. Check your inbox — you have 24 hours to click the link.",
       });
     } catch (err) {
-      setResendState({ status: "idle", message: err.message || "Could not send the email." });
+      setResendState({ status: "idle", message: errorMessage(err, "Could not send the email.") });
     }
   }
 
   // Human-readable time remaining until the verification deadline.
-  function describeTimeRemaining(deadline) {
+  function describeTimeRemaining(deadline: string | null): string {
     if (!deadline) return "24 hours";
     const secondsLeft = Math.floor((new Date(deadline).getTime() - Date.now()) / 1000);
     if (secondsLeft <= 0) return "the link has expired";
@@ -204,7 +259,7 @@ function Login() {
   // provider-issued credential to the API. The API verifies it and returns the
   // same session payload as email/password, so nothing after this point needs
   // to know how the person signed in.
-  const handleSocial = async (provider) => {
+  const handleSocial = async (provider: SocialProvider) => {
     setFormError(null);
     setSuccess(null);
     setPendingProvider(provider);
@@ -223,9 +278,10 @@ function Login() {
       } else if (!(error instanceof ProviderCancelledError)) {
         console.error(error);
         setFormError(
-          error instanceof ProviderUnavailableError
-            ? error.message
-            : error.message || `Could not sign in with ${PROVIDER_LABELS[provider]}.`,
+          errorMessage(
+            error,
+            `Could not sign in with ${PROVIDER_LABELS[provider]}.`,
+          ),
         );
       }
     } finally {
