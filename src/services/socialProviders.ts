@@ -15,6 +15,38 @@
 //
 // The scripts come from the providers' own CDNs; nothing is bundled or vendored.
 
+import type {
+  AppleSdk,
+  AppleSignInResponse,
+  FacebookLoginResponse,
+  FacebookSdk,
+  GoogleSdk,
+  MsalInstance,
+  MsalSdk,
+  SocialCredential,
+  SocialProvider,
+} from "../types/socialAuth"
+
+/**
+ * Render an unknown thrown value as a searchable string.
+ *
+ * The Apple SDK rejects with a plain object (`{ error, error_message }`) rather
+ * than an `Error`, so the discrimination has to survive a non-Error throw.
+ * `utils/errors.ts` covers the same need for HTTP failures; this is the
+ * provider-SDK-local equivalent and stays private to this module.
+ */
+function describeError(err: unknown): string {
+  if (typeof err === "string") return err
+  if (err instanceof Error) return err.message
+  if (typeof err === "object" && err !== null) {
+    const record = err as Record<string, unknown>
+    return [record.error, record.error_message, record.message]
+      .filter((part): part is string => typeof part === "string")
+      .join(" ")
+  }
+  return String(err)
+}
+
 const GOOGLE_SDK_URL = "https://accounts.google.com/gsi/client";
 const APPLE_SDK_URL =
   "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
@@ -24,7 +56,9 @@ const FACEBOOK_SDK_URL = "https://connect.facebook.net/en_US/sdk.js";
 
 // Provider is not configured for this deployment (no client id in the Vite env).
 export class ProviderUnavailableError extends Error {
-  constructor(provider) {
+  readonly provider: string
+
+  constructor(provider: string) {
     super(`${provider} sign-in is not available right now.`);
     this.name = "ProviderUnavailableError";
     this.provider = provider;
@@ -35,7 +69,10 @@ export class ProviderUnavailableError extends Error {
 // configuration problem (origin/client ID), not something the person using the
 // app can fix. Surfaced to the UI, unlike a cancelled popup.
 export class ProviderConfigurationError extends Error {
-  constructor(provider, detail) {
+  readonly provider: string
+  readonly detail: string
+
+  constructor(provider: string, detail: string) {
     super(`${provider} sign-in isn't available on this address. ${detail}`);
     this.name = "ProviderConfigurationError";
     this.provider = provider;
@@ -46,16 +83,41 @@ export class ProviderConfigurationError extends Error {
 // The person closed the provider popup without finishing, or the provider
 // declined the request. Not an error worth showing as a failure.
 export class ProviderCancelledError extends Error {
-  constructor(provider) {
+  readonly provider: string
+
+  constructor(provider: string) {
     super(`${provider} sign-in was cancelled.`);
     this.name = "ProviderCancelledError";
     this.provider = provider;
   }
 }
 
+/** The public, frontend-safe config each provider's SDK initialisation needs. */
+interface PublicProviderConfig {
+  google: { clientId: string | undefined }
+  apple: { clientId: string | undefined; redirectURI: string }
+  microsoft: { clientId: string | undefined; tenant: string }
+  facebook: { appId: string | undefined; graphVersion: string }
+}
+
+/**
+ * One factory per provider.
+ *
+ * Modelled as an interface (not `Record<SocialProvider, …>`) on purpose: a
+ * Record would widen every factory to the *union* of all four return types, so
+ * `publicConfig.apple().redirectURI` would stop type-checking. Declaring each
+ * member separately keeps `publicConfig.apple()` inferred as the Apple config.
+ */
+interface PublicProviderConfigFactories {
+  google: () => PublicProviderConfig["google"]
+  apple: () => PublicProviderConfig["apple"]
+  microsoft: () => PublicProviderConfig["microsoft"]
+  facebook: () => PublicProviderConfig["facebook"]
+}
+
 // Only public, frontend-safe identifiers. Every value here is compiled into the
 // Vite bundle, so nothing secret may ever be added.
-const publicConfig = {
+const publicConfig: PublicProviderConfigFactories = {
   google: () => ({
     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   }),
@@ -77,30 +139,47 @@ const publicConfig = {
 };
 
 // Human labels for the sign-in buttons (also used by Account settings).
-export const PROVIDER_LABELS = {
+export const PROVIDER_LABELS: Record<SocialProvider, string> = {
   google: "Google",
   apple: "Apple",
   microsoft: "Microsoft",
   facebook: "Facebook",
 };
 
-// Providers this deployment actually exposes a button for.
-export function availableProviders() {
-  return Object.keys(publicConfig).filter((provider) => {
-    try {
-      const config = publicConfig[provider]();
-      return Boolean(provider === "facebook" ? config.appId : config.clientId);
-    } catch {
-      return false;
-    }
-  });
+/** True when this deployment's env carries the provider's client id / app id. */
+function isPresent(value: string | undefined | null): boolean {
+  return typeof value === "string" && value.trim().length > 0
 }
 
-export function isConfigured(provider) {
+/**
+ * The identifier that decides whether a provider is usable: Google, Apple and
+ * Microsoft all need a client id, Facebook needs an app id.
+ */
+function configuredIdentifier(provider: SocialProvider): string | undefined {
+  switch (provider) {
+    case "google":
+      return publicConfig.google().clientId;
+    case "apple":
+      return publicConfig.apple().clientId;
+    case "microsoft":
+      return publicConfig.microsoft().clientId;
+    case "facebook":
+      return publicConfig.facebook().appId;
+  }
+}
+
+// Providers this deployment actually exposes a button for.
+export function availableProviders(): SocialProvider[] {
+  return (Object.keys(publicConfig) as SocialProvider[]).filter((provider) =>
+    isPresent(configuredIdentifier(provider)),
+  );
+}
+
+export function isConfigured(provider: SocialProvider): boolean {
   return availableProviders().includes(provider);
 }
 
-function requireClientId(provider, value) {
+function requireClientId(provider: string, value: string | undefined): string {
   if (!value) throw new ProviderUnavailableError(provider);
   return value;
 }
@@ -110,19 +189,22 @@ function requireClientId(provider, value) {
 // ---------------------------------------------------------------------------
 
 // Injects a provider's SDK script once and resolves when it has loaded.
-const scriptPromises = new Map();
+const scriptPromises = new Map<string, Promise<void>>();
 
-function loadScript(url) {
-  if (scriptPromises.has(url)) return scriptPromises.get(url);
+function loadScript(url: string): Promise<void> {
+  const cached = scriptPromises.get(url);
+  if (cached) return cached;
 
-  const promise = new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${url}"]`);
+  const promise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${url}"]`,
+    );
     if (existing?.dataset.loaded === "true") {
       resolve();
       return;
     }
 
-    const script = existing || document.createElement("script");
+    const script = existing ?? document.createElement("script");
     script.src = url;
     script.async = true;
     script.defer = true;
@@ -143,13 +225,26 @@ function loadScript(url) {
   return promise;
 }
 
-// Waits for a global the SDK installs (e.g. `google`, `AppleID`, `msal`, `FB`).
-function waitForGlobal(name, { attempts = 50, interval = 100 } = {}) {
+/** Poll options for `waitForGlobal`. */
+interface WaitForGlobalOptions {
+  attempts?: number
+  interval?: number
+}
+
+/**
+ * Waits for a global the SDK installs (e.g. `google`, `AppleID`, `msal`, `FB`).
+ * Typed as `unknown` because the global's shape depends on which SDK the caller
+ * asked for — each sign-in function narrows it to its own interface.
+ */
+function waitForGlobal(
+  name: string,
+  { attempts = 50, interval = 100 }: WaitForGlobalOptions = {},
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let tries = 0;
     const tick = () => {
-      if (window[name]) {
-        resolve(window[name]);
+      if (name in window) {
+        resolve((window as unknown as Record<string, unknown>)[name]);
         return;
       }
       tries += 1;
@@ -167,13 +262,13 @@ function waitForGlobal(name, { attempts = 50, interval = 100 } = {}) {
 // Nonce helpers (Apple requires the raw nonce to be sent alongside the token)
 // ---------------------------------------------------------------------------
 
-function newNonce() {
+function newNonce(): string {
   const bytes = new Uint8Array(16);
   window.crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sha256Hex(value) {
+async function sha256Hex(value: string): Promise<string> {
   const data = new TextEncoder().encode(value);
   const digest = await window.crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(digest), (b) =>
@@ -189,11 +284,13 @@ async function sha256Hex(value) {
 // verifies the signature against Google's JWKS and re-checks issuer, audience,
 // expiry and the email_verified claim. The email shown in the browser is never
 // treated as proof of anything.
-// GSI's `getNotDisplayedReason()` values that mean the *client configuration*
-// is wrong (checked before any account chooser appears). Everything else —
-// `browser_not_supported`, `suppressed_by_user`, `opt_out_or_no_session`, … —
-// is an environment/personal choice, not a bug in our setup.
-const GOOGLE_CONFIG_ERRORS = {
+//
+// Values of GSI's `getNotDisplayedReason()` that mean the *client
+// configuration* is wrong (checked before any account chooser appears).
+// Everything else — `browser_not_supported`, `suppressed_by_user`,
+// `opt_out_or_no_session`, … — is an environment/personal choice, not a bug in
+// our setup.
+const GOOGLE_CONFIG_ERRORS: Record<string, string> = {
   unregistered_origin:
     "The page's address isn't authorised for this Google client ID — add " +
     "it under 'Authorized JavaScript origins' in Google Cloud Console " +
@@ -207,14 +304,14 @@ const GOOGLE_CONFIG_ERRORS = {
     "VITE_GOOGLE_CLIENT_ID and restart the dev server.",
 };
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(): Promise<SocialCredential> {
   const config = publicConfig.google();
   const clientId = requireClientId("Google", config.clientId);
 
   await loadScript(GOOGLE_SDK_URL);
-  const google = await waitForGlobal("google");
+  const google = (await waitForGlobal("google")) as GoogleSdk;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<SocialCredential>((resolve, reject) => {
     let settled = false;
 
     console.log("Google OAuth configuration:", {
@@ -247,7 +344,7 @@ export async function signInWithGoogle() {
         // accounts.google.com/gsi/ plus `unregistered_origin` is exactly the
         // "origin not allowed for the given client ID" console error).
         const reason = notification.getNotDisplayedReason?.();
-        if (GOOGLE_CONFIG_ERRORS[reason]) {
+        if (reason && GOOGLE_CONFIG_ERRORS[reason]) {
           settled = true;
           reject(
             new ProviderConfigurationError(
@@ -285,12 +382,12 @@ export async function signInWithGoogle() {
 // The API treats Apple's `sub` as the identity and never auto-links an existing
 // account on a relay address, so "Hide My Email" users still get exactly one
 // account.
-export async function signInWithApple() {
+export async function signInWithApple(): Promise<SocialCredential> {
   const config = publicConfig.apple();
   const clientId = requireClientId("Apple", config.clientId);
 
   await loadScript(APPLE_SDK_URL);
-  const apple = await waitForGlobal("AppleID");
+  const apple = (await waitForGlobal("AppleID")) as AppleSdk;
 
   const rawNonce = newNonce();
   const hashedNonce = await sha256Hex(rawNonce);
@@ -303,12 +400,12 @@ export async function signInWithApple() {
     nonce: hashedNonce,
   });
 
-  let data;
+  let data: AppleSignInResponse;
   try {
     data = await apple.auth.signIn();
   } catch (err) {
     // Apple reports a user-dismissed popup as "popup_closed_by_user".
-    if (String(err?.error || err?.message || "").includes("popup_closed")) {
+    if (describeError(err).includes("popup_closed")) {
       throw new ProviderCancelledError("Apple");
     }
     throw err;
@@ -333,19 +430,19 @@ export async function signInWithApple() {
 // Only the default OpenID scopes (openid profile email) are requested — no
 // Microsoft Graph permission is asked for, because authentication needs nothing
 // more than the ID token.
-let msalInstance = null;
-let msalClientId = null;
+let msalInstance: MsalInstance | null = null;
+let msalClientId: string | null = null;
 
-function microsoftAuthority(config) {
+function microsoftAuthority(config: { tenant: string }): string {
   return `https://login.microsoftonline.com/${config.tenant}`;
 }
 
-async function microsoftClient() {
+async function microsoftClient(): Promise<MsalInstance> {
   const config = publicConfig.microsoft();
   const clientId = requireClientId("Microsoft", config.clientId);
 
   await loadScript(MICROSOFT_SDK_URL);
-  const msal = await waitForGlobal("msal");
+  const msal = (await waitForGlobal("msal")) as MsalSdk;
   if (!msal?.PublicClientApplication)
     throw new ProviderUnavailableError("Microsoft");
 
@@ -369,7 +466,7 @@ async function microsoftClient() {
   return msalInstance;
 }
 
-export async function signInWithMicrosoft() {
+export async function signInWithMicrosoft(): Promise<SocialCredential> {
   const instance = await microsoftClient();
 
   try {
@@ -381,7 +478,11 @@ export async function signInWithMicrosoft() {
     if (!result?.idToken) throw new ProviderCancelledError("Microsoft");
     return { credential: result.idToken };
   } catch (err) {
-    if (err?.errorCode === "user_cancelled") {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      (err as { errorCode?: unknown }).errorCode === "user_cancelled"
+    ) {
       throw new ProviderCancelledError("Microsoft");
     }
     throw err;
@@ -401,12 +502,12 @@ export async function signInWithMicrosoft() {
 // establish identity. Instagram is not a separate provider.
 let facebookInitialised = false;
 
-async function facebookClient() {
+async function facebookClient(): Promise<FacebookSdk> {
   const config = publicConfig.facebook();
   const appId = requireClientId("Facebook", config.appId);
 
   await loadScript(FACEBOOK_SDK_URL);
-  const FB = await waitForGlobal("FB");
+  const FB = (await waitForGlobal("FB")) as FacebookSdk;
 
   if (!facebookInitialised) {
     FB.init({
@@ -421,10 +522,10 @@ async function facebookClient() {
   return FB;
 }
 
-export async function signInWithFacebook() {
+export async function signInWithFacebook(): Promise<SocialCredential> {
   const FB = await facebookClient();
 
-  const response = await new Promise((resolve) => {
+  const response = await new Promise<FacebookLoginResponse>((resolve) => {
     FB.login(resolve, { scope: "public_profile,email", return_scopes: true });
   });
 
@@ -439,7 +540,9 @@ export async function signInWithFacebook() {
 // Dispatcher used by the Login card
 // ---------------------------------------------------------------------------
 
-const SIGN_IN_HANDLERS = {
+type SignInHandler = () => Promise<SocialCredential>;
+
+const SIGN_IN_HANDLERS: Record<SocialProvider, SignInHandler> = {
   google: signInWithGoogle,
   apple: signInWithApple,
   microsoft: signInWithMicrosoft,
@@ -447,7 +550,9 @@ const SIGN_IN_HANDLERS = {
 };
 
 // Runs the provider popup and returns { credential, nonce? } for the API.
-export async function signInWith(provider) {
+export async function signInWith(
+  provider: SocialProvider,
+): Promise<SocialCredential> {
   const handler = SIGN_IN_HANDLERS[provider];
   if (!handler) throw new ProviderUnavailableError(provider);
   return handler();

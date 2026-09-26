@@ -1,18 +1,13 @@
 import { BrowserRouter } from "react-router-dom";
-import { useState } from "react";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
-import AppRoutes from "./components/AppRoutes.jsx";
-import { AuthProvider } from "./contexts/AuthContext.jsx";
-import { TestAccessProvider } from "./contexts/TestAccessContext.jsx";
-import { TestAccessGate } from "./components/TestAccess.jsx";
+import AppRoutes from "./components/AppRoutes";
+import { AuthProvider } from "./contexts/AuthContext";
+import { TestAccessProvider } from "./contexts/TestAccessContext";
+import { TestAccessGate } from "./components/TestAccess";
 
 function App() {
-  // Owned here (as before) and passed down for the Login route; the real
-  // session state lives in AuthProvider.
-  const [user, setUser] = useState(null);
-
   return (
     <TestAccessProvider>
       <AuthProvider>
@@ -20,7 +15,7 @@ function App() {
           <TestAccessGate>
             <Header />
             <main className="app-main">
-              <AppRoutes user={user} setUser={setUser} />
+              <AppRoutes />
             </main>
             <Footer />
           </TestAccessGate>

@@ -2,7 +2,14 @@
 // `value` is the integer millilitres stored in the database; `label` is the
 // human-readable text shown in selects. 187ml bottles are nominally 187.5ml
 // (a champagne split) but stored as 187 so the column stays an integer.
-export const VOLUMES = [
+
+/** A selectable bottle size. `value` is the millilitre integer persisted in Rails. */
+export interface WineVolume {
+  value: number
+  label: string
+}
+
+export const VOLUMES: WineVolume[] = [
   { value: 187, label: "187.5 ml" },
   { value: 250, label: "250 ml" },
   { value: 375, label: "375 ml" },
@@ -27,9 +34,13 @@ export const DEFAULT_COLOR = "White";
 export const DEFAULT_CLOSURE = "Cork";
 export const DEFAULT_ALCOHOL_PERCENTAGE = 13.5;
 
-// Map a stored integer ml value to its display label (fallback to "<n>ml").
-export const volumeLabel = (volume_ml) => {
-  if (volume_ml == null) return null;
-  const found = VOLUMES.find((v) => v.value === Number(volume_ml));
-  return found ? found.label : `${volume_ml}ml`;
-};
+/**
+ * Map a stored integer ml value to its display label.
+ * Falls back to a raw "<n>ml" label for sizes not in the canonical list.
+ * Returns null for an absent volume so callers can render nothing.
+ */
+export const volumeLabel = (volume_ml: number | null | undefined): string | null => {
+  if (volume_ml == null) return null
+  const found = VOLUMES.find((v) => v.value === Number(volume_ml))
+  return found ? found.label : `${volume_ml}ml`
+}

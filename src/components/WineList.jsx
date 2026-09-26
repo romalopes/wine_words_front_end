@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { winesApi, categoriesApi } from "../services/api";
 import { useSelectedCategory } from "../hooks/useSelectedCategory";
 import { useAuth } from "../contexts/AuthContext";
@@ -16,8 +16,6 @@ function WineList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const selectedProducer = searchParams.get("producer");
   const selectedCategory = useSelectedCategory();
 
   // --- Advanced search state ---------------------------------------------

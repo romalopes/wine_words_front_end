@@ -1,6 +1,6 @@
 import { useState } from "react";
 import styles from "../ApiHealth.module.css";
-import ResponseInspector from "./ResponseInspector.jsx";
+import ResponseInspector from "./ResponseInspector";
 
 export default function WriteSandbox({ check, onRun, result, running }) {
   const [confirming, setConfirming] = useState(false);

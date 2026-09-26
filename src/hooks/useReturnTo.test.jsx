@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { useReturnToLink } from "./useReturnToLink.js";
-import { useReturnTo } from "./useReturnTo.js";
+import { useReturnToLink } from "./useReturnToLink";
+import { useReturnTo } from "./useReturnTo";
 
 // These two hooks power the "← Back to <origin>" links on every detail page.
 // They are shared by Wine, Article, Review and (now) Wine Package detail, so a

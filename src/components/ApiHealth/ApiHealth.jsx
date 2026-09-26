@@ -4,17 +4,17 @@ import {
   API_CHECKS,
   API_CATEGORIES,
   isWriteCheck,
-} from "../../services/apiHealth/apiHealthConfig.js";
+} from "../../services/apiHealth/apiHealthConfig";
 import {
   runCheck,
   runWriteFlow,
-} from "../../services/apiHealth/healthRunner.js";
-import { useAuth } from "../../contexts/AuthContext.jsx";
-import { getAuthToken } from "../../services/api.js";
-import { isAdmin } from "../../constants/roles.js";
-import { APP_VERSION } from "../../constants/versions.js";
-import ResponseInspector from "./components/ResponseInspector.jsx";
-import WriteSandbox from "./components/WriteSandbox.jsx";
+} from "../../services/apiHealth/healthRunner";
+import { useAuth } from "../../contexts/AuthContext";
+import { getAuthToken } from "../../services/api";
+import { isAdmin } from "../../constants/roles";
+import { APP_VERSION } from "../../constants/versions";
+import ResponseInspector from "./components/ResponseInspector";
+import WriteSandbox from "./components/WriteSandbox";
 
 const methodClass = {
   GET: styles.get,

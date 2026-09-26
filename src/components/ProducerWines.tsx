@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { producersApi, winesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
 import WineTable from "./WineTable";
+import type { Producer } from "../types/producer";
+import type { WineListItem } from "../types/wine";
 
 function ProducerWines() {
-  const { slug } = useParams();
-  const [producer, setProducer] = useState(null);
-  const [wines, setWines] = useState([]);
+  const { slug } = useParams<{ slug: string }>();
+  const [producer, setProducer] = useState<Producer | null>(null);
+  const [wines, setWines] = useState<WineListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadWines();
@@ -16,6 +19,7 @@ function ProducerWines() {
   }, [slug]);
 
   async function loadWines() {
+    if (!slug) return;
     try {
       setLoading(true);
       setError(null);
@@ -24,12 +28,12 @@ function ProducerWines() {
         winesApi.list(),
       ]);
       setProducer(producerData);
-      const allWines = Array.isArray(winesData) ? winesData : [];
+      const allWines: WineListItem[] = Array.isArray(winesData) ? winesData : [];
       setWines(
         allWines.filter((wine) => wine.producer && wine.producer.slug === slug),
       );
-    } catch (err) {
-      setError(err.message || "Failed to load wines");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Failed to load wines"));
     } finally {
       setLoading(false);
     }
@@ -53,6 +57,8 @@ function ProducerWines() {
       </div>
     );
   }
+
+  if (!producer) return null;
 
   return (
     <div className="wine-app">
@@ -84,7 +90,7 @@ function ProducerWines() {
           onWineLinked={() => {
             producersApi
               .show(producer.slug)
-              .then((p) => setWines(p.wines))
+              .then((p) => setWines(p.wines ?? []))
               .catch(() => {});
           }}
         />

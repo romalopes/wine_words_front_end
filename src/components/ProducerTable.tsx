@@ -2,13 +2,36 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LinkProducerDialog from "./LinkProducerDialog";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import type { Producer } from "../types/producer";
+import type { LinkEntityContext } from "../types/common";
+import type { Image } from "../types/image";
+
+// The API returns producer images as a list of URL strings; older payloads
+// may contain full image objects, so normalise both shapes to a URL.
+function imageSrc(image: string | Image | undefined): string {
+  if (typeof image === "string") return image;
+  return image?.url ?? "";
+}
+
+interface ProducerTableProps {
+  producers: Producer[];
+  canManage?: boolean;
+  /** When present, renders the "Link a Producer" action for the given entity. */
+  linkContext?: LinkEntityContext;
+  onProducerLinked?: () => void;
+}
 
 // Reusable producers table (image · name · country · type · status ·
 // address · email · wines · actions). Used by ProducerList and any other
 // page that needs to render a list of producers.
 // When `linkContext` is provided, shows a "Link a Producer" button that
 // opens a dialog to search and link producers to the given entity.
-function ProducerTable({ producers, canManage = false, linkContext, onProducerLinked }) {
+function ProducerTable({
+  producers,
+  canManage = false,
+  linkContext,
+  onProducerLinked,
+}: ProducerTableProps) {
   const navigate = useNavigate();
   const returnToLink = useReturnToLink();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,7 +54,7 @@ function ProducerTable({ producers, canManage = false, linkContext, onProducerLi
           </div>
         )}
         <p className="wine-management__empty-state">No producers yet.</p>
-        {dialogOpen && (
+        {dialogOpen && linkContext && (
           <LinkProducerDialog
             entityType={linkContext.type}
             entityId={linkContext.id}
@@ -95,7 +118,7 @@ function ProducerTable({ producers, canManage = false, linkContext, onProducerLi
               ) : Array.isArray(producer.images) &&
                 producer.images.length > 0 ? (
                 <img
-                  src={producer.images[0]}
+                  src={imageSrc(producer.images[0])}
                   alt={producer.name}
                   className="producers-table__thumb"
                 />
@@ -160,7 +183,7 @@ function ProducerTable({ producers, canManage = false, linkContext, onProducerLi
         ))}
       </tbody>
     </table>
-    {dialogOpen && (
+    {dialogOpen && linkContext && (
       <LinkProducerDialog
         entityType={linkContext.type}
         entityId={linkContext.id}

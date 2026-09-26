@@ -4,22 +4,26 @@ import usePagedList from "../hooks/usePagedList";
 import { grapesApi, producersApi } from "../services/api";
 import ProducerTable from "./ProducerTable";
 import Pagination from "./Pagination";
+import type { Grape } from "../types/catalog";
+import type { Producer } from "../types/producer";
+import type { QueryParams } from "../types/common";
 
 // Paginated list of producers for a given grape — mirrors GrapeWines.
 function GrapeProducers() {
-  const { slug } = useParams();
-  const [grape, setGrape] = useState(null);
+  const { slug } = useParams<{ slug: string }>();
+  const [grape, setGrape] = useState<Grape | null>(null);
 
   useEffect(() => {
+    if (!slug) return;
     grapesApi
       .show(slug)
       .then(setGrape)
       .catch(() => setGrape(null));
   }, [slug]);
 
-  const producers = usePagedList({
-    fetcher: (page) => producersApi.list({ grape_id: grape?.id, page }),
-    deps: [grape?.id],
+  const producers = usePagedList<Producer>({
+    fetcher: (params: QueryParams) =>
+      producersApi.list({ grape_id: grape?.id, ...params }),
     enabled: Boolean(grape?.id),
     paramKey: "producer_page",
   });
@@ -39,7 +43,9 @@ function GrapeProducers() {
         <>
           <ProducerTable
             producers={producers.items}
-            linkContext={{ type: "grape", id: grape?.id }}
+            linkContext={
+              grape ? { type: "grape", id: grape.id } : undefined
+            }
             onProducerLinked={() => producers.reload()}
           />
           <Pagination

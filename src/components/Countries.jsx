@@ -126,6 +126,9 @@ function Countries() {
     }
   }
 
+  // Edit and Delete entry points (restored with the strict-null baseline):
+  // they drive the shared form above (handleSubmit, mode/editingId) and the
+  // destroy call below, and are rendered from each row's actions.
   function startEdit(country) {
     setMode("edit");
     setEditingId(country.id);
@@ -370,13 +373,13 @@ function Countries() {
                       >
                         Edit
                       </button>
-                      {/* <button
+                      <button
                         type="button"
                         className="btn-action btn-action--delete"
                         onClick={() => handleDelete(country)}
                       >
                         Delete
-                      </button> */}
+                      </button>
                     </td>
                   )}
                 </tr>

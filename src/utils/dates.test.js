@@ -1,4 +1,4 @@
-import { parseDate, formatDate, daysUntil, deadlineLabel, todayInputValue } from "./dates.js";
+import { parseDate, formatDate, daysUntil, deadlineLabel, todayInputValue } from "./dates";
 
 // These helpers exist because bare ISO dates ("2026-10-15") must be read as
 // LOCAL midnight. `new Date("2026-10-15")` is UTC midnight, which renders as the

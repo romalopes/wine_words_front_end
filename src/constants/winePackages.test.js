@@ -5,7 +5,7 @@ import {
   sourceLabel,
   statusLabel,
   statusTone,
-} from "./winePackages.js";
+} from "./winePackages";
 
 // The package vocabulary is shared by the list, the detail page, the
 // notifications list and the item form. These tests pin the parts the status

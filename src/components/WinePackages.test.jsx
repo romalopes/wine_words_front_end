@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import WinePackages from "./WinePackages.jsx";
+import WinePackages from "./WinePackages";
 
 // Canned API responses. Every named export the component tree asks for must
 // exist here, or Vitest fails the import rather than the assertion.

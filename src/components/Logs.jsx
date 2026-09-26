@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import { logsApi } from "../services/api";
 import { copyText } from "../utils/clipboard";
-import Pagination from "./Pagination.jsx";
+import Pagination from "./Pagination";
 
 const LINE_COUNT_OPTIONS = [100, 250, 500, 1000, 2000];
 const PER_PAGE_OPTIONS = [10, 20, 50, 100];

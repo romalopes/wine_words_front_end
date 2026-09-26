@@ -1,48 +1,48 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import About from "./About.jsx";
-import AccountSettings from "./AccountSettings.jsx";
-import Dashboard from "./Dashboard.jsx";
-import Home from "./Home.jsx";
-import Login from "./Login.jsx";
-import ResetPassword from "./ResetPassword.jsx";
-import Reviews from "./Reviews.jsx";
-import ReviewDetail from "./ReviewDetail.jsx";
-import Articles from "./Articles.jsx";
-import ArticleDetail from "./ArticleDetail.jsx";
-import Quiz from "./Quiz.jsx";
-import WineList from "./WineList.jsx";
-import WineDetail from "./WineDetail.jsx";
-import WineForm from "./WineForm.jsx";
-import WineSearch from "./WineSearch.jsx";
-import ProducerList from "./ProducerList.jsx";
-import ProducerDetail from "./ProducerDetail.jsx";
-import ProducerForm from "./ProducerForm.jsx";
-import ProducerWines from "./ProducerWines.jsx";
-import UserRoles from "./UserRoles.jsx";
-import Categories from "./Categories.jsx";
-import CategoryDetail from "./CategoryDetail.jsx";
-import Grapes from "./Grapes.jsx";
-import GrapeDetail from "./GrapeDetail.jsx";
-import GrapeWines from "./GrapeWines.jsx";
-import GrapeProducers from "./GrapeProducers.jsx";
-import Countries from "./Countries.jsx";
-import CountryDetail from "./CountryDetail.jsx";
-import Regions from "./Regions.jsx";
-import RegionDetail from "./RegionDetail.jsx";
-import ApiHealth from "./ApiHealth/ApiHealth.jsx";
-import Subscribe from "./Subscribe.jsx";
-import TestAccessPage from "./TestAccess.jsx";
-import SubscriptionAdmin from "./SubscriptionAdmin.jsx";
-import Logs from "./Logs.jsx";
-import LogDetail from "./LogDetail.jsx";
-import Configuration from "./Configuration.jsx";
-import WinePackages from "./WinePackages.jsx";
-import WinePackageDetail from "./WinePackageDetail.jsx";
-import WinePackageForm from "./WinePackageForm.jsx";
-import Notifications from "./Notifications.jsx";
-import VerifyEmail from "./VerifyEmail.jsx";
+import About from "./About";
+import AccountSettings from "./AccountSettings";
+import Dashboard from "./Dashboard";
+import Home from "./Home";
+import Login from "./Login";
+import ResetPassword from "./ResetPassword";
+import Reviews from "./Reviews";
+import ReviewDetail from "./ReviewDetail";
+import Articles from "./Articles";
+import ArticleDetail from "./ArticleDetail";
+import Quiz from "./Quiz";
+import WineList from "./WineList";
+import WineDetail from "./WineDetail";
+import WineForm from "./WineForm";
+import WineSearch from "./WineSearch";
+import ProducerList from "./ProducerList";
+import ProducerDetail from "./ProducerDetail";
+import ProducerForm from "./ProducerForm";
+import ProducerWines from "./ProducerWines";
+import UserRoles from "./UserRoles";
+import Categories from "./Categories";
+import CategoryDetail from "./CategoryDetail";
+import Grapes from "./Grapes";
+import GrapeDetail from "./GrapeDetail";
+import GrapeWines from "./GrapeWines";
+import GrapeProducers from "./GrapeProducers";
+import Countries from "./Countries";
+import CountryDetail from "./CountryDetail";
+import Regions from "./Regions";
+import RegionDetail from "./RegionDetail";
+import ApiHealth from "./ApiHealth/ApiHealth";
+import Subscribe from "./Subscribe";
+import TestAccessPage from "./TestAccess";
+import SubscriptionAdmin from "./SubscriptionAdmin";
+import Logs from "./Logs";
+import LogDetail from "./LogDetail";
+import Configuration from "./Configuration";
+import WinePackages from "./WinePackages";
+import WinePackageDetail from "./WinePackageDetail";
+import WinePackageForm from "./WinePackageForm";
+import Notifications from "./Notifications";
+import VerifyEmail from "./VerifyEmail";
 
-function AppRoutes({ user, setUser }) {
+function AppRoutes() {
   return (
     <>
       <Routes>
@@ -52,10 +52,7 @@ function AppRoutes({ user, setUser }) {
         <Route element={<Home />} path="/finder" />
         <Route element={<Quiz />} path="quiz" />
         <Route element={<About />} path="about" />
-        <Route
-          path="/login"
-          element={<Login user={user} setUser={setUser} />}
-        />
+        <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route element={<Navigate replace to="/reviews" />} path="/my-reviews" />

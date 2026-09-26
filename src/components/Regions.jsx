@@ -20,7 +20,7 @@ function typeLabel(region) {
 }
 
 // Tree node component for displaying regions recursively
-function RegionTreeNode({ node, level, targetRegionId }) {
+function RegionTreeNode({ node, level, targetRegionId, onEdit, onDelete, canManage }) {
   const hasChildren = node.children && node.children.length > 0;
   const isCurrentRegion = node.id === targetRegionId;
   const wineCount = node.wine_count || 0;
@@ -66,6 +66,24 @@ function RegionTreeNode({ node, level, targetRegionId }) {
             {wineCount} wine{wineCount === 1 ? "" : "s"}
           </span>
         )}
+        {canManage && (
+          <span className="region-tree-node__actions">
+            <button
+              type="button"
+              className="btn-action"
+              onClick={() => onEdit(node)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="btn-action btn-action--delete"
+              onClick={() => onDelete(node)}
+            >
+              Delete
+            </button>
+          </span>
+        )}
       </div>
       {hasChildren && isExpanded && node.children && (
         <div className="region-tree-node__children">
@@ -75,6 +93,9 @@ function RegionTreeNode({ node, level, targetRegionId }) {
               node={child}
               level={level + 1}
               targetRegionId={targetRegionId}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              canManage={canManage}
             />
           ))}
         </div>
@@ -97,8 +118,8 @@ function Regions() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [expandedCountries, setExpandedCountries] = useState(new Set());
-  // Highlight target: the region currently being edited (null = none).
-  const [targetRegionId] = useState(null);
+  // Active highlight follows the row sent into the edit form (null = none).
+  const [targetRegionId, setTargetRegionId] = useState(null);
   const [showOnlyWithWines, setShowOnlyWithWines] = useState(true);
 
   const displayTree = showOnlyWithWines
@@ -145,6 +166,7 @@ function Regions() {
   function resetForm() {
     setMode("create");
     setEditingId(null);
+    setTargetRegionId(null);
     setShowForm(false);
     setForm(emptyForm);
   }
@@ -152,6 +174,7 @@ function Regions() {
   function openCreateForm() {
     setMode("create");
     setEditingId(null);
+    setTargetRegionId(null);
     setForm(emptyForm);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -201,8 +224,12 @@ function Regions() {
     }
   }
 
+  // Edit and Delete entry points: they drive the shared form above
+  // (handleSubmit, mode/editingId) and the destroy call below, and are
+  // rendered from each tree row's actions.
   function startEdit(region) {
     setMode("edit");
+    setTargetRegionId(region.id);
     setEditingId(region.id);
     setForm({
       name: region.name,
@@ -423,6 +450,9 @@ function Regions() {
                           node={region}
                           level={1}
                           targetRegionId={targetRegionId}
+                          onEdit={startEdit}
+                          onDelete={handleDelete}
+                          canManage={canManage}
                         />
                       ))}
                     </div>

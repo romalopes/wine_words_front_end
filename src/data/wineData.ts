@@ -1,3 +1,12 @@
+import type {
+  AustralianWineTest,
+  TasteParameterSpec,
+  TasteValues,
+  VintageSpec,
+  WineDetails,
+  WineProfile,
+} from "../types/wineFinder"
+
 // Curated Unsplash photo IDs grouped by wine style. Using stable photo IDs
 // (rather than keyword search) keeps the images consistent across deploys.
 const RED_WINE_PHOTO = "1510812431401-41d2bd2722f3";
@@ -5,19 +14,17 @@ const WHITE_WINE_PHOTO = "1506377247377-2a5b3b417ebb";
 const ROSE_WINE_PHOTO = "1558346490-a72e53ae2d4f";
 const SPARKLING_PHOTO = "1547595628-c61a29f496f0";
 const DESSERT_PHOTO = "1568213816046-0ee1c42bd559";
-const POUR_PHOTO = "1474722883778-792e7990302f";
-const GRAPES_PHOTO = "1535688269728-49b3b6da1f0d";
-const CELLAR_PHOTO = "1506377247377-2a5b3b417ebb";
 
-const FALLBACK_IMAGE =
+export const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80";
 
-function imageFor(color, photo) {
+function imageFor(_color: string, photo: string): string {
   const id = photo || RED_WINE_PHOTO;
   return `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=600&q=80`;
 }
 
-function imageByColor(color) {
+/** Pick a placeholder bottle photo for a wine colour, falling back to red. */
+export function imageByColor(color: string): string {
   if (color === "Red") return imageFor(color, RED_WINE_PHOTO);
   if (color === "White") return imageFor(color, WHITE_WINE_PHOTO);
   if (color === "Rose") return imageFor(color, ROSE_WINE_PHOTO);
@@ -26,9 +33,7 @@ function imageByColor(color) {
   return FALLBACK_IMAGE;
 }
 
-export { imageByColor, FALLBACK_IMAGE };
-
-export const tasteParameters = [
+export const tasteParameters: TasteParameterSpec[] = [
   {
     id: "acidity",
     label: "Acidity",
@@ -73,7 +78,7 @@ export const tasteParameters = [
   },
 ];
 
-const p = {
+const p: Record<string, TasteValues> = {
   pinotNoir: {
     acidity: 4,
     body: 2,
@@ -309,7 +314,7 @@ const p = {
 // Compact wine definitions; image URLs are picked from a small palette
 // of curated Unsplash photos so the bundle stays light and the look
 // remains consistent.
-function img(color) {
+function img(color: string): string {
   return imageByColor(color);
 }
 
@@ -319,7 +324,7 @@ function img(color) {
 // like. Adding vintages lets the React finder answer "what was the
 // 2020 Penfolds like?" in addition to "what does a generic Penfolds
 // taste like?".
-const VINTAGE_LIBRARY = {
+const VINTAGE_LIBRARY: Record<string, VintageSpec[]> = {
   "pinot-noir": [
     {
       year: 2018,
@@ -740,7 +745,7 @@ const VINTAGE_LIBRARY = {
   ],
 };
 
-const VINTAGE_TEST_LIBRARY = {
+const VINTAGE_TEST_LIBRARY: Record<string, VintageSpec[]> = {
   "penfolds-bin-389": [
     {
       year: 2018,
@@ -868,7 +873,7 @@ const VINTAGE_TEST_LIBRARY = {
 // between the wineProfiles catalogue and the australianWineTests
 // quiz, so we look it up by wine id and apply it through withDetails
 // in both exports.
-const WINE_DETAILS_LIBRARY = {
+const WINE_DETAILS_LIBRARY: Record<string, WineDetails> = {
   "pinot-noir": { closure: "Cork", alcoholPercentage: 13.5, volumeMl: 750 },
   "cabernet-sauvignon": {
     closure: "Cork",
@@ -975,21 +980,28 @@ const WINE_DETAILS_LIBRARY = {
   },
 };
 
-function withVintages(wine, library) {
-  const vintages = library[wine.id] || [];
+/** Merge a wine's year-specific tasting notes in from the vintage library. */
+function withVintages<T extends { id: string }>(
+  wine: T,
+  library: Record<string, VintageSpec[]>,
+): T & { vintages: VintageSpec[] } {
+  const vintages = library[wine.id] ?? [];
   return { ...wine, vintages };
 }
 
-function withDetails(wine) {
-  const details = WINE_DETAILS_LIBRARY[wine.id] || {
-    closure: "Cork",
-    alcoholPercentage: 13.5,
-    volumeMl: 750,
-  };
+const DEFAULT_WINE_DETAILS: WineDetails = {
+  closure: "Cork",
+  alcoholPercentage: 13.5,
+  volumeMl: 750,
+};
+
+/** Merge bottle metadata in by wine id, falling back to the generic defaults. */
+function withDetails<T extends { id: string }>(wine: T): T & WineDetails {
+  const details = WINE_DETAILS_LIBRARY[wine.id] ?? DEFAULT_WINE_DETAILS;
   return { ...wine, ...details };
 }
 
-export const wineProfiles = [
+export const wineProfiles: WineProfile[] = [
   {
     id: "pinot-noir",
     name: "Pinot Noir",
@@ -1383,7 +1395,7 @@ export const wineProfiles = [
   .map((wine) => withVintages(wine, VINTAGE_LIBRARY))
   .map((wine) => withDetails(wine));
 
-export const australianWineTests = [
+export const australianWineTests: AustralianWineTest[] = [
   {
     id: "penfolds-bin-389",
     name: "Penfolds Bin 389 Cabernet Shiraz",
@@ -1558,11 +1570,22 @@ export const australianWineTests = [
   .map((wine) => withVintages(wine, VINTAGE_TEST_LIBRARY))
   .map((wine) => withDetails(wine));
 
-export const initialTaste = tasteParameters.reduce((taste, parameter) => {
-  return { ...taste, [parameter.id]: 3 };
-}, {});
+/** Neutral mid-point (3 on the 1-5 scale) for every tasting parameter. */
+export const initialTaste: TasteValues = tasteParameters.reduce(
+  (taste, parameter) => {
+    return { ...taste, [parameter.id]: 3 };
+  },
+  {} as TasteValues,
+);
 
-export function calculateMatch(profile, selectedTaste) {
+/**
+ * Score a wine profile (0-100) against the user's tasting selection by summing
+ * the absolute distance across every parameter. A perfect match scores 100.
+ */
+export function calculateMatch(
+  profile: { parameters: TasteValues },
+  selectedTaste: TasteValues,
+): number {
   const totalDistance = tasteParameters.reduce((total, parameter) => {
     return (
       total +

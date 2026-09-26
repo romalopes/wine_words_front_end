@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTestAccess } from "../contexts/TestAccessContext.jsx";
+import { useTestAccess } from "../contexts/TestAccessContext";
 import "./TestAccess.css";
 
 /**

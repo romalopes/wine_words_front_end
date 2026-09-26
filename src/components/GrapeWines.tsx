@@ -4,17 +4,22 @@ import { grapesApi, winesApi } from "../services/api";
 import WineTable from "./WineTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
+import type { Grape } from "../types/catalog";
+import type { WineListItem } from "../types/wine";
+import type { QueryParams } from "../types/common";
 
 function GrapeWines() {
-  const { slug } = useParams();
-  const [grape, setGrape] = useState(null);
+  const { slug } = useParams<{ slug: string }>();
+  const [grape, setGrape] = useState<Grape | null>(null);
 
-  const list = usePagedList({
-    fetcher: (params) => winesApi.list({ ...params, grape_id: grape?.id }),
+  const list = usePagedList<WineListItem>({
+    fetcher: (params: QueryParams) =>
+      winesApi.list({ ...params, grape_id: grape?.id }),
     enabled: Boolean(grape?.id),
   });
 
   useEffect(() => {
+    if (!slug) return;
     grapesApi
       .show(slug)
       .then(setGrape)
@@ -47,7 +52,11 @@ function GrapeWines() {
           <WineTable
             wines={list.items}
             onDeleted={() => list.reload()}
-            linkContext={{ type: "grape", id: grape?.id, name: grape?.name }}
+            linkContext={
+              grape
+                ? { type: "grape", id: grape.id, name: grape.name }
+                : undefined
+            }
             onWineLinked={() => list.reload()}
           />
           <Pagination

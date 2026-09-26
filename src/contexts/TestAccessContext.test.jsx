@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { TestAccessProvider, useTestAccess } from "./TestAccessContext.jsx";
+import { TestAccessProvider, useTestAccess } from "./TestAccessContext";
 import {
   testAccessApi,
   getTestAccessToken,
   setTestAccessToken,
-} from "../services/api.js";
+} from "../services/api";
 
-vi.mock("../services/api.js", async (importOriginal) => {
+vi.mock("../services/api", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,

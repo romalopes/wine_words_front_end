@@ -146,6 +146,9 @@ function Grapes() {
     }
   }
 
+  // Edit and Delete entry points: they drive the shared form above
+  // (handleSubmit, mode/editingId) and the destroy call below, and are
+  // rendered from each table row's actions.
   function startEdit(grape) {
     setMode("edit");
     setEditingId(grape.id);
@@ -356,7 +359,7 @@ function Grapes() {
                 <th>Synonyms</th>
                 <th>Wines</th>
                 <th>Producers</th>
-                {/* {isWineManager && <th>Actions</th>} */}
+                {isWineManager && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -411,7 +414,7 @@ function Grapes() {
                       "—"
                     )}
                   </td>
-                  {/* {isWineManager && (
+                  {isWineManager && (
                     <td className="actions">
                       <Link to={`/grapes/${grape.slug}`} className="btn-action">
                         Show
@@ -431,7 +434,7 @@ function Grapes() {
                         Delete
                       </button>
                     </td>
-                  )} */}
+                  )}
                 </tr>
               ))}
             </tbody>

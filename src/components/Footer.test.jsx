@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import Footer from "./Footer.jsx";
-import { APP_VERSION } from "../constants/versions.js";
+import Footer from "./Footer";
+import { APP_VERSION } from "../constants/versions";
 
 describe("Footer", () => {
   it("renders the footer", () => {

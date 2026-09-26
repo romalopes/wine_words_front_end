@@ -1,7 +1,7 @@
 import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, Link } from "react-router-dom";
-import NotificationBell from "./NotificationBell.jsx";
+import NotificationBell from "./NotificationBell";
 import { emitNotificationsChanged } from "../services/notificationEvents";
 
 const mockList = vi.fn();

@@ -1,16 +1,28 @@
 // Tests for the Google Identity Services reason → error mapping in
-// socialProviders.js. The GSI SDK itself is faked: the "script load" is
+// socialProviders.ts. The GSI SDK itself is faked: the "script load" is
 // resolved by intercepting the <script> injection, and a fake
 // `google.accounts.id` object records the notification listener so each test
 // can replay a prompt moment (not-displayed reason) synchronously.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { GooglePromptMoment, GoogleSdk } from "../types/socialAuth";
 import {
   ProviderCancelledError,
   ProviderConfigurationError,
   signInWithGoogle,
 } from "./socialProviders";
 
-function fakeNotification({ notDisplayed, reason, skipped }) {
+/** The prompt-moment state a given test wants to simulate. */
+interface NotificationFixture {
+  notDisplayed?: boolean;
+  reason?: string;
+  skipped?: boolean;
+}
+
+function fakeNotification({
+  notDisplayed,
+  reason,
+  skipped,
+}: NotificationFixture): GooglePromptMoment {
   return {
     isNotDisplayed: () => Boolean(notDisplayed),
     getNotDisplayedReason: () => reason,
@@ -19,7 +31,7 @@ function fakeNotification({ notDisplayed, reason, skipped }) {
   };
 }
 
-let promptListener;
+let promptListener: ((notification: GooglePromptMoment) => void) | null;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -27,13 +39,13 @@ beforeEach(async () => {
 
   // Resolve the injected GSI <script> immediately — jsdom never fetches it.
   vi.spyOn(document.head, "appendChild").mockImplementation((element) => {
-    element.dataset.loaded = "true";
+    (element as HTMLScriptElement).dataset.loaded = "true";
     setTimeout(() => element.dispatchEvent(new Event("load")), 0);
     return element;
   });
 
   promptListener = null;
-  window.google = {
+  const fakeGoogle: GoogleSdk = {
     accounts: {
       id: {
         initialize: vi.fn(),
@@ -43,6 +55,7 @@ beforeEach(async () => {
       },
     },
   };
+  window.google = fakeGoogle;
 });
 
 afterEach(() => {
@@ -51,7 +64,7 @@ afterEach(() => {
   delete window.google;
 });
 
-function promptWith(notification) {
+function promptWith(notification: GooglePromptMoment) {
   const promise = signInWithGoogle();
   setTimeout(() => promptListener?.(notification), 0);
   return promise;
@@ -95,7 +108,9 @@ describe("signInWithGoogle prompt-moment handling", () => {
     const promise = signInWithGoogle();
     setTimeout(() => promptListener?.(fakeNotification({ skipped: true })), 0);
     await expect(promise).rejects.toBeInstanceOf(ProviderCancelledError);
-    expect(window.google.accounts.id.initialize).toHaveBeenCalledWith(
+    const google = window.google;
+    if (!google) throw new Error("the GSI fake was not installed");
+    expect(google.accounts.id.initialize).toHaveBeenCalledWith(
       expect.objectContaining({ client_id: "test-client-id.apps.googleusercontent.com" }),
     );
   });

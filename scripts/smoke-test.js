@@ -9,7 +9,7 @@
 // Exits 0 on success, 1 on any failure.
 /* global process */
 
-import { API_CHECKS, isWriteCheck } from "../src/services/apiHealth/apiHealthConfig.js";
+import { API_CHECKS, isWriteCheck } from "../src/services/apiHealth/apiHealthConfig";
 
 const argIndex = process.argv.indexOf("--base");
 const BASE_URL =

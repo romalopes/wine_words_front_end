@@ -7,8 +7,8 @@ import {
   canAccessPackages,
 } from "../constants/roles";
 import { categoriesApi } from "../services/api";
-import { useTestAccess } from "../contexts/TestAccessContext.jsx";
-import NotificationBell from "./NotificationBell.jsx";
+import { useTestAccess } from "../contexts/TestAccessContext";
+import NotificationBell from "./NotificationBell";
 
 function NavDropdown({ label, items }) {
   const [open, setOpen] = useState(false);

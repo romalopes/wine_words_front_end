@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import ApiHealth from "./ApiHealth.jsx";
-import { APP_VERSION } from "../../constants/versions.js";
-import { API_CHECKS } from "../../services/apiHealth/apiHealthConfig.js";
+import ApiHealth from "./ApiHealth";
+import { APP_VERSION } from "../../constants/versions";
+import { API_CHECKS } from "../../services/apiHealth/apiHealthConfig";
 
 // Mock the health runner so the component receives canned results instead of
 // making real HTTP requests. `runWriteFlow` must be present too: the component
@@ -11,20 +11,20 @@ import { API_CHECKS } from "../../services/apiHealth/apiHealthConfig.js";
 const mockRunCheck = vi.fn();
 const mockRunWriteFlow = vi.fn();
 
-vi.mock("../../services/apiHealth/healthRunner.js", () => ({
+vi.mock("../../services/apiHealth/healthRunner", () => ({
   runCheck: (...args) => mockRunCheck(...args),
   runWriteFlow: (...args) => mockRunWriteFlow(...args),
 }));
 
 // Mock the token getter so no real localStorage/network is touched.
-vi.mock("../../services/api.js", () => ({
+vi.mock("../../services/api", () => ({
   getAuthToken: () => "fake-token",
 }));
 
 // Mock the auth context so the component doesn't try to talk to a real API.
 // The user must be an Admin, otherwise the component renders the
 // "no permission" message instead of the diagnostics UI.
-vi.mock("../../contexts/AuthContext.jsx", () => ({
+vi.mock("../../contexts/AuthContext", () => ({
   useAuth: () => ({
     user: { id: 1, email: "admin@example.com", roles: ["Admin"] },
     isAuthenticated: true,

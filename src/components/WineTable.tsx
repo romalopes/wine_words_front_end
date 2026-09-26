@@ -4,12 +4,22 @@ import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import LinkWineDialog from "./LinkWineDialog";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import type { WineListItem } from "../types/wine";
+import type { LinkEntityContext } from "../types/common";
+
+interface WineTableProps {
+  wines: WineListItem[];
+  linkContext?: LinkEntityContext;
+  onWineLinked?: () => void;
+  /** Accepted for call-site compatibility; the delete button is not rendered here. */
+  onDeleted?: (deleted: WineListItem) => void;
+}
 
 // Shared table of wines (one wine per row): Name, Producer, Regions,
 // Vintages count and Edit actions for wine managers.
 // When `linkContext` is provided, shows a "Link a Wine" button that opens
 // a dialog to search and link wines to the given entity.
-function WineTable({ wines, linkContext, onWineLinked }) {
+function WineTable({ wines, linkContext, onWineLinked }: WineTableProps) {
   const { user } = useAuth();
   const canManageWines = canManageWinesRole(user);
   const navigate = useNavigate();
@@ -34,7 +44,7 @@ function WineTable({ wines, linkContext, onWineLinked }) {
           </div>
         )}
         <p className="wine-management__empty-state">No wines yet.</p>
-        {dialogOpen && (
+        {dialogOpen && linkContext && (
           <LinkWineDialog
             entityType={linkContext.type}
             entityId={linkContext.id}
@@ -138,7 +148,7 @@ function WineTable({ wines, linkContext, onWineLinked }) {
                 : "—"}
             </td>
             <td>
-              {wine.vintages_count > 0
+              {(wine.vintages_count ?? 0) > 0
                 ? `${wine.vintages_count} vintage${
                     wine.vintages_count !== 1 ? "s" : ""
                   }`
@@ -161,7 +171,7 @@ function WineTable({ wines, linkContext, onWineLinked }) {
         ))}
       </tbody>
     </table>
-      {dialogOpen && (
+      {dialogOpen && linkContext && (
         <LinkWineDialog
           entityType={linkContext.type}
           entityId={linkContext.id}

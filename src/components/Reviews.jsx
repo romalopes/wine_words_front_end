@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   reviewsApi,
@@ -15,7 +15,6 @@ import { canManageWinesRole } from "../constants/roles";
 import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import DOMPurify from "dompurify";
-import { timeAgo } from "../utils/dates";
 
 function excerpt(html, max = 50) {
   if (!html) return "";
@@ -111,7 +110,7 @@ function Reviews() {
   // All reviews, loaded once when no category is selected (grouped view).
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
-  async function loadGroups() {
+  const loadGroups = useCallback(async () => {
     try {
       setLoadingGroups(true);
       const data = await reviewsApi.grouped();
@@ -121,16 +120,17 @@ function Reviews() {
     } finally {
       setLoadingGroups(false);
     }
-  }
+  }, []);
 
   // Reload whichever feed is active (paginated when a category is selected,
-  // the full grouped list otherwise).
-  const reloadReviews = () => {
+  // the full grouped list otherwise). Stable unless the selected category
+  // changes, so effects can safely depend on it.
+  const reloadReviews = useCallback(() => {
     if (selectedCategory) loadReviews();
     else loadGroups();
-  };
+  }, [selectedCategory, loadReviews, loadGroups]);
 
-  async function loadMyReviews() {
+  const loadMyReviews = useCallback(async () => {
     try {
       const data = await reviewsApi.myReviews();
       setMyReviews(Array.isArray(data) ? data : []);
@@ -139,7 +139,7 @@ function Reviews() {
     } finally {
       setMineLoaded(true);
     }
-  }
+  }, []);
 
   useEffect(() => {
     reloadReviews();
@@ -148,7 +148,7 @@ function Reviews() {
       setMyReviews([]);
       setMineLoaded(true);
     }
-  }, [user, selectedCategory]);
+  }, [user, selectedCategory, reloadReviews, loadMyReviews]);
 
   function canManage(review) {
     return Boolean(

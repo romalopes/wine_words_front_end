@@ -7,7 +7,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./src/setupTests.js",
-    include: ["src/**/*.{test,spec}.{js,mjs,jsx}"],
+    include: ["src/**/*.{test,spec}.{js,mjs,jsx,ts,tsx}"],
   },
   // Bind both IPv4 and IPv6 loopback: Node binds only the first address it
   // resolves for "localhost" (::1 here), which left 127.0.0.1:5173 refusing

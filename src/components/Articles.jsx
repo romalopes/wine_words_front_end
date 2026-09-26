@@ -79,7 +79,7 @@ function Articles() {
   // All articles, loaded once when no category is selected (grouped view).
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
-  async function loadGroups() {
+  const loadGroups = useCallback(async () => {
     try {
       setLoadingGroups(true);
       const data = await articlesApi.grouped();
@@ -89,14 +89,15 @@ function Articles() {
     } finally {
       setLoadingGroups(false);
     }
-  }
+  }, []);
 
   // Reload whichever feed is active (paginated when a category is selected,
-  // the full grouped list otherwise).
-  const reloadArticles = () => {
+  // the full grouped list otherwise). Stable unless the selected category
+  // changes, so effects can safely depend on it.
+  const reloadArticles = useCallback(() => {
     if (selectedCategory) loadArticles();
     else loadGroups();
-  };
+  }, [selectedCategory, loadArticles, loadGroups]);
 
   const loadMyArticles = useCallback(async () => {
     try {
@@ -109,9 +110,9 @@ function Articles() {
     }
   }, []);
 
-  // `reloadArticles` is an inline dispatcher over the stable refs above, so it
-  // intentionally has no dependency array of its own — see the disable below.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // `reloadArticles` is an inline dispatcher over the stable refs above — the
+  // effect re-runs when the user, the selected category, or either loader
+  // identity changes.
   useEffect(() => {
     reloadArticles();
     if (user) loadMyArticles();
@@ -119,7 +120,7 @@ function Articles() {
       setMyArticles([]);
       setMineLoaded(true);
     }
-  }, [user, selectedCategory]);
+  }, [user, selectedCategory, reloadArticles, loadMyArticles]);
 
   function canManage(article) {
     return Boolean(
