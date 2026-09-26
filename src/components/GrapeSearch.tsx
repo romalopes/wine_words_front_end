@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { grapesApi } from "../services/api";
-import type { Grape } from "../types/catalog";
+import type { GrapeSearchResult } from "../types/catalog";
 
 interface SelectedGrape {
   id: number
@@ -17,7 +17,7 @@ interface GrapeSearchProps {
 // adding multiple grapes to a wine, shown as removable tags.
 function GrapeSearch({ selected, onChange }: GrapeSearchProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Grape[] | null>(null);
+  const [results, setResults] = useState<GrapeSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,7 +42,7 @@ function GrapeSearch({ selected, onChange }: GrapeSearchProps) {
     timerRef.current = setTimeout(() => performSearch(newValue), 300);
   }
 
-  function handleSelect(grape: Grape) {
+  function handleSelect(grape: GrapeSearchResult) {
     if (!selected.some((g) => g.id === grape.id)) {
       onChange([...selected, { id: grape.id, name: grape.name }]);
     }

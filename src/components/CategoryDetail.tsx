@@ -7,35 +7,41 @@ import ArticleTable from "./ArticleTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
 import BackToSource from "./BackToSource";
+import { errorMessage } from "../utils/errors";
+import type { CategoryDetail as CategoryDetailData } from "../types/catalog";
+import type { WineListItem } from "../types/wine";
+import type { Review } from "../types/review";
+import type { Article } from "../types/article";
 
 function CategoryDetail() {
-  const { slug } = useParams();
-  const [category, setCategory] = useState(null);
+  const { slug } = useParams<{ slug: string }>();
+  const [category, setCategory] = useState<CategoryDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Three independent paginated lists — paging one does not disturb the others.
-  const wines = usePagedList({
+  const wines = usePagedList<WineListItem>({
     fetcher: (params) => winesApi.list({ ...params, category_id: category?.id }),
     enabled: Boolean(category?.id),
   });
-  const reviews = usePagedList({
+  const reviews = usePagedList<Review>({
     fetcher: (params) => reviewsApi.all({ ...params, category_id: category?.id }),
     enabled: Boolean(category?.id),
   });
-  const articles = usePagedList({
+  const articles = usePagedList<Article>({
     fetcher: (params) => articlesApi.list({ ...params, category_id: category?.id }),
     enabled: Boolean(category?.id),
   });
 
   useEffect(() => {
+    if (!slug) return;
     setLoading(true);
     setError(null);
     setCategory(null);
     categoriesApi
       .show(slug)
       .then(setCategory)
-      .catch((err) => setError(err.message || "Failed to load category"))
+      .catch((err: unknown) => setError(errorMessage(err, "Failed to load category")))
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -108,11 +114,7 @@ function CategoryDetail() {
           <>
             <ReviewTable
               reviews={reviews.items}
-              linkContext={
-                category
-                  ? { type: "category", id: category.id, name: category.name }
-                  : null
-              }
+              linkContext={{ type: "category", id: category.id, name: category.name }}
               onReviewLinked={() => reviews.reload()}
             />
             {reviews.items.length > 0 && (
@@ -138,11 +140,7 @@ function CategoryDetail() {
           <>
             <ArticleTable
               articles={articles.items}
-              linkContext={
-                category
-                  ? { type: "category", id: category.id, name: category.name }
-                  : null
-              }
+              linkContext={{ type: "category", id: category.id, name: category.name }}
               onArticleLinked={() => articles.reload()}
             />
             {articles.items.length > 0 && (

@@ -1,19 +1,55 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { winesApi, categoriesApi, regionsApi, grapesApi, producersApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
+import type { LinkEntityType } from "../types/common";
+import type { WineListItem } from "../types/wine";
 
-const LINK_ENDPOINTS = {
+/**
+ * The catalog entities a wine can be attached to — a subset of the shared
+ * `LinkEntityType`, which also allows "country".
+ */
+export type WineLinkTarget = "category" | "region" | "grape" | "producer";
+
+/**
+ * `linkWine` differs per catalog entity but has the same shape everywhere, so
+ * the dialog picks the right one from `entityType` at call time. Deliberately a
+ * *partial* map over `LinkEntityType`: callers pass the wider shared union, and
+ * the unsupported keys stay `undefined` so the runtime guard below still fires
+ * for a "country" target rather than silently doing nothing.
+ */
+const LINK_ENDPOINTS: Partial<
+  Record<LinkEntityType, (entityId: number) => (wineId: number | string) => Promise<unknown>>
+> = {
   category: (id) => (wineId) => categoriesApi.linkWine(id, wineId),
   region: (id) => (wineId) => regionsApi.linkWine(id, wineId),
   grape: (id) => (wineId) => grapesApi.linkWine(id, wineId),
   producer: (id) => (wineId) => producersApi.linkWine(id, wineId),
 };
 
-function LinkWineDialog({ entityType, entityId, entityName, excludeIds, onLinked, onClose }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState(null);
-  const [linking, setLinking] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+interface LinkWineDialogProps {
+  entityType: LinkEntityType
+  entityId: number
+  entityName?: string | null
+  /** Ids *and* slugs already attached, shown with a "Linked" badge. */
+  excludeIds?: Array<number | string>
+  onLinked?: (wine: WineListItem) => void
+  onClose?: () => void
+}
+
+function LinkWineDialog({
+  entityType,
+  entityId,
+  entityName,
+  excludeIds,
+  onLinked,
+  onClose,
+}: LinkWineDialogProps) {
+  const [query, setQuery] = useState<string>("");
+  const [results, setResults] = useState<WineListItem[] | null>(null);
+  const [linking, setLinking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -41,7 +77,7 @@ function LinkWineDialog({ entityType, entityId, entityName, excludeIds, onLinked
     };
   }, [query]);
 
-  async function handleLink(wine) {
+  async function handleLink(wine: WineListItem) {
     setLinking(true);
     setError(null);
     try {
@@ -50,12 +86,12 @@ function LinkWineDialog({ entityType, entityId, entityName, excludeIds, onLinked
       await linkFn(entityId)(wine.slug || wine.id);
       onLinked?.(wine);
     } catch (err) {
-      setError(err.message || "Failed to link wine");
+      setError(errorMessage(err, "Failed to link wine"));
       setLinking(false);
     }
   }
 
-  function handleBackdropClick(e) {
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
@@ -77,7 +113,7 @@ function LinkWineDialog({ entityType, entityId, entityName, excludeIds, onLinked
           className="dialog__search-input"
           placeholder="Search wines by name…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
         />
         {error && <p className="dialog__error">{error}</p>}
         <div className="dialog__results">
@@ -87,7 +123,7 @@ function LinkWineDialog({ entityType, entityId, entityName, excludeIds, onLinked
             <p className="dialog__hint">No wines found.</p>
           ) : (
             <ul className="dialog__results-list">
-              {results.map((wine) => {
+              {results.map((wine: WineListItem) => {
                 const isLinked = (excludeIds || []).includes(wine.id)
                   || (excludeIds || []).includes(wine.slug);
                 return (

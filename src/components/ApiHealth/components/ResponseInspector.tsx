@@ -1,21 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "../ApiHealth.module.css";
 import { copyText } from "../../../utils/clipboard";
+import type { ApiCheck } from "../../../services/apiHealth/apiHealthConfig";
+import type { HealthCheckResult } from "../../../services/apiHealth/healthRunner";
 
-function JsonBlock({ label, data, copyable = false }) {
-  let text;
+type CopyState = "idle" | "copied" | "failed";
+
+interface JsonBlockProps {
+  label: string;
+  data: unknown;
+  copyable?: boolean;
+}
+
+function JsonBlock({ label, data, copyable = false }: JsonBlockProps) {
+  let text: string;
   try {
     text = JSON.stringify(data, null, 2);
   } catch {
     text = String(data);
   }
 
-  const [copyState, setCopyState] = useState("idle"); // idle | copied | failed
-  const timerRef = useRef(null);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  function handleCopy() {
+  function handleCopy(): void {
     copyText(text)
       .then(() => setCopyState("copied"))
       .catch(() => setCopyState("failed"))
@@ -50,7 +60,15 @@ function JsonBlock({ label, data, copyable = false }) {
   );
 }
 
-export default function ResponseInspector({ check, result }) {
+export interface ResponseInspectorProps {
+  check: ApiCheck | null | undefined;
+  result: HealthCheckResult | null | undefined;
+}
+
+export default function ResponseInspector({
+  check,
+  result,
+}: ResponseInspectorProps) {
   if (!check || !result) return null;
 
   const headers = result.requestHeaders || {};

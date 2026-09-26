@@ -1,4 +1,3 @@
-import type { Image } from "./image"
 import type { Country, Region } from "./reference"
 import type { Wine } from "./wine"
 
@@ -41,8 +40,12 @@ export interface Producer {
   regions?: Pick<Region, "id" | "name">[]
   grapes?: Pick<Region, "id" | "name">[]
   logo_url?: string | null
-  images?: (string | Image)[]
-  logo?: Image | string | null
+  /**
+   * Ordered image URL strings — `image_urls` in the producers controller.
+   * NOTE: this is `string[]`, not `Image[]`; producers expose no rich
+   * `image_details` payload, only `logo_url` and these flat URLs.
+   */
+  images?: string[]
   wines?: Wine[]
   [key: string]: unknown
 }

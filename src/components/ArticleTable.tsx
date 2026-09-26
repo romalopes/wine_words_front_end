@@ -4,19 +4,40 @@ import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import LinkArticleDialog from "./LinkArticleDialog";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import type { Article } from "../types/article";
+
+/**
+ * The entity an article is linked to. Like reviews, articles can only be
+ * attached to a category — `linkArticle` exists on `categoriesApi` alone — so
+ * `type` is pinned to "category" rather than widened to `LinkEntityType`.
+ * Widening it would let a call site pass e.g. "grape" and have it silently
+ * ignored, since the dialog always posts to `/categories/:id/link_article`.
+ */
+export interface ArticleLinkContext {
+  type: "category"
+  id: number
+  name: string
+}
+
+interface ArticleTableProps {
+  articles: Article[];
+  /** When set, management users get a "+ Link an Article" action. */
+  linkContext?: ArticleLinkContext;
+  onArticleLinked?: () => void;
+}
 
 // Shared table of articles (one article per row): Title, Author, Status and
 // Published date. Rows navigate to the article detail page.
 // When `linkContext` is provided, shows a "+ Link an Article" button that
 // opens a dialog to search and link articles to the given entity.
-function ArticleTable({ articles, linkContext, onArticleLinked }) {
+function ArticleTable({ articles, linkContext, onArticleLinked }: ArticleTableProps) {
   const { user } = useAuth();
   const canManage = canManageWinesRole(user);
   const navigate = useNavigate();
   const returnToLink = useReturnToLink();
   const [dialogOpen, setDialogOpen] = useState(false);
   const excludeIds = Array.isArray(articles)
-    ? articles.flatMap((a) => [a.id, a.slug].filter(Boolean))
+    ? articles.flatMap((a) => [a.id, a.slug].filter(Boolean) as (number | string)[])
     : [];
 
   const linkButton = canManage && linkContext && (
@@ -36,7 +57,7 @@ function ArticleTable({ articles, linkContext, onArticleLinked }) {
       <>
         {linkButton}
         <p className="wine-management__empty-state">No articles yet.</p>
-        {dialogOpen && (
+        {linkContext && dialogOpen && (
           <LinkArticleDialog
             entityId={linkContext.id}
             entityName={linkContext.name}
@@ -81,7 +102,7 @@ function ArticleTable({ articles, linkContext, onArticleLinked }) {
                   {article.title}
                 </Link>
               </td>
-              <td>{article.author || "—"}</td>
+              <td>{article.author_name || "—"}</td>
               <td>{article.status || "—"}</td>
               <td>
                 {article.published_at
@@ -92,7 +113,7 @@ function ArticleTable({ articles, linkContext, onArticleLinked }) {
           ))}
         </tbody>
       </table>
-      {dialogOpen && (
+      {linkContext && dialogOpen && (
         <LinkArticleDialog
           entityId={linkContext.id}
           entityName={linkContext.name}

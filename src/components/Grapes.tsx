@@ -1,10 +1,35 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { grapesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin, canManageGrapes } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type { GrapeDetail } from "../types/catalog";
 
-const emptyForm = {
+/**
+ * The editable columns of a grape. `relevance` is a string here (it lives in a
+ * text input) and is coerced to a number-or-null in the submit payload.
+ */
+interface GrapeForm {
+  name: string;
+  color: string;
+  origin_country: string;
+  main_regions: string[];
+  synonyms: string[];
+  is_blending_grape: boolean;
+  notes: string[];
+  serving: string;
+  relevance: string;
+}
+
+/** The three list-valued fields the `ArrayFieldInput` helper manages. */
+type GrapeListField = "main_regions" | "synonyms" | "notes";
+
+/** The columns the table's sort <select> offers. */
+type GrapeSortKey = "relevance" | "name" | "origin_country";
+
+const emptyForm: GrapeForm = {
   name: "",
   color: "",
   origin_country: "",
@@ -25,16 +50,16 @@ const COLOR_OPTIONS = [
 
 function Grapes() {
   const { user } = useAuth();
-  const [sortBy, setSortBy] = useState("relevance");
-  const [grapes, setGrapes] = useState([]);
+  const [sortBy, setSortBy] = useState<GrapeSortKey>("relevance");
+  const [grapes, setGrapes] = useState<GrapeDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [mode, setMode] = useState("create");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState<GrapeForm>(emptyForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [newRegion, setNewRegion] = useState("");
   const [newSynonym, setNewSynonym] = useState("");
   const [newNote, setNewNote] = useState("");
@@ -66,18 +91,18 @@ function Grapes() {
       const data = await grapesApi.list();
       setGrapes(Array.isArray(data) ? data : []);
       setError(null);
-    } catch (err) {
-      setError(err.message || "Failed to load grapes");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Failed to load grapes"));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadGrapes();
+    void loadGrapes();
   }, [loadGrapes]);
 
-  function updateField(field, value) {
+  function updateField<K extends keyof GrapeForm>(field: K, value: GrapeForm[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -102,20 +127,26 @@ function Grapes() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function addArrayField(field, value, setter) {
-    if (!value.trim()) return;
-    if (form[field].includes(value.trim())) return;
-    updateField(field, [...form[field], value.trim()]);
+  function addArrayField(
+    field: GrapeListField,
+    value: string,
+    setter: (next: string) => void,
+  ) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (form[field].includes(trimmed)) return;
+    updateField(field, [...form[field], trimmed]);
     setter("");
   }
 
-  function removeArrayField(field, index) {
+  function removeArrayField(field: GrapeListField, index: number) {
     updateField(
       field,
       form[field].filter((_, i) => i !== index),
     );
   }
-  async function handleSubmit(e) {
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim()) {
       setError("Name is required.");
@@ -139,8 +170,8 @@ function Grapes() {
       }
       resetForm();
       await loadGrapes();
-    } catch (err) {
-      setError(err.message || "Failed to save grape");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Failed to save grape"));
     } finally {
       setSaving(false);
     }
@@ -149,7 +180,7 @@ function Grapes() {
   // Edit and Delete entry points: they drive the shared form above
   // (handleSubmit, mode/editingId) and the destroy call below, and are
   // rendered from each table row's actions.
-  function startEdit(grape) {
+  function startEdit(grape: GrapeDetail) {
     setMode("edit");
     setEditingId(grape.id);
     setShowForm(true);
@@ -162,12 +193,12 @@ function Grapes() {
       is_blending_grape: !!grape.is_blending_grape,
       notes: grape.notes || [],
       serving: grape.serving || "",
-      relevance: grape.relevance || "",
+      relevance: String(grape.relevance ?? ""),
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleDelete(grape) {
+  async function handleDelete(grape: GrapeDetail) {
     if (!window.confirm(`Delete grape "${grape.name}"? This cannot be undone.`))
       return;
     setError(null);
@@ -177,8 +208,8 @@ function Grapes() {
       setNotice(`Grape "${grape.name}" deleted.`);
       if (editingId === grape.id) resetForm();
       await loadGrapes();
-    } catch (err) {
-      setError(err.message || "Failed to delete grape");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Failed to delete grape"));
     }
   }
 
@@ -298,7 +329,7 @@ function Grapes() {
                 value={form.serving}
                 onChange={(e) => updateField("serving", e.target.value)}
                 placeholder="Food pairing suggestions..."
-                rows="3"
+                rows={3}
               />
             </div>
 
@@ -328,7 +359,7 @@ function Grapes() {
             <select
               className="sort-select"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={(e) => setSortBy(e.target.value as GrapeSortKey)}
             >
               <option value="relevance">Sort by Relevance</option>
               <option value="name">Sort by Name</option>
@@ -445,6 +476,17 @@ function Grapes() {
   );
 }
 
+/** Props for the tag-list editor shared by the three array fields. */
+interface ArrayFieldInputProps {
+  label: string
+  items: string[]
+  newValue: string
+  setNewValue: (value: string) => void
+  onAdd: () => void
+  onRemove: (index: number) => void
+  placeholder?: string
+}
+
 function ArrayFieldInput({
   label,
   items,
@@ -453,7 +495,7 @@ function ArrayFieldInput({
   onAdd,
   onRemove,
   placeholder,
-}) {
+}: ArrayFieldInputProps) {
   return (
     <div className="form-group">
       <label>{label}</label>

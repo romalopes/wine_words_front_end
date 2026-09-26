@@ -1,6 +1,11 @@
 import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useTestAccess } from "../contexts/TestAccessContext";
 import "./TestAccess.css";
+
+interface TestAccessGateProps {
+  children: ReactNode;
+}
 
 /**
  * Private test-access gate — the first screen while the app is in its private
@@ -11,10 +16,10 @@ import "./TestAccess.css";
 function TestAccessPage() {
   const { authenticated, verifying, submit, exit } = useTestAccess();
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!password.trim() || busy) return;
     setBusy(true);
@@ -90,7 +95,7 @@ function TestAccessPage() {
  * Renders only the gate page until test access is granted — no header, no
  * routes, no deep links.
  */
-export function TestAccessGate({ children }) {
+export function TestAccessGate({ children }: TestAccessGateProps) {
   const { authenticated, verifying } = useTestAccess();
   if (!authenticated && !verifying) return <TestAccessPage />;
   return children;

@@ -20,7 +20,3 @@ export interface Setting {
   value: unknown
   [key: string]: unknown
 }
-
-export interface Stats {
-  [key: string]: number
-}

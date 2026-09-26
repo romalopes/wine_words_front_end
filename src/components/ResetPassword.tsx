@@ -1,6 +1,8 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { errorMessage } from "../utils/errors";
 
 // Password reset page — reached from the "reset password" email link
 // (/reset-password?reset_password_token=…). Sets the new password, is signed
@@ -13,10 +15,10 @@ function ResetPassword() {
 
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setError(null);
 
@@ -42,7 +44,7 @@ function ResetPassword() {
       });
       navigate("/wines", { replace: true });
     } catch (err) {
-      setError(err.message || "Failed to reset password");
+      setError(errorMessage(err, "Failed to reset password"));
       setSubmitting(false);
     }
   }

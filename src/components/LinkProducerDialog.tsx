@@ -1,19 +1,55 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { producersApi, categoriesApi, regionsApi, grapesApi, countriesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
+import type { LinkEntityType } from "../types/common";
+import type { ProducerSearchResult } from "../types/producer";
 
-const LINK_ENDPOINTS = {
+/**
+ * The catalog entities a producer can be attached to — a subset of the shared
+ * `LinkEntityType`, which also allows "producer".
+ */
+export type ProducerLinkTarget = "category" | "region" | "grape" | "country";
+
+/**
+ * `linkProducer` differs per catalog entity but has the same shape everywhere,
+ * so the dialog picks the right one from `entityType` at call time. Deliberately
+ * a *partial* map over `LinkEntityType`: callers pass the wider shared union,
+ * and the unsupported keys stay `undefined` so the runtime guard below still
+ * fires for a "producer" target rather than silently doing nothing.
+ */
+const LINK_ENDPOINTS: Partial<
+  Record<LinkEntityType, (entityId: number) => (producerId: number | string) => Promise<unknown>>
+> = {
   category: (id) => (producerId) => categoriesApi.linkProducer(id, producerId),
   region: (id) => (producerId) => regionsApi.linkProducer(id, producerId),
   grape: (id) => (producerId) => grapesApi.linkProducer(id, producerId),
   country: (id) => (producerId) => countriesApi.linkProducer(id, producerId),
 };
 
-function LinkProducerDialog({ entityType, entityId, entityName, excludeIds, onLinked, onClose }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState(null);
-  const [linking, setLinking] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+interface LinkProducerDialogProps {
+  entityType: LinkEntityType
+  entityId: number
+  entityName?: string | null
+  /** Ids *and* slugs already attached, shown with a "Linked" badge. */
+  excludeIds?: Array<number | string>
+  onLinked?: (producer: ProducerSearchResult) => void
+  onClose?: () => void
+}
+
+function LinkProducerDialog({
+  entityType,
+  entityId,
+  entityName,
+  excludeIds,
+  onLinked,
+  onClose,
+}: LinkProducerDialogProps) {
+  const [query, setQuery] = useState<string>("");
+  const [results, setResults] = useState<ProducerSearchResult[] | null>(null);
+  const [linking, setLinking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -41,7 +77,7 @@ function LinkProducerDialog({ entityType, entityId, entityName, excludeIds, onLi
     };
   }, [query]);
 
-  async function handleLink(producer) {
+  async function handleLink(producer: ProducerSearchResult) {
     setLinking(true);
     setError(null);
     try {
@@ -50,12 +86,12 @@ function LinkProducerDialog({ entityType, entityId, entityName, excludeIds, onLi
       await linkFn(entityId)(producer.slug || producer.id);
       onLinked?.(producer);
     } catch (err) {
-      setError(err.message || "Failed to link producer");
+      setError(errorMessage(err, "Failed to link producer"));
       setLinking(false);
     }
   }
 
-  function handleBackdropClick(e) {
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
@@ -77,7 +113,7 @@ function LinkProducerDialog({ entityType, entityId, entityName, excludeIds, onLi
           className="dialog__search-input"
           placeholder="Search producers by name…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
         />
         {error && <p className="dialog__error">{error}</p>}
         <div className="dialog__results">
@@ -87,7 +123,7 @@ function LinkProducerDialog({ entityType, entityId, entityName, excludeIds, onLi
             <p className="dialog__hint">No producers found.</p>
           ) : (
             <ul className="dialog__results-list">
-              {results.map((producer) => {
+              {results.map((producer: ProducerSearchResult) => {
                 const isLinked = (excludeIds || []).includes(producer.id)
                   || (excludeIds || []).includes(producer.slug);
                 return (

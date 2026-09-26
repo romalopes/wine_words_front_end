@@ -6,18 +6,33 @@
 // immediately. The Vintage model requires a year, so a non-vintage wine still
 // stores the current year alongside no_vintage: true.
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { vintagesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
 import styles from "./winePackages.module.css";
 
-const currentYear = () => String(new Date().getFullYear());
+const currentYear = (): string => String(new Date().getFullYear());
 
-function InlineVintageCreateForm({ wine, defaultYear = "", onCreated, onCancel }) {
-  const [year, setYear] = useState(defaultYear || currentYear());
+interface InlineVintageCreateFormProps {
+  /** The wine the new vintage belongs to; may be null before one is chosen. */
+  wine: { slug?: string | null; name?: string | null } | null;
+  defaultYear?: string;
+  onCreated: (created: Awaited<ReturnType<typeof vintagesApi.create>>) => void;
+  onCancel: () => void;
+}
+
+function InlineVintageCreateForm({
+  wine,
+  defaultYear = "",
+  onCreated,
+  onCancel,
+}: InlineVintageCreateFormProps) {
+  const [year, setYear] = useState<string>(defaultYear || currentYear());
   const [noVintage, setNoVintage] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
     if (!wine?.slug) {
@@ -37,7 +52,7 @@ function InlineVintageCreateForm({ wine, defaultYear = "", onCreated, onCancel }
 
       onCreated(created);
     } catch (err) {
-      setError(err.message || "Failed to create vintage");
+      setError(errorMessage(err, "Failed to create vintage"));
       setSaving(false);
     }
   }

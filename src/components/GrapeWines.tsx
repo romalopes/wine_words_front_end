@@ -4,13 +4,13 @@ import { grapesApi, winesApi } from "../services/api";
 import WineTable from "./WineTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
-import type { Grape } from "../types/catalog";
+import type { GrapeDetail } from "../types/catalog";
 import type { WineListItem } from "../types/wine";
 import type { QueryParams } from "../types/common";
 
 function GrapeWines() {
   const { slug } = useParams<{ slug: string }>();
-  const [grape, setGrape] = useState<Grape | null>(null);
+  const [grape, setGrape] = useState<GrapeDetail | null>(null);
 
   const list = usePagedList<WineListItem>({
     fetcher: (params: QueryParams) =>

@@ -8,37 +8,42 @@ import ProducerTable from "./ProducerTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
 import BackToSource from "./BackToSource";
+import { errorMessage } from "../utils/errors";
+import type { CountryDetail as CountryDetailData } from "../types/reference";
+import type { Producer } from "../types/producer";
+import type { WineListItem } from "../types/wine";
 
 function CountryDetail() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const canManageProducers = canManageWinesRole(user);
-  const [country, setCountry] = useState(null);
+  const [country, setCountry] = useState<CountryDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Paginated per-country lists (independent URL params so paging one
   // section does not disturb the other).
-  const producers = usePagedList({
+  const producers = usePagedList<Producer>({
     fetcher: (params) => producersApi.list({ ...params, country_id: country?.id }),
     enabled: Boolean(country?.id),
     paramKey: "producer_page",
   });
-  const wines = usePagedList({
+  const wines = usePagedList<WineListItem>({
     fetcher: (params) => winesApi.list({ ...params, country_id: country?.id }),
     enabled: Boolean(country?.id),
     paramKey: "page",
   });
 
   useEffect(() => {
+    if (!slug) return;
     let cancelled = false;
     countriesApi
       .show(slug)
       .then((data) => {
         if (!cancelled) setCountry(data);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load country");
+      .catch((err: unknown) => {
+        if (!cancelled) setError(errorMessage(err, "Failed to load country"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

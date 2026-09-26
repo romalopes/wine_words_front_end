@@ -4,19 +4,39 @@ import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import LinkReviewDialog from "./LinkReviewDialog";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import type { Review } from "../types/review";
+
+/**
+ * The entity a review is linked to. Reviews can only be attached to a
+ * category — `linkReview` exists on `categoriesApi` alone — so `type` is
+ * pinned to "category" rather than widened to `LinkEntityType`. Widening it
+ * would let a call site pass e.g. "grape" and have it silently ignored.
+ */
+export interface ReviewLinkContext {
+  type: "category"
+  id: number
+  name?: string | null
+}
+
+interface ReviewTableProps {
+  reviews: Review[];
+  /** When set, management users get a "+ Link a Review" action. */
+  linkContext?: ReviewLinkContext;
+  onReviewLinked?: () => void;
+}
 
 // Shared table of reviews (one review per row): Score, Wine, Vintage,
 // Reviewer and Status. Rows navigate to the review detail page.
 // When `linkContext` is provided, shows a "+ Link a Review" button that opens
 // a dialog to search and link reviews to the given entity.
-function ReviewTable({ reviews, linkContext, onReviewLinked }) {
+function ReviewTable({ reviews, linkContext, onReviewLinked }: ReviewTableProps) {
   const { user } = useAuth();
   const canManage = canManageWinesRole(user);
   const navigate = useNavigate();
   const returnToLink = useReturnToLink();
   const [dialogOpen, setDialogOpen] = useState(false);
   const excludeIds = Array.isArray(reviews)
-    ? reviews.flatMap((r) => [r.id, r.slug].filter(Boolean))
+    ? reviews.flatMap((r) => [r.id, r.slug].filter(Boolean) as (number | string)[])
     : [];
 
   const linkButton = canManage && linkContext && (
@@ -36,7 +56,7 @@ function ReviewTable({ reviews, linkContext, onReviewLinked }) {
       <>
         {linkButton}
         <p className="wine-management__empty-state">No reviews yet.</p>
-        {dialogOpen && (
+        {linkContext && dialogOpen && (
           <LinkReviewDialog
             entityId={linkContext.id}
             entityName={linkContext.name}
@@ -96,7 +116,7 @@ function ReviewTable({ reviews, linkContext, onReviewLinked }) {
           ))}
         </tbody>
       </table>
-      {dialogOpen && (
+      {linkContext && dialogOpen && (
         <LinkReviewDialog
           entityId={linkContext.id}
           entityName={linkContext.name}

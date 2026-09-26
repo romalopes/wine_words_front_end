@@ -51,9 +51,23 @@ import type { Account, AccountUpdate, PasswordChange } from "./account"
 import type { Configuration, Setting } from "./notification"
 import type { LogEntry, ImpersonationResponse } from "./user"
 import type { Article } from "./article"
-import type { Category, Grape, TasteParameter } from "./catalog"
-import type { Country, Region } from "./reference"
-import type { Notification, Stats } from "./notification"
+import type {
+  Category,
+  CategoryDetail,
+  GrapeDetail,
+  GrapeSearchResult,
+  TasteParameter,
+} from "./catalog"
+import type {
+  Country,
+  CountryDetail,
+  CountryListItem,
+  CountryRegionNode,
+  Region,
+  RegionDetail,
+} from "./reference"
+import type { Notification } from "./notification"
+import type { Stats } from "./stats"
 import type { Producer, ProducerSearchResult, Subscription } from "./producer"
 import type { Review } from "./review"
 import type { ShipmentTracking } from "./shipmentTracking"
@@ -290,15 +304,16 @@ export interface TasteParametersApi {
   list(): Promise<TasteParameter[]>
 }
 
-export interface VintagesApi {
-  create(wineSlug: string, payload: Record<string, unknown>): Promise<Vintage>
+/** Payload of `vintages#create` — nested under a wine slug. */
+export interface VintageInput {
+  year: number
+  no_vintage?: boolean
+  prompt?: string | null
+  price?: number | null
 }
 
-export interface CategoryDetail extends Category {
-  wines?: Wine[]
-  reviews?: Review[]
-  articles?: Article[]
-  [key: string]: unknown
+export interface VintagesApi {
+  create(wineSlug: string, payload: VintageInput): Promise<Vintage>
 }
 
 export interface CategoryCounts {
@@ -314,29 +329,34 @@ export interface CategoriesApi {
   remove(id: string | number): Promise<unknown>
   reorder(type: string, orderedIds: number[]): Promise<unknown>
   linkWine(id: string | number, wineId: string | number): Promise<Category>
-  linkProducer(id: string | number, producerId: number): Promise<Category>
+  linkProducer(id: string | number, producerId: string | number): Promise<Category>
   linkReview(id: string | number, reviewId: string | number): Promise<Category>
   linkArticle(id: string | number, articleId: string | number): Promise<Category>
 }
 
 export interface GrapesApi {
-  list(): Promise<ResourceResponse<Grape>>
-  search(query: string): Promise<Grape[]>
-  show(id: string | number): Promise<Grape>
-  create(payload: Record<string, unknown>): Promise<Grape>
-  update(id: string | number, payload: Record<string, unknown>): Promise<Grape>
+  /**
+   * `index` and `show` share the same `grape_json`, differing only in the
+   * `wines` key that `show` adds — so both are `GrapeDetail` (`wines`
+   * optional). `search` is a reduced projection: only these four keys.
+   */
+  list(): Promise<ResourceResponse<GrapeDetail>>
+  search(query: string): Promise<GrapeSearchResult[]>
+  show(id: string | number): Promise<GrapeDetail>
+  create(payload: Record<string, unknown>): Promise<GrapeDetail>
+  update(id: string | number, payload: Record<string, unknown>): Promise<GrapeDetail>
   remove(id: string | number): Promise<unknown>
-  linkWine(id: string | number, wineId: string | number): Promise<Grape>
-  linkProducer(id: string | number, producerId: number): Promise<Grape>
+  linkWine(id: string | number, wineId: string | number): Promise<GrapeDetail>
+  linkProducer(id: string | number, producerId: string | number): Promise<GrapeDetail>
 }
 
 export interface CountriesApi {
-  list(): Promise<ResourceResponse<Country>>
-  show(id: string | number): Promise<Country>
+  list(): Promise<ResourceResponse<CountryListItem>>
+  show(id: string | number): Promise<CountryDetail>
   create(payload: Record<string, unknown>): Promise<Country>
   update(id: string | number, payload: Record<string, unknown>): Promise<Country>
   remove(id: string | number): Promise<unknown>
-  linkProducer(id: string | number, producerId: number): Promise<Country>
+  linkProducer(id: string | number, producerId: string | number): Promise<Country>
 }
 
 export interface StatsApi {
@@ -345,12 +365,12 @@ export interface StatsApi {
 
 export interface RegionsApi {
   list(): Promise<Region[]>
-  tree(): Promise<Region[]>
-  show(id: string | number): Promise<Region>
+  tree(): Promise<CountryRegionNode[]>
+  show(id: string | number): Promise<RegionDetail>
   create(payload: Record<string, unknown>): Promise<Region>
   update(id: string | number, payload: Record<string, unknown>): Promise<Region>
-  linkWine(id: string | number, wineId: string | number): Promise<Region>
-  linkProducer(id: string | number, producerId: number): Promise<Region>
+  linkWine(id: string | number, wineId: string | number): Promise<RegionDetail>
+  linkProducer(id: string | number, producerId: string | number): Promise<Region>
   remove(id: string | number): Promise<unknown>
 }
 
@@ -371,9 +391,28 @@ export interface ConfigurationApi {
   update(payload: ConfigurationUpdatePayload): Promise<Configuration>
 }
 
+/**
+ * Success body of `GET /api/v1/email-verifications/:token`. `message` is
+ * optional because the API returns `status`/`email`/`user_name`; the UI falls
+ * back to its own copy.
+ */
+export interface EmailVerificationResult {
+  status: string
+  email?: string | null
+  user_name?: string | null
+  message?: string | null
+}
+
+/** 202 body of `POST /api/v1/email-verifications/resend`. */
+export interface EmailVerificationResendResult {
+  status: string
+  email_address?: string | null
+  message?: string | null
+}
+
 export interface EmailVerificationsApi {
-  verify(token: string): Promise<unknown>
-  resend(emailAddress: string): Promise<unknown>
+  verify(token: string): Promise<EmailVerificationResult>
+  resend(emailAddress: string): Promise<EmailVerificationResendResult>
 }
 
 export interface SettingsApi {

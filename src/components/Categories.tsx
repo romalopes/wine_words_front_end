@@ -1,16 +1,38 @@
 import { useCallback, useEffect, useState } from "react";
+import type { DragEvent, FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { categoriesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type { Category, CategoryFlag } from "../types/catalog";
 
-const TYPE_TABS = [
+/**
+ * The three independently-ordered category lists. `sortKey` is the per-flag
+ * column the drag-and-drop reorder writes to, and `flag` is the boolean that
+ * decides membership of the list.
+ */
+interface CategoryTab {
+  key: "wine" | "review" | "article"
+  label: string
+  sortKey: "sort_order_wine" | "sort_order_review" | "sort_order_article"
+  flag: CategoryFlag
+}
+
+const TYPE_TABS: CategoryTab[] = [
   { key: "wine", label: "Wine categories", sortKey: "sort_order_wine", flag: "for_wine" },
   { key: "review", label: "Review categories", sortKey: "sort_order_review", flag: "for_review" },
   { key: "article", label: "Article categories", sortKey: "sort_order_article", flag: "for_article" },
 ];
 
-const emptyForm = {
+interface CategoryForm {
+  name: string
+  for_wine: boolean
+  for_review: boolean
+  for_article: boolean
+}
+
+const emptyForm: CategoryForm = {
   name: "",
   for_wine: false,
   for_review: false,
@@ -20,17 +42,17 @@ const emptyForm = {
 function Categories() {
   const { user } = useAuth();
   const canManage = canManageWinesRole(user);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [mode, setMode] = useState("create"); // "create" | "edit"
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [activeTab, setActiveTab] = useState("wine");
-  const [dragId, setDragId] = useState(null);
-  const [dragOverId, setDragOverId] = useState(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [form, setForm] = useState<CategoryForm>(emptyForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"wine" | "review" | "article">("wine");
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -39,7 +61,7 @@ function Categories() {
       setCategories(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load categories");
+      setError(errorMessage(err, "Failed to load categories"));
     } finally {
       setLoading(false);
     }
@@ -49,7 +71,7 @@ function Categories() {
     loadCategories();
   }, [loadCategories]);
 
-  function updateField(field, value) {
+  function updateField<K extends keyof CategoryForm>(field: K, value: CategoryForm[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -59,7 +81,7 @@ function Categories() {
     setForm(emptyForm);
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim()) {
       setError("Name is required.");
@@ -85,13 +107,13 @@ function Categories() {
       resetForm();
       await loadCategories();
     } catch (err) {
-      setError(err.message || "Failed to save category");
+      setError(errorMessage(err, "Failed to save category"));
     } finally {
       setSaving(false);
     }
   }
 
-  function startEdit(category) {
+  function startEdit(category: Category) {
     setMode("edit");
     setEditingId(category.id);
     setForm({
@@ -103,7 +125,7 @@ function Categories() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleDelete(category) {
+  async function handleDelete(category: Category) {
     const message = 'Delete category' + JSON.stringify(category.name) + '? This cannot be undone.';
     if (!window.confirm(message)) return;
     setError(null);
@@ -114,22 +136,22 @@ function Categories() {
       if (editingId === category.id) { resetForm(); }
       await loadCategories();
     } catch (err) {
-      setError(err.message || 'Failed to delete category');
+      setError(errorMessage(err, "Failed to delete category"));
     }
   }
 
-
-
-  const tab = TYPE_TABS.find((t) => t.key === activeTab);
+  // `activeTab` is constrained to the three keys above, so this always finds a
+  // tab; fall back to the first so the sort below never sees `undefined`.
+  const tab = TYPE_TABS.find((t) => t.key === activeTab) ?? TYPE_TABS[0];
   const tabCategories = categories
     .filter((c) => c[tab.flag])
     .sort((a, b) => (a[tab.sortKey] ?? 9999) - (b[tab.sortKey] ?? 9999));
 
-  function handleDragStart(category) {
+  function handleDragStart(category: Category) {
     setDragId(category.id);
   }
 
-  function handleDragOver(e, category) {
+  function handleDragOver(e: DragEvent<HTMLLIElement>, category: Category) {
     e.preventDefault();
     setDragOverId(category.id);
   }
@@ -138,7 +160,7 @@ function Categories() {
     setDragOverId(null);
   }
 
-  async function handleDrop(e, targetCategory) {
+  async function handleDrop(e: DragEvent<HTMLLIElement>, targetCategory: Category) {
     e.preventDefault();
     setDragOverId(null);
     const sourceId = dragId;
@@ -163,7 +185,7 @@ function Categories() {
       await categoriesApi.reorder(tab.key, ids);
       setNotice(`Order saved for ${tab.label.toLowerCase()}.`);
     } catch (err) {
-      setError(err.message || "Failed to save new order");
+      setError(errorMessage(err, "Failed to save new order"));
     }
     await loadCategories();
   }

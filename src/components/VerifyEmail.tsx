@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { emailVerificationsApi } from "../services/api";
+import { errorData, errorMessage } from "../utils/errors";
 
 // /verify-email?token=... — the page the verification email links to. Consumes
 // the token on mount and reports success/expired/invalid, offering a resend
 // (with a fresh 24-hour window) when the link can no longer be used.
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
-  const [state, setState] = useState({ status: "verifying", message: null });
+  const [state, setState] = useState<{ status: string; message: string | null }>({
+    status: "verifying",
+    message: null,
+  });
   const [resendEmail, setResendEmail] = useState(searchParams.get("email") || "");
-  const [resendState, setResendState] = useState({ status: "idle", message: null });
+  const [resendState, setResendState] = useState<{ status: string; message: string | null }>({
+    status: "idle",
+    message: null,
+  });
 
   const token = searchParams.get("token");
 
@@ -28,17 +35,21 @@ function VerifyEmail() {
           message: result.message || "Your email address is verified. You can sign in now.",
         });
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (cancelled) return;
+        const data = errorData(err);
         setState({
-          status: err.data?.email_verification_expired ? "expired" : "invalid",
-          message: err.message || "This verification link is invalid or has expired.",
+          status: data.email_verification_expired ? "expired" : "invalid",
+          message: errorMessage(
+            err,
+            "This verification link is invalid or has expired.",
+          ),
         });
       });
     return () => { cancelled = true; };
   }, [token]);
 
-  async function handleResend(event) {
+  async function handleResend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!resendEmail.trim()) return;
     setResendState({ status: "sending", message: null });
@@ -49,7 +60,10 @@ function VerifyEmail() {
         message: result.message || "If an unverified account exists, a new verification email has been sent.",
       });
     } catch (err) {
-      setResendState({ status: "idle", message: err.message || "Could not send the email." });
+      setResendState({
+        status: "idle",
+        message: errorMessage(err, "Could not send the email."),
+      });
     }
   }
 

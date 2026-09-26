@@ -4,14 +4,14 @@ import usePagedList from "../hooks/usePagedList";
 import { grapesApi, producersApi } from "../services/api";
 import ProducerTable from "./ProducerTable";
 import Pagination from "./Pagination";
-import type { Grape } from "../types/catalog";
+import type { GrapeDetail } from "../types/catalog";
 import type { Producer } from "../types/producer";
 import type { QueryParams } from "../types/common";
 
 // Paginated list of producers for a given grape — mirrors GrapeWines.
 function GrapeProducers() {
   const { slug } = useParams<{ slug: string }>();
-  const [grape, setGrape] = useState<Grape | null>(null);
+  const [grape, setGrape] = useState<GrapeDetail | null>(null);
 
   useEffect(() => {
     if (!slug) return;

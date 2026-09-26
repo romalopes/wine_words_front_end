@@ -2,16 +2,28 @@ import type { ResourceResponse } from "../types/common"
 import type {
   CategoriesApi,
   CategoryCounts,
-  CategoryDetail,
   CountriesApi,
   GrapesApi,
   RegionsApi,
   StatsApi,
   TasteParametersApi,
 } from "../types/api"
-import type { Category, Grape, TasteParameter } from "../types/catalog"
-import type { Country, Region } from "../types/reference"
-import type { Stats } from "../types/notification"
+import type {
+  Category,
+  CategoryDetail,
+  GrapeDetail,
+  GrapeSearchResult,
+  TasteParameter,
+} from "../types/catalog"
+import type {
+  Country,
+  CountryDetail,
+  CountryListItem,
+  CountryRegionNode,
+  Region,
+  RegionDetail,
+} from "../types/reference"
+import type { Stats } from "../types/stats"
 import type { ApiRequester } from "./apiClient"
 
 export function createTasteParametersApi(request: ApiRequester): TasteParametersApi {
@@ -40,21 +52,22 @@ export function createCategoriesApi(request: ApiRequester): CategoriesApi {
 
 export function createGrapesApi(request: ApiRequester): GrapesApi {
   return {
-    list: () => request<ResourceResponse<Grape>>("/grapes"),
-    search: (query) => request<Grape[]>(`/grapes/search?q=${encodeURIComponent(query)}`),
-    show: (id) => request<Grape>(`/grapes/${id}`),
-    create: (data) => request<Grape>("/grapes", { method: "POST", auth: true, body: { grape: data as unknown as Record<string, never> } }),
-    update: (id, data) => request<Grape>(`/grapes/${id}`, { method: "PATCH", auth: true, body: { grape: data as unknown as Record<string, never> } }),
+    list: () => request<ResourceResponse<GrapeDetail>>("/grapes"),
+    search: (query) =>
+      request<GrapeSearchResult[]>(`/grapes/search?q=${encodeURIComponent(query)}`),
+    show: (id) => request<GrapeDetail>(`/grapes/${id}`),
+    create: (data) => request<GrapeDetail>("/grapes", { method: "POST", auth: true, body: { grape: data as unknown as Record<string, never> } }),
+    update: (id, data) => request<GrapeDetail>(`/grapes/${id}`, { method: "PATCH", auth: true, body: { grape: data as unknown as Record<string, never> } }),
     remove: (id) => request(`/grapes/${id}`, { method: "DELETE", auth: true }),
-    linkWine: (id, wineId) => request<Grape>(`/grapes/${id}/link_wine`, { method: "POST", auth: true, body: { wine_id: wineId } }),
-    linkProducer: (id, producerId) => request<Grape>(`/grapes/${id}/link_producer`, { method: "POST", auth: true, body: { producer_id: producerId } }),
+    linkWine: (id, wineId) => request<GrapeDetail>(`/grapes/${id}/link_wine`, { method: "POST", auth: true, body: { wine_id: wineId } }),
+    linkProducer: (id, producerId) => request<GrapeDetail>(`/grapes/${id}/link_producer`, { method: "POST", auth: true, body: { producer_id: producerId } }),
   }
 }
 
 export function createCountriesApi(request: ApiRequester): CountriesApi {
   return {
-    list: () => request<ResourceResponse<Country>>("/countries"),
-    show: (id) => request<Country>(`/countries/${id}`),
+    list: () => request<ResourceResponse<CountryListItem>>("/countries"),
+    show: (id) => request<CountryDetail>(`/countries/${id}`),
     create: (data) => request<Country>("/countries", { method: "POST", auth: true, body: { country: data as unknown as Record<string, never> } }),
     update: (id, data) => request<Country>(`/countries/${id}`, { method: "PATCH", auth: true, body: { country: data as unknown as Record<string, never> } }),
     remove: (id) => request(`/countries/${id}`, { method: "DELETE", auth: true }),
@@ -69,8 +82,8 @@ export function createStatsApi(request: ApiRequester): StatsApi {
 export function createRegionsApi(request: ApiRequester): RegionsApi {
   return {
     list: () => request<Region[]>("/regions", { auth: false }),
-    tree: () => request<Region[]>("/regions/tree", { auth: false }),
-    show: (id) => request<Region>(`/regions/${id}`),
+    tree: () => request<CountryRegionNode[]>("/regions/tree", { auth: false }),
+    show: (id) => request<RegionDetail>(`/regions/${id}`),
     create: (data) => request<Region>("/regions", { method: "POST", auth: true, body: { region: data as unknown as Record<string, never> } }),
     update: (id, data) => request<Region>(`/regions/${id}`, { method: "PATCH", auth: true, body: { region: data as unknown as Record<string, never> } }),
     linkWine: (id, wineId) => request<Region>(`/regions/${id}/link_wine`, { method: "POST", auth: true, body: { wine_id: wineId } }),

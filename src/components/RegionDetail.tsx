@@ -9,24 +9,30 @@ import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import { errorMessage } from "../utils/errors";
+import type {
+  RegionDetail as RegionDetailData,
+  RegionPathCrumb,
+} from "../types/reference";
+import type { WineListItem } from "../types/wine";
 
-function typeLabel(region) {
-  const labels = [];
+function typeLabel(region: RegionDetailData): string {
+  const labels: string[] = [];
   if (region.is_state) labels.push("State");
   if (region.is_appellation) labels.push("Appellation");
   return labels.length > 0 ? labels.join(" / ") : "Region";
 }
 
 function RegionDetail() {
-  const { slug } = useParams();
+  const { slug = "" } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
   const canManage = isAdmin(user) || canManageGrapes(user);
   // Admins, Reviewers and Editors may link wines to this region.
   const canManageWines = canManageWinesRole(user);
-  const [region, setRegion] = useState(null);
+  const [region, setRegion] = useState<RegionDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Paginated per-region lists (independent URL params so paging one
   // section does not disturb the other).
@@ -43,9 +49,9 @@ function RegionDetail() {
 
   // Inline wine search for linking wines to this region.
   const [wineQuery, setWineQuery] = useState("");
-  const [wineResults, setWineResults] = useState(null);
+  const [wineResults, setWineResults] = useState<WineListItem[] | null>(null);
   const [linking, setLinking] = useState(false);
-  const [linkError, setLinkError] = useState(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const loadRegion = useCallback(async () => {
     try {
@@ -53,7 +59,7 @@ function RegionDetail() {
       const data = await regionsApi.show(slug);
       setRegion(data);
     } catch (err) {
-      setError(err.message || "Failed to load region");
+      setError(errorMessage(err, "Failed to load region"));
       throw err;
     }
   }, [slug]);
@@ -94,8 +100,11 @@ function RegionDetail() {
     };
   }, [wineQuery, canManageWines]);
 
-  async function handleLinkWine(wine) {
-    const current = wine.regions?.some((r) => String(r.id) === String(region?.id));
+  async function handleLinkWine(wine: WineListItem) {
+    if (!region) return;
+    const current = wine.regions?.some(
+      (r) => String(r.id) === String(region.id),
+    );
     if (current) return;
     if (!window.confirm(`Add "${wine.name}" to "${region.name}"?`)) return;
     setLinking(true);
@@ -105,7 +114,7 @@ function RegionDetail() {
       await loadRegion();
       wines.reload();
     } catch (err) {
-      setLinkError(err.message || "Failed to link wine");
+      setLinkError(errorMessage(err, "Failed to link wine"));
     } finally {
       setLinking(false);
     }
@@ -131,15 +140,27 @@ function RegionDetail() {
     );
   }
 
-  // Get the full path from country to region
-  const path = region.full_path || [
+  // Get the full path from country to region. `full_path` is always present
+  // from the API; this fallback covers a payload that omits it. A country
+  // crumb needs a slug to link to, so it is only included when the region
+  // actually has a country (previously this read `region.country.slug` and
+  // would throw for a country-less region).
+  const path: RegionPathCrumb[] = region.full_path ?? [
+    ...(region.country
+      ? [
+          {
+            type: "country" as const,
+            id: region.country.id,
+            slug: region.country.slug,
+            name: region.country.name,
+            flag_emoji: region.country.flag_emoji,
+          },
+        ]
+      : []),
     {
-      type: "country",
-      name: region.country?.name || "Unknown Country",
-      flag_emoji: region.country?.flag_emoji,
-    },
-    {
-      type: "region",
+      type: "region" as const,
+      id: region.id,
+      slug: region.slug,
       name: region.name,
     },
   ];
@@ -165,9 +186,15 @@ function RegionDetail() {
         {path.map((item, index) => (
           <span key={index} className="region-detail__path-item">
             {index > 0 && " → "}
-            {item.flag_emoji && <span className="region-detail__flag">{item.flag_emoji} </span>}
+            {item.type === "country" && item.flag_emoji && (
+              <span className="region-detail__flag">{item.flag_emoji} </span>
+            )}
             <Link
-              to={returnToLink(item.type === "country" ? `/countries/${region.country.slug}` : `/regions/${item.slug}`)}
+              to={returnToLink(
+                item.type === "country"
+                  ? `/countries/${item.slug}`
+                  : `/regions/${item.slug}`,
+              )}
               className="region-detail__path-link"
             >
               {item.name}

@@ -18,3 +18,16 @@ export function errorStatus(error: unknown): number | null {
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
 }
+
+/**
+ * The parsed JSON body of a failed API response, when there is one. Always
+ * returns an object so callers can probe optional flags without a null check.
+ * Values are `unknown` — narrow them at the point of use.
+ */
+export function errorData(error: unknown): Record<string, unknown> {
+  if (!(error instanceof ApiError)) return {}
+  const { data } = error
+  return data !== null && typeof data === "object"
+    ? (data as Record<string, unknown>)
+    : {}
+}

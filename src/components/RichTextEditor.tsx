@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 
 // Load Trix (the same rich-text editor the Rails app uses) from the CDN once.
-let trixLoadPromise = null;
+let trixLoadPromise: Promise<void> | null = null;
 
-function loadTrix() {
+function loadTrix(): Promise<void> {
   if (!trixLoadPromise) {
-    trixLoadPromise = new Promise((resolve) => {
+    trixLoadPromise = new Promise<void>((resolve) => {
       if (window.customElements && window.customElements.get("trix-editor")) {
         resolve();
         return;
@@ -17,11 +17,22 @@ function loadTrix() {
 
       const script = document.createElement("script");
       script.src = "https://unpkg.com/trix@2.1.15/dist/trix.umd.min.js";
-      script.onload = resolve;
+      script.onload = () => resolve();
       document.head.appendChild(script);
     });
   }
   return trixLoadPromise;
+}
+
+// <trix-editor> is a custom element, so TypeScript does not know it exposes a
+// `value` property for its current HTML. This narrows it for our one use site.
+type TrixEditorElement = HTMLElement & { value: string };
+
+export interface RichTextEditorProps {
+  /** Initial HTML only — Trix owns the DOM afterwards (like a defaultValue). */
+  value?: string;
+  onChange?: (html: string) => void;
+  placeholder?: string;
 }
 
 /**
@@ -29,8 +40,12 @@ function loadTrix() {
  * sanitized-by-Trix HTML through `onChange`. `value` is only used for the
  * initial content (like a defaultValue).
  */
-function RichTextEditor({ value = "", onChange, placeholder = "" }) {
-  const hostRef = useRef(null);
+function RichTextEditor({
+  value = "",
+  onChange,
+  placeholder = "",
+}: RichTextEditorProps) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const inputIdRef = useRef(
     `trix-input-${Math.random().toString(36).slice(2, 10)}`,
   );
@@ -38,7 +53,7 @@ function RichTextEditor({ value = "", onChange, placeholder = "" }) {
   useEffect(() => {
     let cancelled = false;
 
-    loadTrix().then(() => {
+    void loadTrix().then(() => {
       if (cancelled || !hostRef.current) return;
 
       // Clear any previous mount (e.g. React strict-mode double render).
@@ -50,13 +65,15 @@ function RichTextEditor({ value = "", onChange, placeholder = "" }) {
       input.value = value || "";
       hostRef.current.appendChild(input);
 
-      const editor = document.createElement("trix-editor");
+      const editor = document.createElement(
+        "trix-editor",
+      ) as TrixEditorElement;
       editor.setAttribute("input", inputIdRef.current);
       if (placeholder) editor.setAttribute("placeholder", placeholder);
       hostRef.current.appendChild(editor);
 
       editor.addEventListener("trix-change", () => {
-        onChange && onChange(editor.value || "");
+        onChange?.(editor.value || "");
       });
     });
 

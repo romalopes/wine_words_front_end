@@ -1,12 +1,30 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { reviewsApi, categoriesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
+import type { Review } from "../types/review";
 
-function LinkReviewDialog({ entityId, entityName, excludeIds, onLinked, onClose }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState(null);
-  const [linking, setLinking] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+interface LinkReviewDialogProps {
+  entityId: number
+  entityName?: string | null
+  /** Ids *and* slugs already attached, shown with a "Linked" badge. */
+  excludeIds?: Array<number | string>
+  onLinked?: (review: Review) => void
+  onClose?: () => void
+}
+
+function LinkReviewDialog({
+  entityId,
+  entityName,
+  excludeIds,
+  onLinked,
+  onClose,
+}: LinkReviewDialogProps) {
+  const [query, setQuery] = useState<string>("");
+  const [results, setResults] = useState<Review[] | null>(null);
+  const [linking, setLinking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -35,19 +53,19 @@ function LinkReviewDialog({ entityId, entityName, excludeIds, onLinked, onClose 
     };
   }, [query]);
 
-  async function handleLink(review) {
+  async function handleLink(review: Review) {
     setLinking(true);
     setError(null);
     try {
       await categoriesApi.linkReview(entityId, review.slug || review.id);
       onLinked?.(review);
     } catch (err) {
-      setError(err.message || "Failed to link review");
+      setError(errorMessage(err, "Failed to link review"));
       setLinking(false);
     }
   }
 
-  function handleBackdropClick(e) {
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
@@ -69,7 +87,7 @@ function LinkReviewDialog({ entityId, entityName, excludeIds, onLinked, onClose 
           className="dialog__search-input"
           placeholder="Search reviews by title or wine…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
         />
         {error && <p className="dialog__error">{error}</p>}
         <div className="dialog__results">
@@ -79,7 +97,7 @@ function LinkReviewDialog({ entityId, entityName, excludeIds, onLinked, onClose 
             <p className="dialog__hint">No reviews found.</p>
           ) : (
             <ul className="dialog__results-list">
-              {results.map((review) => {
+              {results.map((review: Review) => {
                 const isLinked = (excludeIds || []).includes(review.id)
                   || (excludeIds || []).includes(review.slug);
                 return (

@@ -1,4 +1,4 @@
-import type { Image } from "./image"
+import type { ImageDetail } from "./image"
 
 export interface Review {
   id: number
@@ -20,9 +20,17 @@ export interface Review {
   category?: string | null
   categories?: Array<{ id: number; name: string; slug: string }>
   category_ids?: number[]
-  images?: Image[]
+  /**
+   * Ordered image URL strings — `image_urls` in Rails (ImageAttributes).
+   * NOTE: this is `string[]`, not `Image[]`. The rich per-image objects live in
+   * `image_details`; `images` is the flat backward-compatible URL list.
+   */
+  images?: string[]
+  /** Image record ids, position-ordered. */
   image_ids?: number[]
-  image_details?: Image[]
+  /** Rich image objects: `{ id, url, filename, content_type, position, primary }`. */
+  image_details?: ImageDetail[]
+  /** URL of the primary (else first) image, or null when there are none. */
   primary_image?: string | null
   published_at?: string | null
   created_at?: string | null

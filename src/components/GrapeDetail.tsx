@@ -5,8 +5,24 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAdmin, canManageGrapes, canManageWinesRole } from "../constants/roles";
 import WineTable from "./WineTable";
 import BackToSource from "./BackToSource";
+import { errorMessage } from "../utils/errors";
+import type { GrapeDetail as GrapeDetailData } from "../types/catalog";
+import type { WineListItem } from "../types/wine";
 
-const emptyForm = {
+/** The editable subset of a grape, seeded blank and refilled on every load. */
+interface GrapeForm {
+  name: string
+  color: string
+  origin_country: string
+  main_regions: string[]
+  synonyms: string[]
+  is_blending_grape: boolean
+  notes: string[]
+  serving: string
+  relevance: string
+}
+
+const emptyForm: GrapeForm = {
   name: "",
   color: "",
   origin_country: "",
@@ -23,18 +39,32 @@ const COLOR_OPTIONS = [
   { value: "white", label: "White" },
   { value: "rosé", label: "Rosé" },
   { value: "orange", label: "Orange" },
-];
+] as const;
+
+/** The three list-valued fields, each managed by an `ArrayFieldInput`. */
+type GrapeListField = "main_regions" | "synonyms" | "notes";
+
+/** Props for the tag-list editor shared by the three array fields. */
+interface ArrayFieldInputProps {
+  label: string
+  items: string[]
+  newValue: string
+  setNewValue: (value: string) => void
+  onAdd: () => void
+  onRemove: (index: number) => void
+  placeholder?: string
+}
 
 function GrapeDetail() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [grape, setGrape] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [grape, setGrape] = useState<GrapeDetailData | null>(null);
+  const [form, setForm] = useState<GrapeForm>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [newRegion, setNewRegion] = useState("");
   const [newSynonym, setNewSynonym] = useState("");
@@ -46,11 +76,12 @@ function GrapeDetail() {
 
   // Inline wine search for linking wines to this grape.
   const [wineQuery, setWineQuery] = useState("");
-  const [wineResults, setWineResults] = useState(null);
+  const [wineResults, setWineResults] = useState<WineListItem[] | null>(null);
   const [linking, setLinking] = useState(false);
-  const [linkError, setLinkError] = useState(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const loadGrape = useCallback(async () => {
+    if (!slug) return;
     try {
       setLoading(true);
       const data = await grapesApi.show(slug);
@@ -64,11 +95,11 @@ function GrapeDetail() {
         is_blending_grape: !!data.is_blending_grape,
         notes: data.notes || [],
         serving: data.serving || "",
-        relevance: data.relevance || "",
+        relevance: data.relevance != null ? String(data.relevance) : "",
       });
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load grape");
+      setError(errorMessage(err, "Failed to load grape"));
     } finally {
       setLoading(false);
     }
@@ -101,7 +132,8 @@ function GrapeDetail() {
     };
   }, [wineQuery, canLinkWines]);
 
-  async function handleLinkWine(wine) {
+  async function handleLinkWine(wine: WineListItem) {
+    if (!grape || !slug) return;
     if (!window.confirm(`Add "${wine.name}" to "${grape.name}"?`)) return;
     setLinking(true);
     setLinkError(null);
@@ -109,28 +141,36 @@ function GrapeDetail() {
       await grapesApi.linkWine(slug, wine.slug);
       await loadGrape();
     } catch (err) {
-      setLinkError(err.message || "Failed to link wine");
+      setLinkError(errorMessage(err, "Failed to link wine"));
     } finally {
       setLinking(false);
     }
   }
 
-  function updateField(field, value) {
+  // Generic over the key so the value type follows the field: `GrapeForm[K]`
+  // ties `updateField("name", "…")` to `string` and `("notes", […])` to
+  // `string[]`, without needing overloads.
+  function updateField<K extends keyof GrapeForm>(field: K, value: GrapeForm[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function addArrayField(field, value, setter) {
+  function addArrayField(
+    field: GrapeListField,
+    value: string,
+    setter: (value: string) => void,
+  ) {
     if (!value.trim()) return;
     if (form[field].includes(value.trim())) return;
     updateField(field, [...form[field], value.trim()]);
     setter("");
   }
 
-  function removeArrayField(field, index) {
+  function removeArrayField(field: GrapeListField, index: number) {
     updateField(field, form[field].filter((_, i) => i !== index));
   }
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!slug) return;
     if (!form.name.trim()) {
       setError("Name is required.");
       return;
@@ -149,13 +189,14 @@ function GrapeDetail() {
       setIsEditing(false);
       await loadGrape();
     } catch (err) {
-      setError(err.message || "Failed to save grape");
+      setError(errorMessage(err, "Failed to save grape"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
+    if (!grape || !slug) return;
     if (!window.confirm(`Delete grape "${grape.name}"? This cannot be undone.`)) return;
     setError(null);
     setNotice(null);
@@ -163,12 +204,16 @@ function GrapeDetail() {
       await grapesApi.remove(slug);
       navigate("/grapes", { state: { notice: `Grape "${grape.name}" deleted.` } });
     } catch (err) {
-      setError(err.message || "Failed to delete grape");
+      setError(errorMessage(err, "Failed to delete grape"));
     }
   }
 
   if (loading) return <p className="loading">Loading grape…</p>;
   if (!grape) return <p className="empty">Grape not found.</p>;
+
+  // `wines` is only sent by `show`; default it once so the table and its
+  // delete handler can treat it as a plain array.
+  const wines: WineListItem[] = grape.wines ?? [];
 
   return (
     <div className="grapes-page">
@@ -288,7 +333,7 @@ function GrapeDetail() {
                 value={form.serving}
                 onChange={(e) => updateField("serving", e.target.value)}
                 placeholder="Food pairing suggestions..."
-                rows="3"
+                rows={3}
               />
             </div>
 
@@ -399,14 +444,11 @@ function GrapeDetail() {
 
           <div className="grape-detail__wines">
             <h2>Wines</h2>
-            {grape.wines?.length > 0 ? (
+            {wines.length > 0 ? (
               <WineTable
-                wines={grape.wines}
+                wines={wines}
                 onDeleted={(deleted) =>
-                  setGrape((prev) => ({
-                    ...prev,
-                    wines: prev.wines.filter((w) => w.slug !== deleted.slug),
-                  }))
+                  setGrape((prev) => (prev ? { ...prev, wines: wines.filter((w) => w.slug !== deleted.slug) } : prev))
                 }
                 linkContext={{ type: "grape", id: grape.id, name: grape.name }}
                 onWineLinked={() => {
@@ -423,7 +465,15 @@ function GrapeDetail() {
   );
 }
 
-function ArrayFieldInput({ label, items, newValue, setNewValue, onAdd, onRemove, placeholder }) {
+function ArrayFieldInput({
+  label,
+  items,
+  newValue,
+  setNewValue,
+  onAdd,
+  onRemove,
+  placeholder,
+}: ArrayFieldInputProps) {
   return (
     <div className="form-group">
       <label>{label}</label>

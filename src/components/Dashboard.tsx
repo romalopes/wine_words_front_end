@@ -2,27 +2,44 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { articlesApi, reviewsApi, statsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
+import type { Article } from "../types/article";
+import type { Review } from "../types/review";
+import type { Stats } from "../types/stats";
 
-const dashboardCards = [
-  { title: "Producers", bandColor: "#6b5855", to: "/producers", cta: "Browse wineries →" },
-  { title: "Wines", bandColor: "#c49b38", to: "/wines", cta: "Explore the catalogue →" },
-  { title: "Reviews", bandColor: "#d47386", to: "/reviews", cta: "Read reviews →" },
-  { title: "Articles", bandColor: "#c49b38", to: "/articles", cta: "Read articles →" },
+/** One promo card on the dashboard. `statKey` indexes the API stats payload. */
+interface DashboardCard {
+  title: string;
+  statKey: keyof Stats;
+  bandColor: string;
+  to: string;
+  cta: string;
+}
+
+const dashboardCards: DashboardCard[] = [
+  { title: "Producers", statKey: "producers", bandColor: "#6b5855", to: "/producers", cta: "Browse wineries →" },
+  { title: "Wines", statKey: "wines", bandColor: "#c49b38", to: "/wines", cta: "Explore the catalogue →" },
+  { title: "Reviews", statKey: "reviews", bandColor: "#d47386", to: "/reviews", cta: "Read reviews →" },
+  { title: "Articles", statKey: "articles", bandColor: "#c49b38", to: "/articles", cta: "Read articles →" },
 ];
+
+const EMPTY_STATS: Stats = { producers: 0, wines: 0, reviews: 0, articles: 0 };
+
+/** Rails returns either a bare array or a paginated envelope; keep the array. */
+function asArray<T>(response: T[] | { items?: T[] }): T[] {
+  return Array.isArray(response) ? response : response.items ?? [];
+}
 
 function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ producers: 0, wines: 0, reviews: 0, articles: 0 });
-  const [recentArticles, setRecentArticles] = useState([]);
-  const [recentReviews, setRecentReviews] = useState([]);
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
+  const [recentArticles, setRecentArticles] = useState<Article[]>([]);
+  const [recentReviews, setRecentReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     statsApi.get().then(setStats).catch(() => {});
-    articlesApi.list().then((data) => setRecentArticles((Array.isArray(data) ? data : []).slice(0, 10))).catch(() => setRecentArticles([]));
-    reviewsApi.all().then((data) => setRecentReviews((Array.isArray(data) ? data : []).slice(0, 10))).catch(() => setRecentReviews([]));
+    articlesApi.list().then((data) => setRecentArticles(asArray(data).slice(0, 10))).catch(() => setRecentArticles([]));
+    reviewsApi.all().then((data) => setRecentReviews(asArray(data).slice(0, 10))).catch(() => setRecentReviews([]));
   }, []);
-
-  const statsMap = { Producers: stats.producers, Wines: stats.wines, Reviews: stats.reviews, Articles: stats.articles };
 
   return (
     <main className="wine-app">
@@ -41,7 +58,7 @@ function Dashboard() {
             <div style={{ padding: "1.1rem" }}>
               <h2 style={{ fontSize: "1.25rem", marginBottom: "0.3rem" }}>{card.title}</h2>
               <p style={{ color: "#6b5855", fontSize: "0.9rem", marginBottom: "0.7rem" }}>
-                {statsMap[card.title] || 0} {card.title.toLowerCase()} in the library.
+                {stats[card.statKey] || 0} {card.title.toLowerCase()} in the library.
               </p>
               <span style={{ display: "inline-block", background: "#f3e9e3", borderRadius: "99px", color: "#6b2834", fontSize: "0.78rem", fontWeight: 600, padding: "0.22rem 0.5rem" }}>
                 {card.cta}

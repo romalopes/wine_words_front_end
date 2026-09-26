@@ -1,12 +1,30 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { articlesApi, categoriesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
+import type { Article } from "../types/article";
 
-function LinkArticleDialog({ entityId, entityName, excludeIds, onLinked, onClose }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState(null);
-  const [linking, setLinking] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+interface LinkArticleDialogProps {
+  entityId: number
+  entityName?: string | null
+  /** Ids *and* slugs already attached, shown with a "Linked" badge. */
+  excludeIds?: Array<number | string>
+  onLinked?: (article: Article) => void
+  onClose?: () => void
+}
+
+function LinkArticleDialog({
+  entityId,
+  entityName,
+  excludeIds,
+  onLinked,
+  onClose,
+}: LinkArticleDialogProps) {
+  const [query, setQuery] = useState<string>("");
+  const [results, setResults] = useState<Article[] | null>(null);
+  const [linking, setLinking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -35,19 +53,19 @@ function LinkArticleDialog({ entityId, entityName, excludeIds, onLinked, onClose
     };
   }, [query]);
 
-  async function handleLink(article) {
+  async function handleLink(article: Article) {
     setLinking(true);
     setError(null);
     try {
       await categoriesApi.linkArticle(entityId, article.slug || article.id);
       onLinked?.(article);
     } catch (err) {
-      setError(err.message || "Failed to link article");
+      setError(errorMessage(err, "Failed to link article"));
       setLinking(false);
     }
   }
 
-  function handleBackdropClick(e) {
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
@@ -69,7 +87,7 @@ function LinkArticleDialog({ entityId, entityName, excludeIds, onLinked, onClose
           className="dialog__search-input"
           placeholder="Search articles by title…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
         />
         {error && <p className="dialog__error">{error}</p>}
         <div className="dialog__results">
@@ -79,15 +97,17 @@ function LinkArticleDialog({ entityId, entityName, excludeIds, onLinked, onClose
             <p className="dialog__hint">No articles found.</p>
           ) : (
             <ul className="dialog__results-list">
-              {results.map((article) => {
+              {results.map((article: Article) => {
+                // `slug` is nullable, and `includes` does not accept undefined —
+                // a record without a slug is matched on its id alone.
                 const isLinked = (excludeIds || []).includes(article.id)
-                  || (excludeIds || []).includes(article.slug);
+                  || (article.slug != null && (excludeIds || []).includes(article.slug));
                 return (
                   <li key={article.id || article.slug} className="dialog__result-item">
                     <div className="dialog__result-info">
                       <strong className="dialog__result-name">{article.title}</strong>
-                      {article.author && (
-                        <span className="dialog__result-meta">{article.author}</span>
+                      {article.author_name && (
+                        <span className="dialog__result-meta">{article.author_name}</span>
                       )}
                       {article.status && (
                         <span className="dialog__result-meta">{article.status}</span>

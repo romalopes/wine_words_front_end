@@ -1,8 +1,22 @@
 import { useState } from "react";
 import styles from "../ApiHealth.module.css";
 import ResponseInspector from "./ResponseInspector";
+import type { ApiCheck } from "../../../services/apiHealth/apiHealthConfig";
+import type { HealthCheckResult } from "../../../services/apiHealth/healthRunner";
 
-export default function WriteSandbox({ check, onRun, result, running }) {
+export interface WriteSandboxProps {
+  check: ApiCheck;
+  onRun: () => void;
+  result: HealthCheckResult | null | undefined;
+  running: boolean;
+}
+
+export default function WriteSandbox({
+  check,
+  onRun,
+  result,
+  running,
+}: WriteSandboxProps) {
   const [confirming, setConfirming] = useState(false);
 
   return (

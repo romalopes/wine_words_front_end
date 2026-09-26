@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { regionsApi, countriesApi } from "../services/api";
+import { regionsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin, canManageGrapes } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type {
+  CountryRegionNode,
+  Region,
+  RegionTreeNode as RegionTreeNodeData,
+} from "../types/reference";
 
-const emptyForm = {
+/** The create/edit region form's local state. IDs stay as strings so an empty
+ * select and a cleared field are the same value; the payload coerces them. */
+interface RegionFormValues {
+  name: string;
+  country_id: string;
+  parent_id: string;
+  is_state: boolean;
+  is_appellation: boolean;
+}
+
+const emptyForm: RegionFormValues = {
   name: "",
   country_id: "",
   parent_id: "",
@@ -12,21 +28,38 @@ const emptyForm = {
   is_appellation: false,
 };
 
-function typeLabel(region) {
-  const labels = [];
+function typeLabel(region: Region | RegionTreeNodeData): string {
+  const labels: string[] = [];
   if (region.is_state) labels.push("State");
   if (region.is_appellation) labels.push("Appellation");
   return labels.length > 0 ? labels.join(" / ") : "Region";
 }
 
+interface RegionTreeNodeProps {
+  node: RegionTreeNodeData;
+  level: number;
+  /** The region being edited, as a string id — `null` when the form is closed. */
+  targetRegionId: string | null;
+  onEdit: (region: RegionTreeNodeData) => void;
+  onDelete: (region: RegionTreeNodeData) => void;
+  canManage: boolean;
+}
+
 // Tree node component for displaying regions recursively
-function RegionTreeNode({ node, level, targetRegionId, onEdit, onDelete, canManage }) {
+function RegionTreeNode({
+  node,
+  level,
+  targetRegionId,
+  onEdit,
+  onDelete,
+  canManage,
+}: RegionTreeNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
-  const isCurrentRegion = node.id === targetRegionId;
+  const isCurrentRegion = String(node.id) === targetRegionId;
   const wineCount = node.wine_count || 0;
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const toggleExpand = (e) => {
+  const toggleExpand = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsExpanded(!isExpanded);
@@ -107,19 +140,21 @@ function RegionTreeNode({ node, level, targetRegionId, onEdit, onDelete, canMana
 function Regions() {
   const { user } = useAuth();
   const canManage = isAdmin(user) || canManageGrapes(user);
-  const [treeData, setTreeData] = useState([]);
-  const [countries, setCountries] = useState([]);
+  // The tree response is the only payload carrying both the country columns the
+  // create form needs (name, flag_emoji) and each country's nested `regions`
+  // for the parent select, so there is no second fetch to reconcile.
+  const [treeData, setTreeData] = useState<CountryRegionNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [mode, setMode] = useState("create");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [expandedCountries, setExpandedCountries] = useState(new Set());
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [expandedCountries, setExpandedCountries] = useState<Set<number>>(new Set());
   // Active highlight follows the row sent into the edit form (null = none).
-  const [targetRegionId, setTargetRegionId] = useState(null);
+  const [targetRegionId, setTargetRegionId] = useState<string | null>(null);
   const [showOnlyWithWines, setShowOnlyWithWines] = useState(true);
 
   const displayTree = showOnlyWithWines
@@ -132,16 +167,14 @@ function Regions() {
       const data = await regionsApi.tree();
       setTreeData(Array.isArray(data) ? data : []);
       if (Array.isArray(data)) {
-        const australiaIndex = data.findIndex(
+        const australia = data.find(
           (c) => c.name.toLowerCase() === "australia",
         );
-        if (australiaIndex !== -1) {
-          setExpandedCountries(new Set([data[australiaIndex].id]));
-        }
+        if (australia) setExpandedCountries(new Set([australia.id]));
       }
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load regions tree");
+      setError(errorMessage(err, "Failed to load regions tree"));
     } finally {
       setLoading(false);
     }
@@ -149,17 +182,15 @@ function Regions() {
 
   useEffect(() => {
     loadTreeData();
-    regionsApi
-      .list()
-      .then((data) => setCountries(Array.isArray(data) ? data : []))
-      .catch(() => {});
-    countriesApi
-      .list()
-      .then((data) => setCountries(Array.isArray(data) ? data : []))
-      .catch(() => {});
+    // The parent-region select reads `regions` off each country, which only the
+    // *tree* endpoint provides — the flat /countries and /regions lists do not
+    // carry it. So the tree response is the single source for that select.
   }, [loadTreeData]);
 
-  function updateField(field, value) {
+  function updateField<K extends keyof RegionFormValues>(
+    field: K,
+    value: RegionFormValues[K],
+  ) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -180,7 +211,7 @@ function Regions() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function toggleCountry(countryId) {
+  function toggleCountry(countryId: number) {
     setExpandedCountries((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(countryId)) {
@@ -192,7 +223,7 @@ function Regions() {
     });
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim() || !form.country_id) {
       setError("Name and Country are required.");
@@ -218,7 +249,7 @@ function Regions() {
       resetForm();
       await loadTreeData();
     } catch (err) {
-      setError(err.message || "Failed to save region");
+      setError(errorMessage(err, "Failed to save region"));
     } finally {
       setSaving(false);
     }
@@ -227,29 +258,29 @@ function Regions() {
   // Edit and Delete entry points: they drive the shared form above
   // (handleSubmit, mode/editingId) and the destroy call below, and are
   // rendered from each tree row's actions.
-  function startEdit(region) {
+  function startEdit(region: RegionTreeNodeData) {
     setMode("edit");
-    setTargetRegionId(region.id);
+    setTargetRegionId(String(region.id));
     setEditingId(region.id);
     setForm({
       name: region.name,
-      country_id: region.country_id,
-      parent_id: region.parent_id,
-      is_state: region.is_state,
-      is_appellation: region.is_appellation,
+      country_id: region.country_id == null ? "" : String(region.country_id),
+      parent_id: region.parent_id == null ? "" : String(region.parent_id),
+      is_state: Boolean(region.is_state),
+      is_appellation: Boolean(region.is_appellation),
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleDelete(region) {
+  async function handleDelete(region: RegionTreeNodeData) {
     if (window.confirm(`Delete region "${region.name}"?`)) {
       try {
         await regionsApi.remove(region.id);
         setNotice(`Region "${region.name}" deleted.`);
         await loadTreeData();
       } catch (err) {
-        setError(err.message || "Failed to delete region");
+        setError(errorMessage(err, "Failed to delete region"));
       }
     }
   }
@@ -299,10 +330,10 @@ function Regions() {
                       onChange={(e) =>
                         updateField("country_id", e.target.value)
                       }
-                      disabled={saving || countries.length === 0}
+                      disabled={saving || treeData.length === 0}
                     >
                       <option value="">Select a country</option>
-                      {countries.map((c) => (
+                      {treeData.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.flag_emoji} {c.name}
                         </option>
@@ -316,17 +347,15 @@ function Regions() {
                     <select
                       id="region-parent"
                       value={form.parent_id || ""}
-                      onChange={(e) =>
-                        updateField("parent_id", e.target.value || null)
-                      }
+                      onChange={(e) => updateField("parent_id", e.target.value)}
                       disabled={saving}
                     >
                       <option value="">No parent (top-level region)</option>
-                      {countries
-                        .map((c) =>
+                      {treeData
+                        .map((c: CountryRegionNode) =>
                           c.regions
-                            ?.filter((r) => r.parent_id === null)
-                            .map((r) => (
+                            ?.filter((r: RegionTreeNodeData) => r.parent_id === null)
+                            .map((r: RegionTreeNodeData) => (
                               <option key={r.id + "-parent"} value={r.id}>
                                 {r.name} ({c.name})
                               </option>

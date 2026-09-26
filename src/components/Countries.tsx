@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { countriesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin, canManageGrapes } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type { Country, CountryListItem } from "../types/reference";
 
-const emptyForm = {
+/**
+ * The editable subset of a country. Every field is a string (or the boolean
+ * flag) because the form is uncontrolled-ish: values are read straight out of
+ * the DOM and blank ones are normalised to `null` in `handleSubmit`.
+ */
+interface CountryForm {
+  name: string
+  code: string
+  continent: string
+  flag_emoji: string
+  is_wine_country: boolean
+}
+
+const emptyForm: CountryForm = {
   name: "",
   code: "",
   continent: "",
@@ -21,18 +37,21 @@ const CONTINENT_OPTIONS = [
   "Oceania",
 ];
 
+/** The two sort orders the table header toggles between. */
+type SortBy = "name" | "continent";
+
 function Countries() {
   const { user } = useAuth();
-  const [sortBy, setSortBy] = useState("name");
-  const [countries, setCountries] = useState([]);
+  const [sortBy, setSortBy] = useState<SortBy>("name");
+  const [countries, setCountries] = useState<CountryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [mode, setMode] = useState("create");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState<CountryForm>(emptyForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [onlyWineCountries, setOnlyWineCountries] = useState(true);
 
   const canManage = isAdmin(user) || canManageGrapes(user);
@@ -65,7 +84,7 @@ function Countries() {
       setCountries(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load countries");
+      setError(errorMessage(err, "Failed to load countries"));
     } finally {
       setLoading(false);
     }
@@ -75,7 +94,11 @@ function Countries() {
     loadCountries();
   }, [loadCountries]);
 
-  function updateField(field, value) {
+  /** Patch one field of the form. The key/value pair is checked together. */
+  function updateField<K extends keyof CountryForm>(
+    field: K,
+    value: CountryForm[K],
+  ) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -94,7 +117,7 @@ function Countries() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim() || !form.code.trim()) {
       setError("Name and ISO code are required.");
@@ -120,7 +143,7 @@ function Countries() {
       resetForm();
       await loadCountries();
     } catch (err) {
-      setError(err.message || "Failed to save country");
+      setError(errorMessage(err, "Failed to save country"));
     } finally {
       setSaving(false);
     }
@@ -129,7 +152,7 @@ function Countries() {
   // Edit and Delete entry points (restored with the strict-null baseline):
   // they drive the shared form above (handleSubmit, mode/editingId) and the
   // destroy call below, and are rendered from each row's actions.
-  function startEdit(country) {
+  function startEdit(country: Country) {
     setMode("edit");
     setEditingId(country.id);
     setShowForm(true);
@@ -143,7 +166,7 @@ function Countries() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleDelete(country) {
+  async function handleDelete(country: Country) {
     if (
       !window.confirm(
         `Delete country "${country.name}"? This cannot be undone.`,
@@ -158,7 +181,7 @@ function Countries() {
       if (editingId === country.id) resetForm();
       await loadCountries();
     } catch (err) {
-      setError(err.message || "Failed to delete country");
+      setError(errorMessage(err, "Failed to delete country"));
     }
   }
 
@@ -278,7 +301,8 @@ function Countries() {
             <select
               className="sort-select"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              // Safe cast: the only two <option>s below are "name"/"continent".
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
               aria-label="Sort countries"
             >
               <option value="name">Name</option>
