@@ -15,6 +15,7 @@ import { canManageWinesRole } from "../constants/roles";
 import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import DOMPurify from "dompurify";
+import { timeAgo } from "../utils/dates";
 
 function excerpt(html, max = 50) {
   if (!html) return "";
@@ -30,17 +31,6 @@ function RichComment({ html }) {
       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
     />
   );
-}
-
-function timeAgo(dateStr) {
-  if (!dateStr) return null;
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return "just now";
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-  return `${Math.floor(diffSec / 86400)}d ago`;
 }
 
 function Reviews() {

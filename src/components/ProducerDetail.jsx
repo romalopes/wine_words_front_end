@@ -7,13 +7,11 @@ import WineTable from "./WineTable";
 import RegionSearch from "./RegionSearch";
 import GrapeSearch from "./GrapeSearch";
 import BackToSource from "./BackToSource";
-import { useReturnToLink } from "../hooks/useReturnToLink";
 
 function ProducerDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const returnToLink = useReturnToLink();
   // Admins, Reviewers and Editors may manage producers / link wines.
   const canManageProducers = canManageWinesRole(user);
   const [producer, setProducer] = useState(null);

@@ -88,8 +88,13 @@ function Quiz() {
       defaults[p.slug] = 3;
     });
 
-    wine.parameters.forEach((p) => {
-      selectedWineParameters[p.taste_parameter_slug] = p.score;
+    // Seed the target-answer map from the selected wine's stored profile.
+    setSelectedWineParameters(() => {
+      const targets = {};
+      wine.parameters.forEach((p) => {
+        targets[p.taste_parameter_slug] = p.score;
+      });
+      return targets;
     });
 
     setTestTaste(defaults);

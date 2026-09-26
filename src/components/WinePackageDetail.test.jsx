@@ -357,7 +357,13 @@ describe("WinePackageDetail", () => {
   });
 
   it("reports when no tracking has been recorded yet", async () => {
+    const user = userEvent.setup();
     renderDetail();
+
+    // The tracking panel is collapsed by default; open it first.
+    await user.click(
+      await screen.findByRole("button", { name: "Show shipment tracking" }),
+    );
 
     expect(
       await screen.findByText("No tracking recorded for this package yet."),

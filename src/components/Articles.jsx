@@ -109,6 +109,9 @@ function Articles() {
     }
   }, []);
 
+  // `reloadArticles` is an inline dispatcher over the stable refs above, so it
+  // intentionally has no dependency array of its own — see the disable below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     reloadArticles();
     if (user) loadMyArticles();

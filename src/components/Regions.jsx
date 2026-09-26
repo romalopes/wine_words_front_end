@@ -97,7 +97,8 @@ function Regions() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [expandedCountries, setExpandedCountries] = useState(new Set());
-  const [targetRegionId, setTargetRegionId] = useState(null);
+  // Highlight target: the region currently being edited (null = none).
+  const [targetRegionId] = useState(null);
   const [showOnlyWithWines, setShowOnlyWithWines] = useState(true);
 
   const displayTree = showOnlyWithWines

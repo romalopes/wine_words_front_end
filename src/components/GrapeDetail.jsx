@@ -5,7 +5,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAdmin, canManageGrapes, canManageWinesRole } from "../constants/roles";
 import WineTable from "./WineTable";
 import BackToSource from "./BackToSource";
-import { useReturnToLink } from "../hooks/useReturnToLink";
 
 const emptyForm = {
   name: "",
@@ -30,7 +29,6 @@ function GrapeDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const returnToLink = useReturnToLink();
   const [grape, setGrape] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);

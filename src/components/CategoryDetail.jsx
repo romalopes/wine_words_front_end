@@ -7,11 +7,9 @@ import ArticleTable from "./ArticleTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
 import BackToSource from "./BackToSource";
-import { useReturnToLink } from "../hooks/useReturnToLink";
 
 function CategoryDetail() {
   const { slug } = useParams();
-  const returnToLink = useReturnToLink();
   const [category, setCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

@@ -86,7 +86,9 @@ function Configuration() {
         payload.test_email = testEmail;
       }
       if (customDirty) {
-        const savedMap = new Map(savedCustomSettings.map((s) => [s.id, s]));
+        // `savedCustomSettings` is the snapshot from the last successful load:
+        // every row in it is either updated to the current value or, when the
+        // row no longer exists locally, destroyed on the server.
         const currentMap = new Map(customSettings.map((s) => [s.id, s]));
         for (const saved of savedCustomSettings) {
           const current = currentMap.get(saved.id);

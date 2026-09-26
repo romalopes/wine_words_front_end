@@ -33,7 +33,6 @@ export function TestAccessProvider({ children }) {
   //     with no frontend redeploy needed.
   useEffect(() => {
     let cancelled = false;
-    const stored = getTestAccessToken();
     setVerifying(true);
     testAccessApi
       .verify()

@@ -8,12 +8,10 @@ import ProducerTable from "./ProducerTable";
 import Pagination from "./Pagination";
 import usePagedList from "../hooks/usePagedList";
 import BackToSource from "./BackToSource";
-import { useReturnToLink } from "../hooks/useReturnToLink";
 
 function CountryDetail() {
   const { slug } = useParams();
   const { user } = useAuth();
-  const returnToLink = useReturnToLink();
   const canManageProducers = canManageWinesRole(user);
   const [country, setCountry] = useState(null);
   const [loading, setLoading] = useState(true);

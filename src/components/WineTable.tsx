@@ -9,7 +9,7 @@ import { useReturnToLink } from "../hooks/useReturnToLink";
 // Vintages count and Edit actions for wine managers.
 // When `linkContext` is provided, shows a "Link a Wine" button that opens
 // a dialog to search and link wines to the given entity.
-function WineTable({ wines, linkContext, onWineLinked, onDeleted }) {
+function WineTable({ wines, linkContext, onWineLinked }) {
   const { user } = useAuth();
   const canManageWines = canManageWinesRole(user);
   const navigate = useNavigate();
