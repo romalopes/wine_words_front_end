@@ -5,17 +5,27 @@ import {
   tasteParameters,
   wineProfiles,
 } from "../data/wineData";
+import type { TasteParameterId, TasteValues, WineColor } from "../types/wineFinder";
+
+/** "All" disables the colour filter, so it sits alongside the real colours. */
+type ColorFilter = WineColor | "All";
+
+/** A scored profile, ready to render as a suggestion card. */
+type ScoredProfile = (typeof wineProfiles)[number] & { score: number };
 
 function Home() {
-  const [selectedTaste, setSelectedTaste] = useState(initialTaste);
-  const [selectedColor, setSelectedColor] = useState("All");
+  const [selectedTaste, setSelectedTaste] = useState<TasteValues>(initialTaste);
+  const [selectedColor, setSelectedColor] = useState<ColorFilter>("All");
 
-  const colorOptions = [
-    "All",
-    ...new Set(wineProfiles.map((profile) => profile.color)),
-  ];
+  const colorOptions: ColorFilter[] = useMemo(
+    () => [
+      "All",
+      ...new Set(wineProfiles.map((profile) => profile.color as WineColor)),
+    ],
+    [],
+  );
 
-  const matches = useMemo(() => {
+  const matches = useMemo<ScoredProfile[]>(() => {
     return wineProfiles
       .filter(
         (profile) => selectedColor === "All" || profile.color === selectedColor,
@@ -28,9 +38,11 @@ function Home() {
       .slice(0, 4);
   }, [selectedTaste, selectedColor]);
 
+  // `noUncheckedIndexedAccess`: the list can legitimately be empty when the
+  // filter matches nothing, so this is absent rather than undefined-by-index.
   const bestMatch = matches[0];
 
-  function handleTasteChange(parameterId, value) {
+  function handleTasteChange(parameterId: TasteParameterId, value: string) {
     setSelectedTaste((currentTaste) => ({
       ...currentTaste,
       [parameterId]: Number(value),

@@ -6,11 +6,11 @@ import type { Review } from "../types/review";
 
 interface LinkReviewDialogProps {
   entityId: number
-  entityName?: string | null
+  entityName?: string | null | undefined
   /** Ids *and* slugs already attached, shown with a "Linked" badge. */
-  excludeIds?: Array<number | string>
-  onLinked?: (review: Review) => void
-  onClose?: () => void
+  excludeIds?: Array<number | string> | undefined
+  onLinked?: ((review: Review) => void) | undefined
+  onClose?: (() => void) | undefined
 }
 
 function LinkReviewDialog({

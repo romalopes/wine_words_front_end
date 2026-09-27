@@ -21,8 +21,8 @@ export interface ReviewLinkContext {
 interface ReviewTableProps {
   reviews: Review[];
   /** When set, management users get a "+ Link a Review" action. */
-  linkContext?: ReviewLinkContext;
-  onReviewLinked?: () => void;
+  linkContext?: ReviewLinkContext | undefined;
+  onReviewLinked?: (() => void) | undefined;
 }
 
 // Shared table of reviews (one review per row): Score, Wine, Vintage,

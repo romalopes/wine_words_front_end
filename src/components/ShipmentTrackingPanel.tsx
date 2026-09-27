@@ -1,7 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { shipmentTrackingsApi } from "../services/api";
+import type { ShipmentTrackingWritePayload } from "../types/api";
+import type { ShipmentTracking } from "../types/shipmentTracking";
 import { formatDate, formatDateTime } from "../utils/dates";
+import { errorMessage, errorStatus } from "../utils/errors";
 import styles from "./winePackages.module.css";
+
+/** Editable tracking fields. Dates are truncated to the `date` input format. */
+interface TrackingFormState {
+  carrier: string
+  number: string
+  status: string
+  url: string
+  estimated_delivery_at: string
+}
+
+interface ShipmentTrackingPanelProps {
+  packageId: string | number
+  canManage: boolean
+  /** Lets the package page refresh itself after a tracking change. */
+  onChanged?: () => void
+}
 
 // Shipment tracking for a package: carrier, consignment number, the current
 // status and the carrier's event history.
@@ -10,11 +30,15 @@ import styles from "./winePackages.module.css";
 // row still works by hand, and "Refresh" simply reports that no live data was
 // fetched. A carrier "Delivered" never marks the package as arrived — a
 // reviewer always confirms that on the package itself.
-function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
-  const [tracking, setTracking] = useState(null);
+function ShipmentTrackingPanel({
+  packageId,
+  canManage,
+  onChanged,
+}: ShipmentTrackingPanelProps) {
+  const [tracking, setTracking] = useState<ShipmentTracking | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<TrackingFormState>({
     carrier: "",
     number: "",
     status: "",
@@ -23,8 +47,8 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
   });
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,8 +65,9 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
       });
     } catch (err) {
       // 404 simply means no tracking has been recorded yet.
-      if (err?.status !== 404)
-        setError(err.message || "Failed to load tracking");
+      if (errorStatus(err) !== 404) {
+        setError(errorMessage(err, "Failed to load tracking"));
+      }
     } finally {
       setLoaded(true);
     }
@@ -52,29 +77,33 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
     load();
   }, [load]);
 
-  function updateField(key, value) {
+  function updateField<K extends keyof TrackingFormState>(
+    key: K,
+    value: TrackingFormState[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSave(event) {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
     setMessage(null);
 
     try {
-      const saved = await shipmentTrackingsApi.update(packageId, {
+      const payload: ShipmentTrackingWritePayload = {
         carrier: form.carrier,
         number: form.number,
         status: form.status,
         url: form.url || null,
         estimated_delivery_at: form.estimated_delivery_at || null,
-      });
+      };
+      const saved = await shipmentTrackingsApi.update(packageId, payload);
       setTracking(saved);
       setMessage("Tracking saved.");
       if (onChanged) onChanged();
     } catch (err) {
-      setError(err.message || "Failed to save tracking");
+      setError(errorMessage(err, "Failed to save tracking"));
     } finally {
       setSaving(false);
     }
@@ -100,7 +129,7 @@ function ShipmentTrackingPanel({ packageId, canManage, onChanged }) {
       );
       if (onChanged) onChanged();
     } catch (err) {
-      setError(err.message || "Failed to refresh tracking");
+      setError(errorMessage(err, "Failed to refresh tracking"));
     } finally {
       setRefreshing(false);
     }

@@ -13,13 +13,13 @@ const mockProducersList = vi.fn();
 const mockUsersSearch = vi.fn();
 
 vi.mock("../services/api", () => ({
-  winePackagesApi: { list: (...args) => mockPackagesList(...args) },
-  winePackageItemsApi: { create: (...args) => mockItemsCreate(...args) },
-  shipmentTrackingsApi: { show: (...args) => mockTrackingShow(...args) },
-  notificationsApi: { list: (...args) => mockNotificationsList(...args) },
-  winesApi: { search: (...args) => mockWinesSearch(...args) },
-  producersApi: { list: (...args) => mockProducersList(...args) },
-  usersApi: { search: (...args) => mockUsersSearch(...args) },
+  winePackagesApi: { list: (...args: unknown[]) => mockPackagesList(...args) },
+  winePackageItemsApi: { create: (...args: unknown[]) => mockItemsCreate(...args) },
+  shipmentTrackingsApi: { show: (...args: unknown[]) => mockTrackingShow(...args) },
+  notificationsApi: { list: (...args: unknown[]) => mockNotificationsList(...args) },
+  winesApi: { search: (...args: unknown[]) => mockWinesSearch(...args) },
+  producersApi: { list: (...args: unknown[]) => mockProducersList(...args) },
+  usersApi: { search: (...args: unknown[]) => mockUsersSearch(...args) },
 }));
 
 let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
@@ -29,7 +29,7 @@ vi.mock("../contexts/AuthContext", () => ({
 }));
 
 // A local-midnight ISO date, matching how the API sends calendar dates.
-function isoDaysFromNow(days) {
+function isoDaysFromNow(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() + days);
   const month = String(date.getMonth() + 1).padStart(2, "0");

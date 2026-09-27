@@ -1,8 +1,51 @@
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { winesApi, winePackageItemsApi } from "../services/api";
+import type { WinePackageItemWritePayload } from "../types/api";
+import type { Vintage, Wine, WineListItem } from "../types/wine";
+import { errorMessage } from "../utils/errors";
 import InlineVintageCreateForm from "./InlineVintageCreateForm";
 import InlineWineCreateForm from "./InlineWineCreateForm";
 import styles from "./winePackages.module.css";
+
+/**
+ * The subset of a package line this form reads and writes. `WinePackageItem`
+ * carries an open index signature, so these fields are declared explicitly here
+ * rather than read off that type.
+ */
+interface PackageItemDraft {
+  id: number;
+  vintage_id?: number | null;
+  quantity?: number | null;
+  review_requested?: boolean | null;
+  condition?: string | null;
+  notes?: string | null;
+}
+
+/** Which create-panel currently replaces this form. */
+type CreatePanel = "wine" | "vintage";
+
+/**
+ * Editable line fields. `quantity` is a number on first render (taken from the
+ * line) and a string once the reviewer types, hence the union — the input needs
+ * a string and `Number()` normalises it on submit.
+ */
+interface ItemFormState {
+  quantity: string | number;
+  review_requested: boolean;
+  condition: string;
+  notes: string;
+}
+
+interface WinePackageItemFormProps {
+  packageId: number | string;
+  /** Present when editing an existing line, absent when adding a new one. */
+  item?: PackageItemDraft;
+  producerId?: number | string | null;
+  producerName?: string | null;
+  onSaved: (saved: Awaited<ReturnType<typeof winePackageItemsApi.create>>) => void;
+  onCancel: () => void;
+}
 
 // Add or edit one wine line inside a package.
 //
@@ -21,24 +64,27 @@ function WinePackageItemForm({
   producerName,
   onSaved,
   onCancel,
-}) {
-  const [wines, setWines] = useState([]);
+}: WinePackageItemFormProps) {
+  const [wines, setWines] = useState<WineListItem[]>([]);
   const [loadingWines, setLoadingWines] = useState(false);
   const [filter, setFilter] = useState("");
   const [wineId, setWineId] = useState("");
   const [vintageId, setVintageId] = useState(
     item?.vintage_id ? String(item.vintage_id) : "",
   );
-  const [panel, setPanel] = useState(null);
-  const [unmatched, setUnmatched] = useState(Boolean(item) && !item.vintage_id);
-  const [form, setForm] = useState({
+  const [panel, setPanel] = useState<CreatePanel | null>(null);
+  // A line that exists but has no vintage is the "not in the catalogue yet" case.
+  const [unmatched, setUnmatched] = useState(
+    item !== undefined && !item.vintage_id,
+  );
+  const [form, setForm] = useState<ItemFormState>({
     quantity: item?.quantity ?? 1,
     review_requested: item?.review_requested ?? true,
     condition: item?.condition || "",
     notes: item?.notes || "",
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const editing = Boolean(item);
 
@@ -57,16 +103,19 @@ function WinePackageItemForm({
   useEffect(() => {
     if (!producerId) return undefined;
 
+    // Captured as a const so the narrowing above survives into `load`, which
+    // TS does not carry into a closure for a reassignable parameter binding.
+    const ownerProducerId = producerId;
     let cancelled = false;
 
     async function load() {
       setLoadingWines(true);
       try {
-        const data = await winesApi.search({ producerId });
+        const data = await winesApi.search({ producerId: ownerProducerId });
         if (!cancelled) setWines(Array.isArray(data) ? data : []);
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || "Could not load this producer's wines");
+          setError(errorMessage(err, "Could not load this producer's wines"));
         }
       } finally {
         if (!cancelled) setLoadingWines(false);
@@ -82,11 +131,12 @@ function WinePackageItemForm({
 
   // An edited line arrives without its wine, so recover it from the vintage.
   useEffect(() => {
-    if (!item?.vintage_id || wineId || wines.length === 0) return;
+    const targetVintageId = item?.vintage_id;
+    if (!targetVintageId || wineId || wines.length === 0) return;
 
     const owner = wines.find((candidate) =>
       (candidate.vintages || []).some(
-        (vintage) => String(vintage.id) === String(item.vintage_id),
+        (vintage) => String(vintage.id) === String(targetVintageId),
       ),
     );
 
@@ -96,24 +146,30 @@ function WinePackageItemForm({
     }
   }, [wines, item, wineId]);
 
-  function updateField(key, value) {
+  function updateField<K extends keyof ItemFormState>(
+    key: K,
+    value: ItemFormState[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function vintageLabel(vintage) {
-    return vintage.no_vintage ? `NV (${vintage.year})` : String(vintage.year);
+  function vintageLabel(vintage: Vintage): string {
+    return vintage.no_vintage
+      ? `NV (${vintage.year ?? ""})`
+      : String(vintage.year);
   }
 
-  function chooseWine(nextId) {
+  function chooseWine(nextId: string) {
     setWineId(nextId);
     setUnmatched(false);
 
     const next = wines.find((candidate) => String(candidate.id) === nextId);
     // Preselect the newest vintage; the reviewer can change it.
-    setVintageId(next?.vintages?.[0]?.id ? String(next.vintages[0].id) : "");
+    const first = next?.vintages?.[0];
+    setVintageId(first ? String(first.id) : "");
   }
 
-  function handleVintageCreated(vintage) {
+  function handleVintageCreated(vintage: Vintage) {
     setPanel(null);
     setWines((current) =>
       current.map((candidate) =>
@@ -125,7 +181,13 @@ function WinePackageItemForm({
     setVintageId(String(vintage.id));
   }
 
-  function handleWineCreated({ wine, vintageId: createdVintageId }) {
+  function handleWineCreated({
+    wine,
+    vintageId: createdVintageId,
+  }: {
+    wine: Wine;
+    vintageId: number;
+  }) {
     setPanel(null);
     setFilter("");
     setWines((current) =>
@@ -137,13 +199,13 @@ function WinePackageItemForm({
     setVintageId(String(createdVintageId));
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
 
     try {
-      const payload = {
+      const payload: WinePackageItemWritePayload = {
         quantity: Number(form.quantity) || 1,
         review_requested: Boolean(form.review_requested),
         condition: form.condition || null,
@@ -155,18 +217,21 @@ function WinePackageItemForm({
       } else if (vintageId) {
         payload.vintage_id = Number(vintageId);
       } else if (!editing) {
-        setError("Pick a wine and a vintage, or mark the line as not in the catalogue yet.");
+        setError(
+          "Pick a wine and a vintage, or mark the line as not in the catalogue yet.",
+        );
         setSaving(false);
         return;
       }
 
-      const saved = editing
-        ? await winePackageItemsApi.update(packageId, item.id, payload)
-        : await winePackageItemsApi.create(packageId, payload);
+      const saved =
+        item && editing
+          ? await winePackageItemsApi.update(packageId, item.id, payload)
+          : await winePackageItemsApi.create(packageId, payload);
 
       onSaved(saved);
     } catch (err) {
-      setError(err.message || "Failed to save this wine line");
+      setError(errorMessage(err, "Failed to save this wine line"));
       setSaving(false);
     }
   }
@@ -176,7 +241,7 @@ function WinePackageItemForm({
   if (panel === "wine") {
     return (
       <InlineWineCreateForm
-        producerId={producerId}
+        producerId={producerId ?? null}
         producerName={producerName}
         defaultName={filter.trim()}
         onCreated={handleWineCreated}

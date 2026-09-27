@@ -1,19 +1,24 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Mock } from "vitest";
 import ApiHealth from "./ApiHealth";
 import { APP_VERSION } from "../../constants/versions";
 import { API_CHECKS } from "../../services/apiHealth/apiHealthConfig";
+import type { ApiCheck } from "../../services/apiHealth/apiHealthConfig";
+import type { HealthCheckOptions } from "../../services/apiHealth/healthRunner";
 
 // Mock the health runner so the component receives canned results instead of
 // making real HTTP requests. `runWriteFlow` must be present too: the component
 // imports it, and Vitest throws when a mocked module is missing a named export
 // the importer asks for.
-const mockRunCheck = vi.fn();
-const mockRunWriteFlow = vi.fn();
+const mockRunCheck: Mock = vi.fn();
+const mockRunWriteFlow: Mock = vi.fn();
 
 vi.mock("../../services/apiHealth/healthRunner", () => ({
-  runCheck: (...args) => mockRunCheck(...args),
-  runWriteFlow: (...args) => mockRunWriteFlow(...args),
+  runCheck: (check: ApiCheck, options?: HealthCheckOptions) =>
+    mockRunCheck(check, options),
+  runWriteFlow: (check: ApiCheck, options?: HealthCheckOptions) =>
+    mockRunWriteFlow(check, options),
 }));
 
 // Mock the token getter so no real localStorage/network is touched.
@@ -57,7 +62,7 @@ const mismatchResult = {
 // the check name and its action buttons inside the same `div[class*='row']`
 // element, so we pick the button whose row text contains the check name. This
 // avoids depending on DOM order or on the exact CSS-module class hashes.
-function testButtonFor(checkName) {
+function testButtonFor(checkName: string) {
   const buttons = screen.getAllByRole("button", { name: /^Test$/i });
   const button = buttons.find((b) =>
     b.closest("div[class*='row']")?.textContent?.includes(checkName),
@@ -92,7 +97,10 @@ describe("ApiHealth", () => {
 
     // The runner must be handed a token getter that reads the *persisted*
     // token, not a value from React state.
-    const [, options] = mockRunCheck.mock.calls[0];
+    const call = mockRunCheck.mock.calls[0];
+    if (!call) throw new Error("runCheck was never called");
+    const options = call[1] as HealthCheckOptions;
+    if (!options.getAuthToken) throw new Error("no token getter was passed");
     expect(options.getAuthToken()).toBe("fake-token");
   });
 
@@ -124,7 +132,9 @@ describe("ApiHealth", () => {
 
   it("the version match check validates against APP_VERSION", () => {
     const versionCheck = API_CHECKS.find((c) => c.id === "system-version-match");
-    expect(versionCheck).toBeDefined();
+    if (!versionCheck) throw new Error("the version match check is missing");
+    // Only this check validates; without a validator the assertion is vacuous.
+    if (!versionCheck.validate) throw new Error("the check has no validator");
     expect(versionCheck.validate({ version: APP_VERSION })).toBe(true);
     expect(versionCheck.validate({ version: "0.0.19" })).toBe(false);
   });

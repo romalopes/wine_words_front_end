@@ -75,17 +75,20 @@ export type RegionPathCrumb =
       id: number
       slug: string
       name: string
-      flag_emoji?: string | null
-      code?: string | null
+      // `| undefined` is accepted explicitly so a value read off an optional
+      // API field can be assigned without a separate spread (see
+      // `exactOptionalPropertyTypes`).
+      flag_emoji?: string | null | undefined
+      code?: string | null | undefined
     }
   | {
       type: "region"
       id: number
       slug: string
       name: string
-      is_state?: boolean | null
-      is_appellation?: boolean | null
-      parent_id?: number | null
+      is_state?: boolean | null | undefined
+      is_appellation?: boolean | null | undefined
+      parent_id?: number | null | undefined
     }
 
 /** `GET /api/v1/regions/:id` — `region_json` plus the computed `full_path` and

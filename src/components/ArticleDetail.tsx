@@ -5,10 +5,16 @@ import ArticleForm from "./ArticleForm";
 import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
+import type { Article } from "../types/article";
+import { errorMessage } from "../utils/errors";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 
-function RichBody({ html }) {
+interface RichBodyProps {
+  html: string;
+}
+
+function RichBody({ html }: RichBodyProps) {
   return (
     <div
       className="article-detail__body"
@@ -18,24 +24,25 @@ function RichBody({ html }) {
 }
 
 function ArticleDetail() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
-  const [article, setArticle] = useState(null);
+  const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const loadArticle = useCallback(async () => {
+    if (!slug) return;
     try {
       setLoading(true);
       setError(null);
       const data = await articlesApi.show(slug);
       setArticle(data);
     } catch (err) {
-      setError(err.message || "Failed to load article");
+      setError(errorMessage(err, "Failed to load article"));
     } finally {
       setLoading(false);
     }
@@ -45,18 +52,22 @@ function ArticleDetail() {
     loadArticle();
   }, [loadArticle]);
 
+  // Every action below edits or deletes the article on screen, so there is
+  // nothing to act on until one has loaded.
   async function togglePublish() {
+    if (!article) return;
     try {
       await articlesApi.update(article.id, {
         status: article.status === "draft" ? "published" : "draft",
       });
       loadArticle();
     } catch (err) {
-      alert(err.message || "Failed to update article");
+      alert(errorMessage(err, "Failed to update article"));
     }
   }
 
   async function handleDelete() {
+    if (!article) return;
     if (!window.confirm("Delete this article? This action cannot be undone.")) {
       return;
     }
@@ -65,7 +76,7 @@ function ArticleDetail() {
       await articlesApi.destroy(article.id);
       navigate("/articles");
     } catch (err) {
-      setError(err.message || "Failed to delete article");
+      setError(errorMessage(err, "Failed to delete article"));
       setDeleting(false);
     }
   }
@@ -96,6 +107,12 @@ function ArticleDetail() {
   const visibleReviews = (article.reviews || []).filter(
     (r) => r.link_status === "published" && r.status === "published",
   );
+  // The serializer omits these collections entirely when empty, so they are
+  // read once here into plain arrays the JSX below can rely on.
+  const categories = article.categories ?? [];
+  const tags = article.tags ?? [];
+  const vintages = article.vintages ?? [];
+  const producers = article.producers ?? [];
 
   return (
     <main className="wine-app">
@@ -122,12 +139,12 @@ function ArticleDetail() {
       </div>
 
       <p className="review-card__comment">
-        {Array.isArray(article.categories) && article.categories.length > 0 ? (
+        {categories.length > 0 ? (
           <>
-            {article.categories.map((cat, i) => (
+            {categories.map((cat, i) => (
               <span key={cat.id}>
                 <Link to={returnToLink(`/categories/${cat.slug}`)}>{cat.name}</Link>
-                {i < article.categories.length - 1 ? ", " : ""}
+                {i < categories.length - 1 ? ", " : ""}
               </span>
             ))}{" "}
             ·{" "}
@@ -137,7 +154,7 @@ function ArticleDetail() {
         {article.published_at
           ? ` · ${new Date(article.published_at).toLocaleDateString()}`
           : ""}
-        {article.tags?.length > 0 ? ` — ${article.tags.join(", ")}` : ""}
+        {tags.length > 0 ? ` — ${tags.join(", ")}` : ""}
       </p>
 
       {canEdit && (
@@ -205,13 +222,13 @@ function ArticleDetail() {
         </div>
       )}
 
-      {(article.vintages?.length > 0 || article.producers?.length > 0) && (
+      {(vintages.length > 0 || producers.length > 0) && (
         <div className="wine-detail__section">
-          {article.vintages?.length > 0 && (
+          {vintages.length > 0 && (
             <>
               <h2>Wines &amp; vintages</h2>
               <ul>
-                {article.vintages.map((vintage) => (
+                {vintages.map((vintage) => (
                   <li key={vintage.id}>
                     <Link to={returnToLink(`/wines/${vintage.wine_slug}`)}>
                       {vintage.wine_name} {vintage.year}
@@ -222,11 +239,11 @@ function ArticleDetail() {
               </ul>
             </>
           )}
-          {article.producers?.length > 0 && (
+          {producers.length > 0 && (
             <>
               <h2>Producers</h2>
               <ul>
-                {article.producers.map((producer) => (
+                {producers.map((producer) => (
                   <li key={producer.id}>
                     <Link to={returnToLink(`/producers/${producer.slug}`)}>{producer.name}</Link>
                   </li>

@@ -1,18 +1,20 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Mock } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import Notifications from "./Notifications";
 import { onNotificationsChanged } from "../services/notificationEvents";
+import type { QueryParams } from "../types/common";
 
-const mockList = vi.fn();
-const mockMarkRead = vi.fn();
-const mockMarkAllRead = vi.fn();
+const mockList: Mock = vi.fn();
+const mockMarkRead: Mock = vi.fn();
+const mockMarkAllRead: Mock = vi.fn();
 
 vi.mock("../services/api", () => ({
   notificationsApi: {
-    list: (...args) => mockList(...args),
-    markRead: (...args) => mockMarkRead(...args),
-    markAllRead: (...args) => mockMarkAllRead(...args),
+    list: (params?: QueryParams) => mockList(params),
+    markRead: (id: string | number) => mockMarkRead(id),
+    markAllRead: () => mockMarkAllRead(),
   },
   winePackagesApi: { list: vi.fn(), show: vi.fn() },
   winePackageItemsApi: { create: vi.fn(), update: vi.fn(), destroy: vi.fn() },

@@ -9,8 +9,22 @@ import {
 import { categoriesApi } from "../services/api";
 import { useTestAccess } from "../contexts/TestAccessContext";
 import NotificationBell from "./NotificationBell";
+import { responseItems } from "../types/common";
+import type { Category, CategoryFlag } from "../types/catalog";
+import type { CategoryCountType, CategoryCounts } from "../types/api";
 
-function NavDropdown({ label, items }) {
+/** One row in a nav dropdown: the text shown and where it navigates. */
+interface NavDropdownItem {
+  label: string;
+  to: string;
+}
+
+interface NavDropdownProps {
+  label: string;
+  items: NavDropdownItem[];
+}
+
+function NavDropdown({ label, items }: NavDropdownProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,7 +69,8 @@ function NavDropdown({ label, items }) {
   );
 }
 
-function getInitials(name) {
+/** Up to two initials from a display name, for the header avatar. */
+function getInitials(name: string | null | undefined): string {
   if (!name) return "?";
   return name
     .split(/\s+/)
@@ -80,9 +95,6 @@ function Header() {
   // Admin nav links are gated on the REAL user (the admin), not the effective
   // impersonated user, so an admin never loses access to the admin interface
   // while impersonating a non-admin user.
-  // Admin nav links are gated on the REAL user (the admin), not the effective
-  // impersonated user, so an admin never loses access to the admin interface
-  // while impersonating a non-admin user.
   //
   // When not impersonating, realUser is null; fall back to user so menus
   // render normally for the signed-in identity.
@@ -99,13 +111,13 @@ function Header() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [counts, setCounts] = useState({});
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [counts, setCounts] = useState<CategoryCounts>({});
 
   useEffect(() => {
     categoriesApi
       .list()
-      .then((cats) => setCategories(Array.isArray(cats) ? cats : []))
+      .then((cats) => setCategories(responseItems(cats)))
       .catch(() => {});
     categoriesApi
       .counts()
@@ -113,8 +125,17 @@ function Header() {
       .catch(() => {});
   }, []);
 
-  function navCategories(flag, sortKey) {
-    const type = flag.replace("for_", "");
+  /**
+   * Build the category links for one nav dropdown: only categories flagged for
+   * this item type that actually have something linked, in their configured
+   * order. `Uncategorised` is appended last when there are any.
+   */
+  function navCategories(
+    flag: CategoryFlag,
+    sortKey: `sort_order_${CategoryCountType}`,
+  ): NavDropdownItem[] {
+    const type = flag.replace("for_", "") as CategoryCountType;
+    // The API keys these by the category id, serialised as a string.
     const countMap = counts[type] || {};
     const uncategorisedCount = counts.uncategorised?.[type] || 0;
     const categoryLinks = categories
@@ -123,11 +144,7 @@ function Header() {
       .filter((c) => (countMap[c.id] || 0) > 0)
       .map((c) => ({
         label: `${c.name} (${countMap[c.id] || 0})`,
-        to:
-          "/" +
-          flag.replace("for_", "") +
-          "s?category=" +
-          encodeURIComponent(c.name),
+        to: `/${type}s?category=${encodeURIComponent(c.name)}`,
       }));
 
     // Add Uncategorised as the last item if there are any
@@ -151,13 +168,17 @@ function Header() {
     navigate("/test-access");
   }
 
-  function getDisplayName() {
+  // `user_name` is the only display field the API sends; the email local-part is
+  // the fallback. (The `displayName` key some social payloads used to carry is
+  // no longer part of `user_json` — see `users_controller#user_json`.)
+  function getDisplayName(): string | null {
     if (!session || !user) return null;
-    return (
-      user.user_name ||
-      user.displayName ||
-      (user.email ? user.email.split("@")[0] : null)
-    );
+    if (user.user_name) return user.user_name;
+    // The local-part of the email is the fallback. `split` yields
+    // `string | undefined` under `noUncheckedIndexedAccess`, and this input is
+    // known to contain an "@", so take the part before it directly.
+    const at = user.email?.indexOf("@") ?? -1;
+    return at > 0 ? user.email.slice(0, at) : user.email ?? null;
   }
 
   const displayName = getDisplayName();

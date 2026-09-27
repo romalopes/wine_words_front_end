@@ -5,7 +5,11 @@ import { badgeClass, statusLabel, statusTone } from "../constants/winePackages";
 // comes from the shared `.wine-badge` family in index.css, so a status reads
 // the same here as anywhere else in the app.
 interface PackageStatusBadgeProps {
-  status: string
+  /**
+   * Nullable: a notification can exist without a package, so a caller may have
+   * no status to show at all. `statusLabel` renders a placeholder for that.
+   */
+  status: string | null | undefined
 }
 
 function PackageStatusBadge({ status }: PackageStatusBadgeProps) {

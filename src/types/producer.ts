@@ -1,4 +1,4 @@
-import type { Country, Region } from "./reference"
+import type { Country } from "./reference"
 import type { Wine } from "./wine"
 
 /** Mirrors `address_json` in Api::V1::ProducersController. */
@@ -21,6 +21,20 @@ export interface ProducerAddressSummary {
   country?: Country | null
 }
 
+/** A region attached to a producer: `{ id, name, country_name }`. */
+export interface ProducerRegionRef {
+  id: number
+  name: string
+  country_name?: string | null
+}
+
+/** A grape attached to a producer: `{ id, name, color }`. */
+export interface ProducerGrapeRef {
+  id: number
+  name: string
+  color?: string | null
+}
+
 export interface Producer {
   id: number
   slug: string
@@ -37,8 +51,16 @@ export interface Producer {
   founded_year?: number | null
   active?: boolean
   country?: Country | null
-  regions?: Pick<Region, "id" | "name">[]
-  grapes?: Pick<Region, "id" | "name">[]
+  /**
+   * Each entry is `{ id, name, country_name }` — the association payload from
+   * `producer_json`, not a full `Region` record.
+   */
+  regions?: ProducerRegionRef[]
+  /**
+   * Each entry is `{ id, name, color }` — grape associations carry a colour so
+   * the form can recolour the tag chips.
+   */
+  grapes?: ProducerGrapeRef[]
   logo_url?: string | null
   /**
    * Ordered image URL strings — `image_urls` in the producers controller.
@@ -74,16 +96,4 @@ export interface ProducerSearchResult {
 export interface SubscriptionFeature {
   id: number
   name: string
-}
-
-export interface Subscription {
-  id: number
-  name: string
-  description?: string | null
-  /** Marks the plan highlighted with a "Most popular" badge. */
-  popular?: boolean
-  monthly_price_cents?: number | null
-  yearly_price_cents?: number | null
-  features?: SubscriptionFeature[]
-  [key: string]: unknown
 }

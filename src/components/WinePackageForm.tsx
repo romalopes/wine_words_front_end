@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usersApi, winePackagesApi } from "../services/api";
+import type { WinePackageWritePayload } from "../types/api";
+import type { AdminUser } from "../types/user";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import ProducerSearch from "./ProducerSearch";
@@ -8,8 +11,21 @@ import { sourceLabel } from "../constants/winePackages";
 import { todayInputValue } from "../utils/dates";
 import ImageManager from "./ImageManager";
 import { imagesApi } from "../services/api";
+import { errorMessage } from "../utils/errors";
+import { responseItems } from "../types/common";
 
 import styles from "./winePackages.module.css";
+
+/**
+ * One entry mode: the copy shown above the form plus the status/source the
+ * backend should start the package with.
+ */
+interface PackageModeConfig {
+  title: string
+  help: string
+  status: string
+  source: string
+}
 
 // The four ways a package enters the workflow. `status` is the entry point the
 // backend expects; the rest is presentation copy.
@@ -38,7 +54,24 @@ const MODES = {
     status: "draft",
     source: "manual",
   },
-};
+} satisfies Record<string, PackageModeConfig>;
+
+type PackageMode = keyof typeof MODES;
+
+function isPackageMode(value: string | null): value is PackageMode {
+  return value !== null && value in MODES;
+}
+
+/** The editable package fields, all held as strings for the controlled inputs. */
+interface PackageFormState {
+  producer_id: string
+  producer_name: string
+  source: string
+  expected_at: string
+  arrived_at: string
+  review_deadline: string
+  notes: string
+}
 
 // Create / edit a wine package.
 //
@@ -47,62 +80,80 @@ const MODES = {
 // the status and source are intentionally not editable: they belong to the
 // workflow actions on the detail page.
 function WinePackageForm() {
-  const { id } = useParams();
-  const editing = Boolean(id);
+  const { id } = useParams<{ id: string }>();
+  // Written as a comparison rather than `Boolean(id)` so TS keeps the
+  // `id !== undefined` narrowing wherever `editing` is checked.
+  const editing = id !== undefined;
   const navigate = useNavigate();
   const { user } = useAuth();
   // users#search is admin-only, so the reviewer field is only offered to admins.
   const canPickReviewer = isAdmin(user);
   const [searchParams] = useSearchParams();
   const requestedMode = searchParams.get("mode");
+  // ?mode= only wins when it names a real mode; anything else falls back to draft.
+  const initialMode: PackageMode = isPackageMode(requestedMode)
+    ? requestedMode
+    : "draft";
 
-  const [mode, setMode] = useState(MODES[requestedMode] ? requestedMode : "draft");
-  const [form, setForm] = useState({
+  const [mode, setMode] = useState<PackageMode>(initialMode);
+  const [form, setForm] = useState<PackageFormState>({
     producer_id: "",
     producer_name: "",
-    source: MODES[requestedMode]?.source || "manual",
+    source: isPackageMode(requestedMode)
+      ? MODES[requestedMode].source
+      : "manual",
     expected_at: "",
-    arrived_at: requestedMode === "arrived" ? todayInputValue() : "",
+    arrived_at: initialMode === "arrived" ? todayInputValue() : "",
     review_deadline: "",
     notes: "",
   });
   const [reviewerId, setReviewerId] = useState("");
-  const [reviewerResults, setReviewerResults] = useState([]);
+  const [reviewerResults, setReviewerResults] = useState<AdminUser[]>([]);
   // Existing server-side images (editing mode) and locally staged files that
   // upload right after creation (create mode).
-  const [existingImages, setExistingImages] = useState([]);
-  const [existingImageIds, setExistingImageIds] = useState([]);
-  const [stagedImages, setStagedImages] = useState([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [existingImageIds, setExistingImageIds] = useState<Array<number | null>>(
+    [],
+  );
+  const [stagedImages, setStagedImages] = useState<File[]>([]);
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!editing) return undefined;
+    // The id is the effect's input: bail out in create mode, and capture it as
+    // a const so the narrowing holds inside `load` (a closure over a possibly
+    // reassigned parameter binding loses it).
+    const packageId = id;
+    if (packageId === undefined) return undefined;
     let cancelled = false;
 
-    async function load() {
+    const load = async () => {
       try {
-        const pkg = await winePackagesApi.show(id);
+        const pkg = await winePackagesApi.show(packageId);
         if (cancelled) return;
-        setReviewerId(pkg.reviewer_id || "");
+        // reviewer_id is a number in the payload but the input is text-backed.
+        setReviewerId(pkg.reviewer_id ? String(pkg.reviewer_id) : "");
         setExistingImages(Array.isArray(pkg.images) ? pkg.images : []);
         setExistingImageIds(Array.isArray(pkg.image_ids) ? pkg.image_ids : []);
         setForm({
-          producer_id: pkg.producer_id || "",
+          producer_id: String(pkg.producer_id ?? ""),
           producer_name: pkg.producer_name || "",
           source: pkg.source || "manual",
           expected_at: pkg.expected_at || "",
+          // Dates come back as full timestamps but the input wants a bare day.
           arrived_at: pkg.arrived_at ? pkg.arrived_at.slice(0, 10) : "",
           review_deadline: pkg.review_deadline || "",
           notes: pkg.notes || "",
         });
       } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load wine package");
+        if (!cancelled) {
+          setError(errorMessage(err, "Failed to load wine package"));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
+    };
 
     load();
     return () => {
@@ -110,18 +161,21 @@ function WinePackageForm() {
     };
   }, [editing, id]);
 
-  function updateField(key, value) {
+  function updateField<K extends keyof PackageFormState>(
+    key: K,
+    value: PackageFormState[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
   // Switching entry mode also switches the default source, mirroring the
   // backend's notion of where the package came from.
-  function chooseMode(next) {
+  function chooseMode(next: PackageMode) {
     setMode(next);
     updateField("source", MODES[next].source);
   }
 
-  function handleProducerChange(id, name) {
+  function handleProducerChange(id: string | number, name: string) {
     setForm((current) => ({
       ...current,
       producer_id: id ? String(id) : "",
@@ -131,20 +185,23 @@ function WinePackageForm() {
 
   async function searchReviewers() {
     try {
+      // A `page` is sent, so the API answers with the pagination envelope.
+      // `responseItems` unwraps that (and a bare array) so the picker shows rows
+      // either way — `Array.isArray(data) ? data : []` would always be empty.
       const data = await usersApi.search("");
-      setReviewerResults(Array.isArray(data) ? data : []);
+      setReviewerResults(responseItems(data));
     } catch (err) {
-      setError(err.message || "Could not search users");
+      setError(errorMessage(err, "Could not search users"));
     }
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
 
     try {
-      const payload = {
+      const payload: WinePackageWritePayload = {
         producer_id: Number(form.producer_id),
         notes: form.notes,
       };
@@ -177,8 +234,10 @@ function WinePackageForm() {
           setStagedImages([]);
         } catch (imgErr) {
           setError(
-            imgErr.message ||
+            errorMessage(
+              imgErr,
               "Package created, but some images could not be uploaded. Retry from the package page.",
+            ),
           );
           setSaving(false);
           return;
@@ -186,7 +245,7 @@ function WinePackageForm() {
       }
       navigate(`/wine-packages/${created.id}`);
     } catch (err) {
-      setError(err.message || "Failed to save wine package");
+      setError(errorMessage(err, "Failed to save wine package"));
       setSaving(false);
     }
   }
@@ -231,7 +290,7 @@ function WinePackageForm() {
                   name="package-entry-mode"
                   value={key}
                   checked={mode === key}
-                  onChange={() => chooseMode(key)}
+                  onChange={() => chooseMode(key as PackageMode)}
                 />
                 {config.title}
               </label>
@@ -343,7 +402,7 @@ function WinePackageForm() {
             <label htmlFor="package-notes">Notes</label>
             <textarea
               id="package-notes"
-              rows="4"
+              rows={4}
               value={form.notes}
               onChange={(event) => updateField("notes", event.target.value)}
             />

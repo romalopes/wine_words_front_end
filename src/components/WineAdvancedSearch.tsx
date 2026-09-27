@@ -60,8 +60,15 @@ type SearchParams = Record<
   string | number | number[]
 >;
 
+/** `"some-slug"` -> `"Some Slug"`, for rendering a slug as a label. */
 const humanize = (slug: string) =>
-  slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+  slug
+    .split("-")
+    // Capitalise the first character of each part. `charAt` is used rather than
+    // indexing because indexing a `string` yields `string | undefined` under
+    // `noUncheckedIndexedAccess`.
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 
 // Sliders for the six searchable taste parameters (0-10 scale). Sliders at
 // the extremes mean the parameter is not filtered.

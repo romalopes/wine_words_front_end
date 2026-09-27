@@ -7,9 +7,11 @@ import {
   getTestAccessToken,
   setTestAccessToken,
 } from "../services/api";
+import * as apiModule from "../services/api";
 
 vi.mock("../services/api", async (importOriginal) => {
-  const actual = await importOriginal();
+  // Keep every other export real; only the test-access endpoints are faked.
+  const actual = await importOriginal<typeof apiModule>();
   return {
     ...actual,
     testAccessApi: {

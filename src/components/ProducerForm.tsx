@@ -1,21 +1,88 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { producersApi, imagesApi, countriesApi } from "../services/api";
-import GrapeSearch from "./GrapeSearch";
-import RegionSearch from "./RegionSearch";
+import GrapeSearch, { type SelectedGrape } from "./GrapeSearch";
+import RegionSearch, { type SelectedRegion } from "./RegionSearch";
+import { errorMessage, errorText } from "../utils/errors";
+import type { CountryListItem } from "../types/reference";
+
+/**
+ * `RegionSearch` carries only id/name, but this form also keeps each region's
+ * country so that changing the producer's country can drop the regions that no
+ * longer belong to it (see `handleCountryChange`).
+ *
+ * `| undefined` is accepted on the nested country fields so a value read off an
+ * optional API field assigns directly — same convention as `RegionPathCrumb`.
+ */
+type SelectedProducerRegion = SelectedRegion & {
+  country?:
+    | { id?: number | null | undefined; name?: string | null | undefined }
+    | null
+    | undefined;
+};
+
+/** `GrapeSearch` carries only id/name; the form preserves the colour too. */
+type SelectedProducerGrape = SelectedGrape & {
+  color?: string | null | undefined;
+};
+
+/**
+ * The nested mailing address. Every text field is a controlled string, so the
+ * numeric ids stay as strings too and are converted on submit.
+ */
+interface ProducerFormAddress {
+  id: number | null;
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country_id: string;
+}
+
+interface ProducerFormData {
+  name: string;
+  legal_name: string;
+  email: string;
+  producer_type: string;
+  website: string;
+  instagram: string;
+  facebook: string;
+  description: string;
+  phone: string;
+  founded_year: string;
+  active: boolean;
+  country_id: string;
+  address: ProducerFormAddress;
+}
+
+const EMPTY_ADDRESS: ProducerFormAddress = {
+  id: null,
+  street_address: "",
+  city: "",
+  state: "",
+  postal_code: "",
+  country_id: "",
+};
 
 function ProducerForm() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const isEditing = Boolean(slug);
-  const [images, setImages] = useState(null);
-  const [logoFile, setLogoFile] = useState(null);
+  // `show`/`update` need a non-null id; the edit branch is the only caller, and
+  // it only runs when `slug` is present.
+  const producerSlug = slug ?? "";
+  const [images, setImages] = useState<FileList | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoRemoved, setLogoRemoved] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const [selectedRegions, setSelectedRegions] = useState([]);
-  const [selectedGrapes, setSelectedGrapes] = useState([]);
+  const [countries, setCountries] = useState<CountryListItem[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<
+    SelectedProducerRegion[]
+  >([]);
+  const [selectedGrapes, setSelectedGrapes] = useState<SelectedProducerGrape[]>(
+    [],
+  );
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProducerFormData>({
     name: "",
     legal_name: "",
     email: "",
@@ -29,19 +96,12 @@ function ProducerForm() {
     active: true,
     country_id: "",
     // Mailing address lives in its own record (producer has_one :address).
-    address: {
-      id: null,
-      street_address: "",
-      city: "",
-      state: "",
-      postal_code: "",
-      country_id: "",
-    },
+    address: { ...EMPTY_ADDRESS },
   });
-  const [existingLogoUrl, setExistingLogoUrl] = useState(null);
+  const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     countriesApi
@@ -75,7 +135,7 @@ function ProducerForm() {
       if (isEditing) {
         try {
           setLoading(true);
-          const data = await producersApi.show(slug);
+          const data = await producersApi.show(producerSlug);
           setFormData({
             name: data.name || "",
             legal_name: data.legal_name || "",
@@ -117,17 +177,28 @@ function ProducerForm() {
             })),
           );
         } catch (err) {
-          setError(err.message || "Failed to load producer");
+          setError(errorMessage(err, "Failed to load producer"));
         } finally {
           setLoading(false);
         }
       }
     }
     initFormData();
-  }, [slug, isEditing]);
+    // `producerSlug` is derived from `slug` (`slug ?? ""`), so listing both
+    // changes nothing at runtime — it just satisfies the exhaustive-deps rule
+    // now that the fetch calls through the derived variable.
+  }, [producerSlug, isEditing]);
 
-  function handleChange(e) {
-    const { name, type, value, checked } = e.target;
+  function handleChange(
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) {
+    const { name, type, value } = e.target;
+    // Only checkboxes expose `checked`; text fields and selects always use
+    // `value`.
+    const checked =
+      e.target instanceof HTMLInputElement && type === "checkbox"
+        ? e.target.checked
+        : value;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -135,7 +206,9 @@ function ProducerForm() {
   }
 
   // Address fields live in the nested formData.address object.
-  function handleAddressChange(e) {
+  function handleAddressChange(
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -144,7 +217,7 @@ function ProducerForm() {
   }
 
   // Changing the country invalidates regions outside it — drop them.
-  function handleCountryChange(e) {
+  function handleCountryChange(e: ChangeEvent<HTMLSelectElement>) {
     const countryId = e.target.value;
     setFormData((prev) => ({ ...prev, country_id: countryId }));
     setSelectedRegions((prev) =>
@@ -154,7 +227,7 @@ function ProducerForm() {
     );
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       setSubmitting(true);
@@ -187,9 +260,9 @@ function ProducerForm() {
 
       let result;
       if (isEditing) {
-        result = await producersApi.update(slug, payload);
+        result = await producersApi.update(producerSlug, payload);
         if (images && images.length > 0) {
-          await imagesApi.upload("producer", slug, images);
+          await imagesApi.upload("producer", producerSlug, images);
         }
       } else {
         result = await producersApi.create(payload);
@@ -198,7 +271,8 @@ function ProducerForm() {
         }
       }
 
-      const producerId = result.slug || slug;
+      // On edit, keep the slug we were already on; a create returns its own.
+      const producerId = result.slug || producerSlug;
       if (logoFile) {
         await producersApi.uploadLogo(producerId, logoFile);
       } else if (logoRemoved) {
@@ -207,9 +281,7 @@ function ProducerForm() {
 
       navigate(`/producers/${producerId}`, { replace: true });
     } catch (err) {
-      const messages =
-        err.data?.errors?.join?.(", ") || err.data?.error || err.message;
-      setError(messages || "Failed to save producer");
+      setError(errorText(err) || errorMessage(err, "Failed to save producer"));
     } finally {
       setSubmitting(false);
     }
@@ -475,7 +547,9 @@ function ProducerForm() {
           <RegionSearch
             selected={selectedRegions}
             onChange={setSelectedRegions}
-            countryId={formData.country_id || null}
+            countryId={
+              formData.country_id ? Number(formData.country_id) : null
+            }
           />
         </div>
 

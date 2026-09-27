@@ -16,24 +16,24 @@ const mockImagesUpload = vi.fn().mockResolvedValue({});
 
 vi.mock("../services/api", () => ({
   winePackagesApi: {
-    show: (...args) => mockShow(...args),
-    markCompleted: (...args) => mockMarkCompleted(...args),
-    markArrived: (...args) => mockMarkArrived(...args),
-    destroy: (...args) => mockDestroy(...args),
+    show: (...args: unknown[]) => mockShow(...args),
+    markCompleted: (...args: unknown[]) => mockMarkCompleted(...args),
+    markArrived: (...args: unknown[]) => mockMarkArrived(...args),
+    destroy: (...args: unknown[]) => mockDestroy(...args),
   },
   winePackageItemsApi: {
-    destroy: (...args) => mockItemDestroy(...args),
-    createReview: (...args) => mockCreateReview(...args),
+    destroy: (...args: unknown[]) => mockItemDestroy(...args),
+    createReview: (...args: unknown[]) => mockCreateReview(...args),
     create: vi.fn(),
     update: vi.fn(),
   },
-  shipmentTrackingsApi: { show: (...args) => mockTrackingShow(...args) },
+  shipmentTrackingsApi: { show: (...args: unknown[]) => mockTrackingShow(...args) },
   notificationsApi: { list: vi.fn() },
   winesApi: { search: vi.fn() },
   producersApi: { list: vi.fn() },
   usersApi: { search: vi.fn() },
-  categoriesApi: { list: (...args) => mockCategoriesList(...args) },
-  imagesApi: { upload: (...args) => mockImagesUpload(...args) },
+  categoriesApi: { list: (...args: unknown[]) => mockCategoriesList(...args) },
+  imagesApi: { upload: (...args: unknown[]) => mockImagesUpload(...args) },
   reviewsApi: { update: vi.fn(), show: vi.fn() },
 }));
 
@@ -43,7 +43,7 @@ vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({ user: currentUser, loading: false }),
 }));
 
-function isoDaysFromNow(days) {
+function isoDaysFromNow(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() + days);
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -312,7 +312,10 @@ describe("WinePackageDetail", () => {
     const table = screen.getByRole("table");
     // The second row is the matched line (it carries a vintage_id), so the
     // picker — and therefore the producer scope — is visible.
-    await user.click(within(table).getAllByRole("button", { name: "Edit" })[1]);
+    const editButtons = within(table).getAllByRole("button", { name: "Edit" });
+    const matchedEdit = editButtons[1];
+    if (!matchedEdit) throw new Error("the matched line has no Edit button");
+    await user.click(matchedEdit);
 
     await waitFor(() =>
       expect(winesApi.search).toHaveBeenCalledWith({ producerId: 3 }),
@@ -334,7 +337,7 @@ describe("WinePackageDetail", () => {
 
     // The reused review form mounts in package mode with the line's vintage.
     // Score is a range slider here (label "Score", value shown alongside).
-    const titleInput = await screen.findByLabelText("Title");
+    const titleInput = await screen.findByLabelText<HTMLInputElement>("Title");
     expect(titleInput.value).toMatch(/grange/i);
     const scoreSlider = await screen.findByLabelText("Score");
     await user.click(scoreSlider);

@@ -6,9 +6,19 @@ const DETAIL_RESOURCES = [
 
 function isDetailPath(path: string | null | undefined): boolean {
   if (!path) return false
-  const segments = path.split("?")[0].split("/").filter(Boolean)
+  // Drop the query string. Destructuring with a default avoids indexing the
+  // `split` result, which is `string | undefined` under
+  // `noUncheckedIndexedAccess`.
+  const [pathname = ""] = path.split("?")
+  const segments = pathname.split("/").filter(Boolean)
   const resource = segments[0]
-  return segments.length >= 2 && resource != null && DETAIL_RESOURCES.some((item) => item === resource)
+  // `segments[0]` is `string | undefined` under `noUncheckedIndexedAccess`; the
+  // length check below already excludes the empty case, so this narrows it.
+  return (
+    segments.length >= 2 &&
+    resource !== undefined &&
+    DETAIL_RESOURCES.some((item) => item === resource)
+  )
 }
 
 export type ReturnToLink = (targetPath: string) => string

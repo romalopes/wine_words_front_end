@@ -26,12 +26,57 @@ export interface UserWineProfile {
   parameters?: Record<string, number>
 }
 
+/**
+ * A raw line of `log/<env>.log`, as returned by `GET /logs` (no wrapping JSON
+ * envelope — one `{ level, message, timestamp }` object per line). Distinct from
+ * `AuditLog`, which is a database record.
+ */
 export interface LogEntry {
   id?: number | string
   timestamp?: string | null
   level?: string | null
   message?: string | null
   [key: string]: unknown
+}
+
+/** The user stub embedded in an audit entry — always has an id and email. */
+export interface AuditLogUser {
+  id: number
+  user_name: string | null
+  email: string
+}
+
+/**
+ * A record touched by an audited request.
+ *
+ * `alive` is only present on the detail view (`GET /logs/:id` passes
+ * `detailed: true`), where the API live-looks-up each polymorphic record to say
+ * whether it still exists. It is absent from the list endpoint, so the type is
+ * optional rather than `boolean | undefined`.
+ */
+export interface AuditLogObject {
+  type: string
+  id: number
+  /** Snapshot label taken at log time, or the record's live name. May be null. */
+  label?: string | null
+  /** Only on the detail view: does the record still exist? */
+  alive?: boolean
+}
+
+/** One row of the audit log — `logs_controller#log_json`. */
+export interface AuditLog {
+  id: number
+  description: string | null
+  user: AuditLogUser | null
+  action: string | null
+  method: string | null
+  path: string | null
+  status: number | null
+  request_id: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string | null
+  objects: AuditLogObject[]
 }
 
 import type { Paginated } from "./common"

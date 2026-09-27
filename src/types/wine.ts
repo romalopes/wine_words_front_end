@@ -63,6 +63,19 @@ export interface WineTasteParameter {
   score: number
 }
 
+/**
+ * One entry of `vintages_attributes` on a wine create/update. `id` is only sent
+ * for rows that already exist in the database — the API treats its presence as
+ * "update this row" and its absence as "create a new one".
+ */
+export interface VintageWrite {
+  id?: number
+  year: number
+  prompt: string | null
+  price: number | null
+  no_vintage: boolean
+}
+
 export interface WineListItem extends Wine {
   vintages_count?: number
 }

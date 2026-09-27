@@ -78,7 +78,13 @@ export const tasteParameters: TasteParameterSpec[] = [
   },
 ];
 
-const p: Record<string, TasteValues> = {
+/**
+ * Per-grape tasting scores. Typed with `satisfies` rather than annotated as
+ * `Record<string, TasteValues>` on purpose: an index signature would make every
+ * `p.pinotNoir` lookup `TasteValues | undefined` under
+ * `noUncheckedIndexedAccess`, even though all 32 accesses use literal keys.
+ */
+const p = {
   pinotNoir: {
     acidity: 4,
     body: 2,
@@ -309,7 +315,7 @@ const p: Record<string, TasteValues> = {
     alcohol: 4,
     fruit: 4,
   },
-};
+} satisfies Record<string, TasteValues>;
 
 // Compact wine definitions; image URLs are picked from a small palette
 // of curated Unsplash photos so the bundle stays light and the look

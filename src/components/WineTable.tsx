@@ -9,10 +9,10 @@ import type { LinkEntityContext } from "../types/common";
 
 interface WineTableProps {
   wines: WineListItem[];
-  linkContext?: LinkEntityContext;
-  onWineLinked?: () => void;
+  linkContext?: LinkEntityContext | undefined;
+  onWineLinked?: (() => void) | undefined;
   /** Accepted for call-site compatibility; the delete button is not rendered here. */
-  onDeleted?: (deleted: WineListItem) => void;
+  onDeleted?: ((deleted: WineListItem) => void) | undefined;
 }
 
 // Shared table of wines (one wine per row): Name, Producer, Regions,

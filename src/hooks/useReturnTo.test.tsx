@@ -1,4 +1,5 @@
 import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { useReturnToLink } from "./useReturnToLink";
 import { useReturnTo } from "./useReturnTo";
@@ -6,8 +7,8 @@ import { useReturnTo } from "./useReturnTo";
 // These two hooks power the "← Back to <origin>" links on every detail page.
 // They are shared by Wine, Article, Review and (now) Wine Package detail, so a
 // regression here silently breaks the return-trip on all of them.
-function router(initialEntry) {
-  return function Wrapper({ children }) {
+function router(initialEntry: string) {
+  return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter>
     );

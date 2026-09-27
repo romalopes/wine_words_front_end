@@ -11,8 +11,10 @@ type LatencyRating = "excellent" | "good" | "slow" | "very_slow";
 type HealthHeaders = Record<string, string>;
 
 export interface HealthCheckOptions {
-  getAuthToken?: () => string | null;
-  timeoutMs?: number;
+  // Widened with `| undefined` so callers can spread optional config straight
+  // through without each one needing `?? undefined`.
+  getAuthToken?: (() => string | null) | undefined;
+  timeoutMs?: number | undefined;
 }
 
 export interface HealthCheckResult {

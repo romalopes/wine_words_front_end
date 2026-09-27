@@ -7,6 +7,7 @@ import Pagination from "./Pagination";
 import PackageStatusBadge from "./PackageStatusBadge";
 import { badgeClass } from "../constants/winePackages";
 import { formatDate } from "../utils/dates";
+import type { Notification } from "../types/notification";
 import styles from "./winePackages.module.css";
 
 // The signed-in user's notifications — currently the wine-package review
@@ -17,12 +18,12 @@ function Notifications() {
   const unreadOnly = searchParams.get("unread") === "true";
   const [busy, setBusy] = useState(false);
 
-  const list = usePagedList({
+  const list = usePagedList<Notification>({
     fetcher: (params) => notificationsApi.list(params),
     extraParams: { unread: unreadOnly ? "true" : "" },
   });
 
-  function toggleUnread(next) {
+  function toggleUnread(next: boolean) {
     const params = new URLSearchParams(searchParams);
     if (next) params.set("unread", "true");
     else params.delete("unread");
@@ -30,7 +31,7 @@ function Notifications() {
     setSearchParams(params);
   }
 
-  async function markRead(notification) {
+  async function markRead(notification: Notification) {
     setBusy(true);
     try {
       await notificationsApi.markRead(notification.id);

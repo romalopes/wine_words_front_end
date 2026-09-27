@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { UserEvent } from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import WinePackageForm from "./WinePackageForm";
 
@@ -12,21 +13,21 @@ const mockImagesUpload = vi.fn().mockResolvedValue({});
 
 vi.mock("../services/api", () => ({
   winePackagesApi: {
-    create: (...args) => mockCreate(...args),
-    update: (...args) => mockUpdate(...args),
-    show: (...args) => mockShow(...args),
+    create: (...args: unknown[]) => mockCreate(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
+    show: (...args: unknown[]) => mockShow(...args),
   },
   winePackageItemsApi: { create: vi.fn(), update: vi.fn(), destroy: vi.fn() },
   shipmentTrackingsApi: { show: vi.fn() },
   notificationsApi: { list: vi.fn() },
   winesApi: { search: vi.fn() },
   producersApi: {
-    search: (...args) => mockProducerSearch(...args),
-    create: (...args) => mockProducerCreate(...args),
+    search: (...args: unknown[]) => mockProducerSearch(...args),
+    create: (...args: unknown[]) => mockProducerCreate(...args),
   },
   usersApi: { search: vi.fn() },
   imagesApi: {
-    upload: (...args) => mockImagesUpload(...args),
+    upload: (...args: unknown[]) => mockImagesUpload(...args),
     destroy: vi.fn(),
     reorder: vi.fn(),
     setPrimary: vi.fn(),
@@ -34,6 +35,25 @@ vi.mock("../services/api", () => ({
 }));
 
 let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+
+/**
+ * The first argument of a mock's first call. `noUncheckedIndexedAccess` makes
+ * every `calls[0][0]` access `undefined`-able, so the assertions read the value
+ * through this instead of indexing inline.
+ */
+function firstCallArg(mock: { mock: { calls: unknown[][] } }): unknown {
+  const call = mock.mock.calls[0];
+  if (!call) throw new Error("expected the mock to have been called");
+  return call[0];
+}
+
+/** The id and payload of a mock's first call, e.g. `update(id, payload)`. */
+function firstCallArgs(mock: { mock: { calls: unknown[][] } }): [unknown, unknown] {
+  const call = mock.mock.calls[0];
+  if (!call) throw new Error("expected the mock to have been called");
+  const [id, payload] = call;
+  return [id, payload];
+}
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({ user: currentUser, loading: false }),
@@ -66,7 +86,7 @@ describe("WinePackageForm (create)", () => {
   });
 
   // The form uses ProducerSearch (type + pick), not a producer <select>.
-  async function pickProducer(user, name = "Penfolds") {
+  async function pickProducer(user: UserEvent, name = "Penfolds") {
     const input = await screen.findByPlaceholderText("Start typing a producer name…");
     await user.type(input, name.slice(0, 4));
     await screen.findByRole("button", { name });
@@ -116,7 +136,7 @@ describe("WinePackageForm (create)", () => {
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ status: "announced", source: "manual" }),
     );
-    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty("arrived_at");
+    expect(firstCallArg(mockCreate)).not.toHaveProperty("arrived_at");
   });
 
   it("switches the default source when the entry mode changes", async () => {
@@ -136,7 +156,8 @@ describe("WinePackageForm (create)", () => {
     await screen.findByRole("heading", { name: "Record Received Package" });
     await pickProducer(user);
 
-    const fileInput = document.querySelector('input[type="file"]');
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!fileInput) throw new Error("the image manager's file input is missing");
     const first = new File(["a"], "box.jpg", { type: "image/jpeg" });
     const second = new File(["b"], "label.jpg", { type: "image/jpeg" });
     await user.upload(fileInput, [first, second]);
@@ -197,7 +218,7 @@ describe("WinePackageForm (edit)", () => {
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
-    const [id, payload] = mockUpdate.mock.calls[0];
+    const [id, payload] = firstCallArgs(mockUpdate);
     expect(id).toBe("7");
     expect(payload).toMatchObject({ producer_id: 3, notes: "Two bottles damaged" });
     // Source and status belong to the workflow, not this form.

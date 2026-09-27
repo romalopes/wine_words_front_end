@@ -1,5 +1,36 @@
 import { useRef, useState } from "react";
 import { imagesApi } from "../services/api";
+import type { ImageableType } from "../types/image";
+import { errorMessage } from "../utils/errors";
+
+/**
+ * A persisted image paired with its id. `id` is absent for a brand-new wine /
+ * review / article that has not been saved yet — its files are still staged
+ * locally in `pending`, so there is no row to point at.
+ */
+interface ManagedImage {
+  src: string;
+  /** Absent (or null) until the image has been persisted. */
+  id?: number | null | undefined;
+}
+
+interface ImageManagerProps {
+  imageableType: ImageableType;
+  /** Display URLs, in display order. Parallel to `imageIds`. */
+  images?: string[] | undefined;
+  /** Ids parallel to `images`. Missing entries mean "not yet persisted". */
+  imageIds?: Array<number | null | undefined> | undefined;
+  /**
+   * Absent until the record exists; uploads stage locally until it does. Wines
+   * are addressed by slug here while reviews/articles use the numeric id — the
+   * API accepts either, so this stays a union.
+   */
+  imageableId?: string | number | null | undefined;
+  /** Reports the staged (not yet uploaded) file list to the parent form. */
+  onFilesChange?: ((files: File[]) => void) | undefined;
+  /** Asks the parent to refetch after a mutation, since it owns the data. */
+  onImagesChange?: (() => void | Promise<void>) | undefined;
+}
 
 // Interactive image manager used by the wine, review and article forms.
 // Existing images can be reordered, promoted to primary, previewed in a
@@ -13,21 +44,37 @@ function ImageManager({
   imageableId,
   onFilesChange,
   onImagesChange,
-}) {
-  const [pending, setPending] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef(null);
+}: ImageManagerProps) {
+  const [pending, setPending] = useState<File[]>([]);
+  const [busy, setBusy] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ManagedImage | null>(null);
+  const [dragOver, setDragOver] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const currentImages = images.map((src, i) => ({ src, id: imageIds?.[i] }));
+  // The parallel `imageIds` array is indexed per image, so a short array yields
+  // `undefined` for the trailing entries — "not yet persisted", as documented
+  // on the prop.
+  const currentImages: ManagedImage[] = images.map((src, i) => ({
+    src,
+    id: imageIds[i],
+  }));
+
+  /**
+   * Move the lightbox by `delta`, ignoring an out-of-range step. The target
+   * entry is `ManagedImage | undefined` under `noUncheckedIndexedAccess`; the
+   * caller already hides the button at each end, and this is the second guard.
+   */
+  function stepPreview(delta: number) {
+    const next = currentImages[previewIndex + delta];
+    if (next) setPreview(next);
+  }
 
   function resetError() {
     if (error) setError(null);
   }
 
-  async function handleFiles(files) {
+  async function handleFiles(files: FileList | File[] | null) {
     const list = Array.from(files || []);
     if (list.length === 0) return;
     resetError();
@@ -37,7 +84,7 @@ function ImageManager({
         await imagesApi.upload(imageableType, imageableId, list);
         onImagesChange && onImagesChange();
       } catch (err) {
-        setError(err.message || "Failed to upload image");
+        setError(errorMessage(err, "Failed to upload image"));
       } finally {
         setBusy(false);
       }
@@ -49,7 +96,7 @@ function ImageManager({
     if (inputRef.current) inputRef.current.value = "";
   }
 
-  async function handleSetPrimary(id) {
+  async function handleSetPrimary(id?: number | null) {
     if (!imageableId || !id) return;
     setBusy(true);
     resetError();
@@ -57,26 +104,33 @@ function ImageManager({
       await imagesApi.setPrimary(imageableType, imageableId, id);
       onImagesChange && onImagesChange();
     } catch (err) {
-      setError(err.message || "Failed to set primary image");
+      setError(errorMessage(err, "Failed to set primary image"));
     } finally {
       setBusy(false);
     }
   }
 
-  function move(index, direction) {
+  function move(index: number, direction: number) {
+    if (!imageableId) return;
     const target = index + direction;
     if (target < 0 || target >= currentImages.length) return;
     const orderedIds = currentImages.map((img) => img.id);
     [orderedIds[index], orderedIds[target]] = [orderedIds[target], orderedIds[index]];
+    // Reordering only ever applies to persisted rows; an id-less entry would
+    // silently corrupt the server-side order.
+    if (orderedIds.some((id) => id == null)) {
+      setError("Save this record before reordering its images");
+      return;
+    }
     setBusy(true);
     imagesApi
-      .reorder(imageableType, imageableId, orderedIds)
+      .reorder(imageableType, imageableId, orderedIds as number[])
       .then(() => onImagesChange && onImagesChange())
-      .catch((err) => setError(err.message || "Failed to reorder images"))
+      .catch((err) => setError(errorMessage(err, "Failed to reorder images")))
       .finally(() => setBusy(false));
   }
 
-  async function handleRemove(index, id) {
+  async function handleRemove(index: number, id?: number | null) {
     setBusy(true);
     resetError();
     try {
@@ -89,7 +143,7 @@ function ImageManager({
         onFilesChange && onFilesChange(next);
       }
     } catch (err) {
-      setError(err.message || "Failed to remove image");
+      setError(errorMessage(err, "Failed to remove image"));
     } finally {
       setBusy(false);
     }
@@ -199,13 +253,13 @@ function ImageManager({
               ×
             </button>
             {previewIndex > 0 && (
-              <button type="button" className="image-manager__lightbox-nav image-manager__lightbox-nav--prev" onClick={() => setPreview(currentImages[previewIndex - 1])} aria-label="Previous image">
+              <button type="button" className="image-manager__lightbox-nav image-manager__lightbox-nav--prev" onClick={() => stepPreview(-1)} aria-label="Previous image">
                 ‹
               </button>
             )}
             <img src={preview.src} alt="Preview" className="image-manager__lightbox-img" />
             {previewIndex < currentImages.length - 1 && (
-              <button type="button" className="image-manager__lightbox-nav image-manager__lightbox-nav--next" onClick={() => setPreview(currentImages[previewIndex + 1])} aria-label="Next image">
+              <button type="button" className="image-manager__lightbox-nav image-manager__lightbox-nav--next" onClick={() => stepPreview(1)} aria-label="Next image">
                 ›
               </button>
             )}

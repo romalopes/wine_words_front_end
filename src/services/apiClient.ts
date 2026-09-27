@@ -112,10 +112,12 @@ export async function request<T>(
   const token = auth ? getAuthToken() : null
   if (token) requestHeaders.Authorization = `Bearer ${token}`
 
+  // Spread rather than `body: payload`: under exactOptionalPropertyTypes a
+  // present-but-undefined `body` is not assignable to RequestInit["body"].
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method,
     headers: requestHeaders,
-    body: payload,
+    ...(payload === undefined ? {} : { body: payload }),
     credentials: "include",
   })
 

@@ -19,11 +19,17 @@ interface CategoryTab {
   flag: CategoryFlag
 }
 
-const TYPE_TABS: CategoryTab[] = [
+/**
+ * The three category lists, in display order.
+ *
+ * Declared as a `const` tuple so the tab lookup below can index element 0 as a
+ * known-present value under `noUncheckedIndexedAccess`.
+ */
+const TYPE_TABS = [
   { key: "wine", label: "Wine categories", sortKey: "sort_order_wine", flag: "for_wine" },
   { key: "review", label: "Review categories", sortKey: "sort_order_review", flag: "for_review" },
   { key: "article", label: "Article categories", sortKey: "sort_order_article", flag: "for_article" },
-];
+] as const satisfies readonly CategoryTab[];
 
 interface CategoryForm {
   name: string
@@ -172,7 +178,12 @@ function Categories() {
     const fromIndex = ids.indexOf(sourceId);
     const toIndex = ids.indexOf(targetCategory.id);
     if (fromIndex === -1 || toIndex === -1) return;
-    ids.splice(toIndex, 0, ids.splice(fromIndex, 1)[0]);
+    // The guards above prove both indices are in range, so the removed element
+    // is always present — captured explicitly because indexing a `number[]`
+    // yields `number | undefined` under `noUncheckedIndexedAccess`.
+    const [moved] = ids.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    ids.splice(toIndex, 0, moved);
 
     setCategories((prev) =>
       prev.map((c) => {

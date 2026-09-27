@@ -12,7 +12,7 @@ import type {
 import type { Notification } from "../types/notification"
 import type { Review } from "../types/review"
 import type { ShipmentTracking } from "../types/shipmentTracking"
-import type { WinePackage, WinePackageItem } from "../types/winePackage"
+import type { WinePackage, WinePackageItem, WinePackageListItem } from "../types/winePackage"
 import type { ApiRequester } from "./apiClient"
 import { buildQuery } from "./apiClient"
 
@@ -25,7 +25,8 @@ function queryPath(path: string, params?: QueryParams): string {
 export function createWinePackagesApi(request: ApiRequester): WinePackagesApi {
   return {
     list(params) {
-      return request<ResourceResponse<WinePackage>>(queryPath("/wine_packages", params), { auth: true })
+      // `#index` is served by the lean WinePackageListSerializer, not the full one.
+      return request<ResourceResponse<WinePackageListItem>>(queryPath("/wine_packages", params), { auth: true })
     },
     show(id) {
       return request<WinePackage>(`/wine_packages/${id}`, { auth: true })

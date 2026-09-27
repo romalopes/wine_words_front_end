@@ -15,7 +15,7 @@ import type {
 } from "../types/api"
 import type { Account } from "../types/account"
 import type { User } from "../types/authentication"
-import type { Subscription } from "../types/producer"
+import type { Subscription } from "../types/subscription"
 import type { Vintage } from "../types/wine"
 import type { ApiRequester } from "./apiClient"
 

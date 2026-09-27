@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import {
   reviewsApi,
   imagesApi,
@@ -8,6 +9,66 @@ import {
 } from "../services/api";
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
+import { responseItems } from "../types/common";
+import type { ReviewWritePayload } from "../types/api";
+import type { Category } from "../types/catalog";
+import type { Review } from "../types/review";
+import type { Vintage, WineListItem } from "../types/wine";
+import { errorMessage } from "../utils/errors";
+
+/**
+ * The wine/vintage a review points at. `id` is nullable because an existing
+ * review can be saved before its vintage is known, and `year` is the display
+ * form — the literal string "NV" stands in for a non-vintage year.
+ */
+interface PickedVintage {
+  id: number | null | undefined;
+  year: number | "NV" | null | undefined;
+  wineName: string | null | undefined;
+}
+
+/**
+ * The editable review fields.
+ *
+ * `score`, `drink_from` and `drink_to` are `number | ""` because a cleared
+ * number input reads back as `""`; the submit handler maps `""` to null.
+ */
+interface ReviewFormState {
+  title: string;
+  comment: string;
+  score: number | "";
+  status: string;
+  drink_from: number | "";
+  drink_to: number | "";
+  drink_plus: boolean;
+  category_ids: number[];
+  /** Only present when editing — create fixes the vintage from the props. */
+  vintage_id?: number | null;
+}
+
+/** Fields whose empty input must become `null` rather than a number. */
+type NumericField = "score" | "drink_from" | "drink_to";
+
+interface ReviewFormProps {
+  /**
+   * Identifies the bottle a *new* review is created against. Required by the
+   * create paths and unused when editing, so the review detail page — which
+   * only ever edits — can omit all three.
+   */
+  wineSlug?: string;
+  vintageId?: number;
+  vintageYear: number | null;
+  wineName?: string;
+  vintageNoVintage?: boolean;
+  review?: Review | null;
+  onSaved: (saved?: Review) => void;
+  onCancel?: () => void;
+  // Package mode: when both are present the review is created through the
+  // package item endpoint, which creates it via the ordinary Review path and
+  // links it back to the line in the same request.
+  packageId?: string | number | null;
+  packageItemId?: string | number | null;
+}
 
 function ReviewForm({
   wineSlug,
@@ -18,12 +79,9 @@ function ReviewForm({
   review,
   onSaved,
   onCancel,
-  // Package mode: when both are present the review is created through the
-  // package item endpoint, which creates it via the ordinary Review path and
-  // links it back to the line in the same request.
   packageId,
   packageItemId,
-}) {
+}: ReviewFormProps) {
   const packageMode = packageId != null && packageItemId != null;
   const isEditing = Boolean(review);
 
@@ -33,7 +91,7 @@ function ReviewForm({
     : "";
   const titleEditedRef = useRef(Boolean(review?.title));
 
-  const [form, setForm] = useState(
+  const [form, setForm] = useState<ReviewFormState>(
     review
       ? {
           title: review.title || "",
@@ -61,9 +119,10 @@ function ReviewForm({
   // Edit mode: wine/vintage picker state.
   const [changingWine, setChangingWine] = useState(false);
   const [wineQuery, setWineQuery] = useState("");
-  const [wineResults, setWineResults] = useState(null);
-  const [pickedWine, setPickedWine] = useState(null); // {name, vintages}
-  const [pickedVintage, setPickedVintage] = useState(
+  // `null` means "no search yet", which the UI distinguishes from "no results".
+  const [wineResults, setWineResults] = useState<WineListItem[] | null>(null);
+  const [pickedWine, setPickedWine] = useState<WineListItem | null>(null);
+  const [pickedVintage, setPickedVintage] = useState<PickedVintage | null>(
     review
       ? {
           id: review.vintage_id,
@@ -96,12 +155,12 @@ function ReviewForm({
     };
   }, [wineQuery, changingWine, isEditing]);
 
-  function pickWine(wine) {
+  function pickWine(wine: WineListItem) {
     setPickedWine(wine);
     setPickedVintage(null);
   }
 
-  function pickVintage(vintage) {
+  function pickVintage(vintage: Vintage) {
     setPickedVintage({
       id: vintage.id,
       year: vintage.no_vintage ? "NV" : vintage.year,
@@ -121,21 +180,29 @@ function ReviewForm({
   }, [autoTitle, isEditing]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [images, setImages] = useState(null);
-  const [existingImages, setExistingImages] = useState(review?.images || []);
-  const [existingImageIds, setExistingImageIds] = useState(
+  const [error, setError] = useState<string | null>(null);
+  // Locally staged files, uploaded right after the review is saved.
+  const [images, setImages] = useState<File[] | null>(null);
+  const [existingImages, setExistingImages] = useState<string[]>(
+    review?.images || [],
+  );
+  const [existingImageIds, setExistingImageIds] = useState<Array<number | null>>(
     review?.image_ids || [],
   );
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     async function loadCategories() {
       try {
-        const allCategories = await categoriesApi.list();
+        // `list` may answer with a bare array or the pagination envelope.
+        const allCategories = responseItems(await categoriesApi.list());
         const reviewCategories = allCategories
           .filter((c) => c.for_review)
-          .sort((a, b) => a.sort_order_review - b.sort_order_review);
+          // Rows without a review sort order are pushed to the end rather than
+          // sorted as 0, so ordered categories keep their positions.
+          .sort(
+            (a, b) => (a.sort_order_review ?? Infinity) - (b.sort_order_review ?? Infinity),
+          );
         setCategories(reviewCategories);
       } catch {
         setCategories([]);
@@ -143,33 +210,35 @@ function ReviewForm({
     }
     loadCategories();
   }, []);
-  function updateField(field) {
-    return (e) => {
-      let value;
+
+  /** Builds the onChange handler for a text/number/checkbox field. */
+  function updateField(field: "drink_plus" | NumericField | "title" | "comment" | "status") {
+    return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const target = e.target as HTMLInputElement;
+      let value: ReviewFormState[typeof field];
       if (field === "drink_plus") {
-        value = e.target.checked;
-      } else if (
-        field === "score" ||
-        field === "drink_from" ||
-        field === "drink_to"
-      ) {
-        value = e.target.value === "" ? "" : Number(e.target.value);
+        value = target.checked as ReviewFormState["drink_plus"];
+      } else if (field === "score" || field === "drink_from" || field === "drink_to") {
+        // An emptied number input is "", which the submit handler maps to null.
+        value = (target.value === "" ? "" : Number(target.value)) as ReviewFormState[typeof field];
       } else {
-        value = e.target.value;
+        value = target.value as ReviewFormState[typeof field];
       }
       setForm((prev) => ({ ...prev, [field]: value }));
       if (field === "title") titleEditedRef.current = true;
     };
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      const payload = {
+      // `""` from a cleared numeric input is sent as null, not 0.
+      const payload: ReviewWritePayload = {
         ...form,
+        score: form.score === "" ? null : form.score,
         published_at:
           form.status === "published" ? new Date().toISOString() : null,
         drink_from: form.drink_from === "" ? null : Number(form.drink_from),
@@ -177,7 +246,7 @@ function ReviewForm({
         drink_plus: Boolean(form.drink_plus),
       };
 
-      if (isEditing) {
+      if (isEditing && review) {
         if (packageMode) {
           throw new Error(
             "A package review cannot be edited here. Open the review page instead.",
@@ -194,12 +263,26 @@ function ReviewForm({
       } else if (packageMode) {
         // Package mode is create-only: the backend creates the review through
         // the ordinary Review path and links it to the line atomically.
-        const saved = await winePackageItemsApi.createReview(packageId, packageItemId, payload);
+        const saved = await winePackageItemsApi.createReview(
+          packageId,
+          packageItemId,
+          payload,
+        );
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
         }
         onSaved(saved);
       } else {
+        // Neither editing nor a package line: this is a brand-new review, which
+        // the API addresses by wine slug + vintage. Both callers that reach
+        // this branch (Reviews and the package line form) supply them; a caller
+        // that does not is a programming error, so it fails loudly here rather
+        // than posting a review against no bottle.
+        if (!wineSlug || vintageId == null) {
+          throw new Error(
+            "A new review needs the wine it belongs to. Open the form from a wine or a package line.",
+          );
+        }
         const saved = await reviewsApi.create(wineSlug, vintageId, payload);
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
@@ -207,7 +290,7 @@ function ReviewForm({
         onSaved(saved);
       }
     } catch (err) {
-      setError(err.message || "Failed to save review");
+      setError(errorMessage(err, "Failed to save review"));
     } finally {
       setSubmitting(false);
     }
@@ -417,10 +500,10 @@ function ReviewForm({
           imageableType="review"
           images={existingImages}
           imageIds={existingImageIds}
-          imageableId={isEditing ? review.id : null}
+          imageableId={isEditing && review ? review.id : null}
           onFilesChange={(files) => setImages(files)}
           onImagesChange={async () => {
-            if (isEditing) {
+            if (isEditing && review) {
               const reloaded = await reviewsApi.show(review.id);
               setExistingImages(reloaded.images || []);
               setExistingImageIds(reloaded.image_ids || []);

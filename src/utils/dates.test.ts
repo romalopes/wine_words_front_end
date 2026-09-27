@@ -7,6 +7,7 @@ import { parseDate, formatDate, daysUntil, deadlineLabel, todayInputValue } from
 describe("utils/dates", () => {
   it("parses a bare ISO date as local midnight", () => {
     const date = parseDate("2026-10-15");
+    if (!date) throw new Error("a valid ISO date should parse");
 
     expect(date.getFullYear()).toBe(2026);
     expect(date.getMonth()).toBe(9); // October (zero-based)

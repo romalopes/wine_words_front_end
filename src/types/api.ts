@@ -51,7 +51,7 @@ export interface ForgotPasswordRequest {
 import type { QueryParams, ResourceResponse } from "./common"
 import type { Account, AccountUpdate, PasswordChange } from "./account"
 import type { Configuration, Setting } from "./notification"
-import type { LogEntry, ImpersonationResponse, UserWineProfile } from "./user"
+import type { AuditLog, LogEntry, ImpersonationResponse, UserWineProfile } from "./user"
 import type { Article } from "./article"
 import type {
   Category,
@@ -70,17 +70,19 @@ import type {
 } from "./reference"
 import type { Notification } from "./notification"
 import type { Stats } from "./stats"
-import type { Producer, ProducerSearchResult, Subscription } from "./producer"
+import type { Producer, ProducerSearchResult } from "./producer"
+import type { Subscription, SubscriptionWritePayload } from "./subscription"
 import type { Review } from "./review"
 import type { ShipmentTracking } from "./shipmentTracking"
 import type { ImageableType, ImageListResponse, ImageUploadResponse } from "./image"
 import type { AdminUser, RoleOption } from "./user"
 import type { Vintage, Wine, WineListItem } from "./wine"
-import type { WinePackage, WinePackageItem } from "./winePackage"
+import type { WinePackage, WinePackageItem, WinePackageListItem } from "./winePackage"
 
 export interface WineSearchInput {
   q?: string
-  producerId?: number
+  /** Serialised straight into `producer_id`, so a string id is accepted too. */
+  producerId?: number | string
 }
 
 export interface WineWritePayload {
@@ -196,7 +198,7 @@ export interface WinePackageActionPayload {
 }
 
 export interface WinePackagesApi {
-  list(params?: QueryParams): Promise<ResourceResponse<WinePackage>>
+  list(params?: QueryParams): Promise<ResourceResponse<WinePackageListItem>>
   show(id: string | number): Promise<WinePackage>
   create(payload: WinePackageWritePayload): Promise<WinePackage>
   update(id: string | number, payload: WinePackageWritePayload): Promise<WinePackage>
@@ -294,8 +296,8 @@ export interface UsersApi {
 export interface SubscriptionsApi {
   list(options?: { auth?: boolean }): Promise<Subscription[]>
   show(id: string | number): Promise<Subscription>
-  create(payload: Record<string, unknown>): Promise<Subscription>
-  update(id: string | number, payload: Record<string, unknown>): Promise<Subscription>
+  create(payload: SubscriptionWritePayload): Promise<Subscription>
+  update(id: string | number, payload: SubscriptionWritePayload): Promise<Subscription>
   destroy(id: string | number): Promise<unknown>
 }
 
@@ -412,8 +414,23 @@ export interface VintagesApi {
   create(wineSlug: string, payload: VintageInput): Promise<Vintage>
 }
 
+/** The three item types the category counts are broken down by. */
+export type CategoryCountType = "wine" | "review" | "article";
+
+/**
+ * The payload of `GET /api/v1/categories/counts`.
+ *
+ * `wine` / `review` / `article` map a category id to how many of that item type
+ * are linked to it (only categories flagged `for_<type>` appear). The keys are
+ * the numbers Rails serialises, so they arrive as strings. `uncategorised` and
+ * `totals` are per-type scalars rather than maps.
+ */
 export interface CategoryCounts {
-  [key: string]: number
+  wine?: Record<string, number>
+  review?: Record<string, number>
+  article?: Record<string, number>
+  uncategorised?: Record<CategoryCountType, number>
+  totals?: Record<CategoryCountType, number>
 }
 
 export interface CategoriesApi {
@@ -472,8 +489,8 @@ export interface RegionsApi {
 
 export interface LogsApi {
   fetchLines(lines?: number): Promise<LogEntry[]>
-  fetchAuditLogs(params?: QueryParams): Promise<ResourceResponse<LogEntry>>
-  fetchAuditLog(id: string | number): Promise<LogEntry>
+  fetchAuditLogs(params?: QueryParams): Promise<ResourceResponse<AuditLog>>
+  fetchAuditLog(id: string | number): Promise<AuditLog>
 }
 
 export interface ImpersonationApi {

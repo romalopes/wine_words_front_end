@@ -15,10 +15,10 @@ function imageSrc(image: string | Image | undefined): string {
 
 interface ProducerTableProps {
   producers: Producer[];
-  canManage?: boolean;
+  canManage?: boolean | undefined;
   /** When present, renders the "Link a Producer" action for the given entity. */
-  linkContext?: LinkEntityContext;
-  onProducerLinked?: () => void;
+  linkContext?: LinkEntityContext | undefined;
+  onProducerLinked?: (() => void) | undefined;
 }
 
 // Reusable producers table (image · name · country · type · status ·

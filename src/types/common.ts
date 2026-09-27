@@ -19,6 +19,18 @@ export interface PaginationParams {
 export type ResourceResponse<T> = T[] | Paginated<T>
 
 /**
+ * The items of a `ResourceResponse`, whichever of the two shapes the API chose.
+ *
+ * Several endpoints return a bare array when no `page` is requested and the
+ * pagination envelope when one is (see the Rails `render_paginated` helper).
+ * Callers that only need the rows should use this instead of
+ * `Array.isArray(data) ? data : []`, which silently empties the paginated case.
+ */
+export function responseItems<T>(response: ResourceResponse<T>): T[] {
+  return Array.isArray(response) ? response : response.items
+}
+
+/**
  * Identifies the entity a link dialog should attach the selected record to.
  * `type` must match a key of the dialog's `LINK_ENDPOINTS` map
  * ("category" | "region" | "grape" | "producer" for wines).

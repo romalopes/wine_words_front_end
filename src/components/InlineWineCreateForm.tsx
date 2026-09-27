@@ -29,11 +29,11 @@ interface WineFormState {
 interface InlineWineCreateFormProps {
   /** The locked producer — the line belongs to this package's producer. */
   producerId: number | string | null
-  producerName?: string | null
-  defaultName?: string
-  defaultVintageYear?: string
+  producerName?: string | null | undefined
+  defaultName?: string | undefined
+  defaultVintageYear?: string | undefined
   onCreated: (result: { wine: Wine; vintageId: number }) => void
-  onCancel?: () => void
+  onCancel?: (() => void) | undefined
 }
 
 function InlineWineCreateForm({

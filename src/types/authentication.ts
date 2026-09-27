@@ -54,7 +54,11 @@ export interface SignUpPayload {
   email: string
   password: string
   password_confirmation: string
-  user_name?: string
+  // `| undefined` throughout: these are optional request fields, and callers
+  // read them off form state where an empty field is `undefined`. Under
+  // `exactOptionalPropertyTypes` an absent key and an explicitly-undefined key
+  // are different, and JSON.stringify drops the latter anyway.
+  user_name?: string | undefined
 }
 
 export interface ForgotPasswordPayload {
@@ -69,7 +73,8 @@ export interface ResetPasswordPayload {
 
 export interface SocialSignInInput {
   credential: string
-  nonce?: string
+  /** Only Apple's flow produces one; see `SocialCredential` in socialAuth.ts. */
+  nonce?: string | undefined
 }
 
 export interface AuthResponse {

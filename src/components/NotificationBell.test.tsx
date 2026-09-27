@@ -1,13 +1,15 @@
 import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Mock } from "vitest";
 import { MemoryRouter, Routes, Route, Link } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 import { emitNotificationsChanged } from "../services/notificationEvents";
+import type { QueryParams } from "../types/common";
 
-const mockList = vi.fn();
+const mockList: Mock = vi.fn();
 
 vi.mock("../services/api", () => ({
-  notificationsApi: { list: (...args) => mockList(...args) },
+  notificationsApi: { list: (params?: QueryParams) => mockList(params) },
 }));
 
 function renderBell() {

@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import WinePackageItemForm from "./WinePackageItemForm";
@@ -5,7 +6,7 @@ import WinePackageItemForm from "./WinePackageItemForm";
 // Partial mock: the real module is loaded and only the endpoints this form
 // calls are replaced, so the test cannot break when unrelated exports change.
 vi.mock("../services/api", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import("../services/api")>();
   return {
     ...actual,
     winesApi: { search: vi.fn(), create: vi.fn() },
@@ -15,6 +16,53 @@ vi.mock("../services/api", async (importOriginal) => {
 });
 
 import { winesApi, vintagesApi, winePackageItemsApi } from "../services/api";
+
+// The module above replaces the endpoints this form calls with `vi.fn()`, so the
+// real signatures are preserved but the mock controls are only visible through
+// `vi.mocked`. Aliases keep the assertions below readable.
+const mockWineSearch = vi.mocked(winesApi.search);
+const mockWineCreate = vi.mocked(winesApi.create);
+const mockVintageCreate = vi.mocked(vintagesApi.create);
+const mockItemCreate = vi.mocked(winePackageItemsApi.create);
+const mockItemUpdate = vi.mocked(winePackageItemsApi.update);
+
+/**
+ * `querySelector` returns `null` for a missing match. A test that cannot find
+ * the element it is about to act on is a failing test, so this throws with a
+ * message instead of letting `fireEvent` complain about a nullable argument.
+ */
+/** The first element matching `selector` inside `root`, narrowed to `T`. */
+function query<T extends Element>(root: ParentNode, selector: string): T {
+  const found = root.querySelector<T>(selector);
+  if (!found) throw new Error(`No element matched "${selector}"`);
+  return found;
+}
+
+/**
+ * The first form rendered inside `root`. Used where the form under test *is* the
+ * main line form, so the nearest enclosing one is also the only one.
+ */
+function firstForm(root: ParentNode): HTMLFormElement {
+  const form = root.querySelector("form");
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error("no <form> was rendered");
+  }
+  return form;
+}
+
+/**
+ * The form an element sits in. Mirrors `Element.closest("form")` but narrows the
+ * result to `HTMLFormElement` and fails loudly when there is no enclosing form
+ * — the inline create panels each post from their own form, so the tests need
+ * to submit a specific one rather than the first on the page.
+ */
+function enclosingForm(element: Element): HTMLFormElement {
+  const form = element.closest("form");
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error("the element is not inside a <form>");
+  }
+  return form;
+}
 
 // The producer's catalogue, as GET /wines/search?producer_id=3 returns it.
 const PRODUCER_WINES = [
@@ -37,7 +85,9 @@ const PRODUCER_WINES = [
   },
 ];
 
-function renderForm(overrides = {}) {
+type FormOverrides = Partial<ComponentProps<typeof WinePackageItemForm>>;
+
+function renderForm(overrides: FormOverrides = {}) {
   return render(
     <WinePackageItemForm
       packageId={7}
@@ -53,38 +103,46 @@ function renderForm(overrides = {}) {
 describe("WinePackageItemForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    winesApi.search.mockResolvedValue(PRODUCER_WINES);
-    winesApi.create.mockResolvedValue({
+    mockWineSearch.mockResolvedValue(PRODUCER_WINES);
+    mockWineCreate.mockResolvedValue({
       id: 9,
       name: "New Wine",
       slug: "new-wine",
       vintages: [{ id: 99, year: 2020, no_vintage: false }],
     });
-    vintagesApi.create.mockResolvedValue({ id: 22, year: 2021, no_vintage: false });
-    winePackageItemsApi.create.mockResolvedValue({ id: 5 });
-    winePackageItemsApi.update.mockResolvedValue({ id: 5 });
-    winePackageItemsApi.destroy.mockResolvedValue({});
+    mockVintageCreate.mockResolvedValue({ id: 22, year: 2021, no_vintage: false });
+    mockItemCreate.mockResolvedValue({
+      id: 5,
+      wine_package_id: 7,
+      wine_id: 0,
+    });
+    mockItemUpdate.mockResolvedValue({
+      id: 5,
+      wine_package_id: 7,
+      wine_id: 0,
+    });
+    vi.mocked(winePackageItemsApi.destroy).mockResolvedValue({});
   });
 
   it("lists the package producer's wines without typing a search", async () => {
     renderForm();
 
     await waitFor(() =>
-      expect(winesApi.search).toHaveBeenCalledWith({ producerId: 3 }),
+      expect(mockWineSearch).toHaveBeenCalledWith({ producerId: 3 }),
     );
   });
 
   it("renders the producer's wines and their vintages", async () => {
     const { container } = renderForm();
 
-    await waitFor(() => expect(winesApi.search).toHaveBeenCalled());
+    await waitFor(() => expect(mockWineSearch).toHaveBeenCalled());
     await waitFor(() =>
       expect(screen.getByRole("option", { name: /Grange/i })).toBeTruthy(),
     );
     expect(screen.getByRole("option", { name: /Bin 389/i })).toBeTruthy();
 
     // Selecting a wine exposes that wine's vintages.
-    const wineSelect = container.querySelector("select");
+    const wineSelect = query<HTMLSelectElement>(container, "select");
     fireEvent.change(wineSelect, { target: { value: "1" } });
 
     await waitFor(() =>
@@ -96,13 +154,13 @@ describe("WinePackageItemForm", () => {
   it("refuses to submit a line without a vintage", async () => {
     const { container } = renderForm();
 
-    await waitFor(() => expect(winesApi.search).toHaveBeenCalled());
+    await waitFor(() => expect(mockWineSearch).toHaveBeenCalled());
 
     // Nothing picked at all. Choosing a wine preselects its newest vintage, so
     // the "no vintage" case only exists before any wine is chosen.
-    fireEvent.submit(container.querySelector("form"));
+    fireEvent.submit(firstForm(container));
 
-    await waitFor(() => expect(winePackageItemsApi.create).not.toHaveBeenCalled());
+    await waitFor(() => expect(mockItemCreate).not.toHaveBeenCalled());
     expect(
       screen.getByText(
         /Pick a wine and a vintage, or mark the line as not in the catalogue yet/i,
@@ -121,12 +179,12 @@ describe("WinePackageItemForm", () => {
     fireEvent.change(await screen.findByLabelText(/^vintage$/i), {
       target: { value: "11" },
     });
-    fireEvent.submit(container.querySelector("form"));
+    fireEvent.submit(firstForm(container));
 
-    await waitFor(() => expect(winePackageItemsApi.create).toHaveBeenCalled());
-    const payload = winePackageItemsApi.create.mock.calls[0].at(-1);
+    await waitFor(() => expect(mockItemCreate).toHaveBeenCalled());
+    const payload = mockItemCreate.mock.calls[0]?.at(-1);
     expect(payload).toMatchObject({ vintage_id: 11, review_requested: true });
-    expect(winePackageItemsApi.create.mock.calls[0][0]).toBe(7);
+    expect(mockItemCreate.mock.calls[0]?.[0]).toBe(7);
   });
 
   it("allows adding a vintage to a wine already in the catalogue", async () => {
@@ -142,11 +200,11 @@ describe("WinePackageItemForm", () => {
       target: { value: "2021" },
     });
     fireEvent.submit(
-      screen.getByRole("button", { name: /^add vintage$/i }).closest("form"),
+      enclosingForm(screen.getByRole("button", { name: /^add vintage$/i })),
     );
 
-    await waitFor(() => expect(vintagesApi.create).toHaveBeenCalled());
-    expect(vintagesApi.create).toHaveBeenCalledWith("grange", {
+    await waitFor(() => expect(mockVintageCreate).toHaveBeenCalled());
+    expect(mockVintageCreate).toHaveBeenCalledWith("grange", {
       year: 2021,
       no_vintage: false,
     });
@@ -161,11 +219,11 @@ describe("WinePackageItemForm", () => {
 
     const name = await screen.findByLabelText(/wine name/i);
     fireEvent.change(name, { target: { value: "New Wine" } });
-    fireEvent.submit(name.closest("form"));
+    fireEvent.submit(enclosingForm(name));
 
-    await waitFor(() => expect(winesApi.create).toHaveBeenCalled());
+    await waitFor(() => expect(mockWineCreate).toHaveBeenCalled());
 
-    const payload = winesApi.create.mock.calls[0][0];
+    const payload = mockWineCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     // The producer is pre-filled from the package and locked in the form.
     expect(payload).toMatchObject({ name: "New Wine", producer_id: 3 });
     // The wine and its first vintage are created in one request.
@@ -178,11 +236,11 @@ describe("WinePackageItemForm", () => {
     await screen.findByRole("option", { name: /Grange/i });
 
     fireEvent.click(screen.getByLabelText(/not in the catalogue yet/i));
-    fireEvent.submit(screen.getByRole("button", { name: /add line/i }).closest("form"));
+    fireEvent.submit(enclosingForm(screen.getByRole("button", { name: /add line/i })));
 
-    await waitFor(() => expect(winePackageItemsApi.create).toHaveBeenCalled());
-    expect(winePackageItemsApi.create.mock.calls[0][0]).toBe(7);
-    expect(winePackageItemsApi.create.mock.calls[0][1]).toMatchObject({
+    await waitFor(() => expect(mockItemCreate).toHaveBeenCalled());
+    expect(mockItemCreate.mock.calls[0]?.[0]).toBe(7);
+    expect(mockItemCreate.mock.calls[0]?.[1]).toMatchObject({
       vintage_id: null,
     });
   });

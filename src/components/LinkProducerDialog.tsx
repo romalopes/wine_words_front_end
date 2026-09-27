@@ -30,9 +30,13 @@ const LINK_ENDPOINTS: Partial<
 interface LinkProducerDialogProps {
   entityType: LinkEntityType
   entityId: number
-  entityName?: string | null
+  /**
+   * Optional in the sense that every caller passes a possibly-absent name, so
+   * `undefined` is accepted explicitly (see `exactOptionalPropertyTypes`).
+   */
+  entityName?: string | null | undefined
   /** Ids *and* slugs already attached, shown with a "Linked" badge. */
-  excludeIds?: Array<number | string>
+  excludeIds?: Array<number | string> | undefined
   onLinked?: (producer: ProducerSearchResult) => void
   onClose?: () => void
 }

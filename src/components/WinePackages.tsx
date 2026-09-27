@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { winePackagesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -36,7 +37,7 @@ function WinePackages() {
 
   // Filters reset pagination: staying on page 3 of a narrower list would
   // usually show an empty page.
-  function setFilter(key, value) {
+  function setFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams);
     if (value) params.set(key, value);
     else params.delete(key);
@@ -44,7 +45,7 @@ function WinePackages() {
     setSearchParams(params);
   }
 
-  function submitQuery(event) {
+  function submitQuery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFilter("query", queryDraft.trim());
   }

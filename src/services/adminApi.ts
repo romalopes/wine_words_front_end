@@ -10,15 +10,15 @@ import type {
   TestAccessResponse,
 } from "../types/api"
 import type { Configuration, Setting } from "../types/notification"
-import type { ImpersonationResponse, LogEntry } from "../types/user"
+import type { AuditLog, ImpersonationResponse, LogEntry } from "../types/user"
 import type { ApiRequester } from "./apiClient"
 import { buildQuery } from "./apiClient"
 
 export function createLogsApi(request: ApiRequester): LogsApi {
   return {
     fetchLines: (lines = 500) => request<LogEntry[]>(`/logs?lines=${lines}`, { auth: true }),
-    fetchAuditLogs: (params = {}) => request<ResourceResponse<LogEntry>>(`/logs/audit${buildQuery(params)}`, { auth: true }),
-    fetchAuditLog: (id) => request<LogEntry>(`/logs/${id}`, { auth: true }),
+    fetchAuditLogs: (params = {}) => request<ResourceResponse<AuditLog>>(`/logs/audit${buildQuery(params)}`, { auth: true }),
+    fetchAuditLog: (id) => request<AuditLog>(`/logs/${id}`, { auth: true }),
   }
 }
 

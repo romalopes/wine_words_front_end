@@ -8,8 +8,8 @@ import {
 } from "../services/api";
 import ImageManager from "./ImageManager";
 import ProducerSearch from "./ProducerSearch";
-import GrapeSearch from "./GrapeSearch";
-import RegionSearch from "./RegionSearch";
+import GrapeSearch, { type SelectedGrape } from "./GrapeSearch";
+import RegionSearch, { type SelectedRegion } from "./RegionSearch";
 import {
   VOLUMES,
   DEFAULT_VOLUME,
@@ -17,15 +17,61 @@ import {
   DEFAULT_CLOSURE,
   DEFAULT_ALCOHOL_PERCENTAGE,
 } from "../data/wineVolumes";
+import { errorMessage } from "../utils/errors";
+import type { Category, TasteParameter } from "../types/catalog";
+import type { VintageWrite, WineTasteParameter } from "../types/wine";
 
-const INITIAL_VINTAGE = { year: "", prompt: "", price: "", no_vintage: false };
+/**
+ * One row of the vintages editor. The API stores `year`/`price` as numbers and
+ * `id` only once persisted, but the inputs are text boxes, so the form holds
+ * them as strings until submit and converts there.
+ */
+interface VintageFormRow {
+  id: number | null
+  year: string
+  prompt: string
+  price: string
+  no_vintage: boolean
+}
+
+/**
+ * A taste score being edited. `id` is the join-table record id, which is null
+ * until the wine exists — a brand new wine has no persisted scores yet.
+ * `Omit`/`&` rather than `extends` because the persisted id is nullable here.
+ */
+type TasteScoreRow = Omit<WineTasteParameter, "id"> & { id: number | null };
+
+const INITIAL_VINTAGE: VintageFormRow = {
+  id: null,
+  year: "",
+  prompt: "",
+  price: "",
+  no_vintage: false,
+};
+
+/** The text fields this form manages. Numbers stay as strings while typing. */
+interface WineFormData {
+  id: number | null
+  name: string
+  color: string
+  closure: string
+  alcohol_percentage: string
+  volume_ml: string
+  prompt: string
+  producer_id: string
+  producer_name: string
+  designation_name: string
+  category_ids: number[]
+  fortified: boolean
+  sparkling: boolean
+}
 
 function WineForm() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const isEditing = Boolean(slug);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<WineFormData>({
     id: null,
     name: "",
     color: DEFAULT_COLOR,
@@ -41,20 +87,20 @@ function WineForm() {
     sparkling: false,
   });
 
-  const [selectedGrapes, setSelectedGrapes] = useState([]);
-  const [selectedRegions, setSelectedRegions] = useState([]);
+  const [selectedGrapes, setSelectedGrapes] = useState<SelectedGrape[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
   const [autoName, setAutoName] = useState(true);
 
-  const [wineCategories, setWineCategories] = useState([]);
-  const [vintages, setVintages] = useState([]);
-  const [tasteParams, setTasteParams] = useState([]);
-  const [tasteScores, setTasteScores] = useState([]);
+  const [wineCategories, setWineCategories] = useState<Category[]>([]);
+  const [vintages, setVintages] = useState<VintageFormRow[]>([]);
+  const [tasteParams, setTasteParams] = useState<TasteParameter[]>([]);
+  const [tasteScores, setTasteScores] = useState<TasteScoreRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [images, setImages] = useState(null);
-  const [existingImages, setExistingImages] = useState([]);
-  const [existingImageIds, setExistingImageIds] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [images, setImages] = useState<File[] | null>(null);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [existingImageIds, setExistingImageIds] = useState<number[]>([]);
   useEffect(() => {
     async function initFormData() {
       try {
@@ -66,10 +112,10 @@ function WineForm() {
         ]);
         const paramsArray = Array.isArray(globalParams) ? globalParams : [];
         setTasteParams(paramsArray);
-        setWineCategories(wineCats || []);
+        setWineCategories(Array.isArray(wineCats) ? wineCats : []);
 
         // Set baseline defaults
-        let initialScores = paramsArray.map((p) => ({
+        let initialScores: TasteScoreRow[] = paramsArray.map((p) => ({
           id: null, // join table record id
           taste_parameter_id: p.id,
           taste_parameter_slug: p.slug,
@@ -78,7 +124,8 @@ function WineForm() {
 
         // 2. If editing, load the wine and merge its existing scores
         if (isEditing) {
-          const wineData = await winesApi.show(slug);
+          // `slug` is only present when editing, which is what isEditing means.
+          const wineData = await winesApi.show(slug ?? "");
 
           setExistingImages(wineData.images || []);
           setExistingImageIds(wineData.image_ids || []);
@@ -97,10 +144,12 @@ function WineForm() {
                 ? String(wineData.volume_ml)
                 : String(DEFAULT_VOLUME),
             prompt: wineData.prompt || "",
-            producer_id: wineData.producer?.id || "",
+            producer_id: wineData.producer?.id
+              ? String(wineData.producer.id)
+              : "",
             producer_name: wineData.producer?.name || "",
             designation_name: wineData.designation_name || "",
-            category_ids: (wineData.categories || []).map((c) => c.id),
+            category_ids: (wineData.categories ?? []).map((c) => c.id),
             sparkling: Boolean(wineData.sparkling),
             fortified: Boolean(wineData.fortified),
           });
@@ -110,18 +159,19 @@ function WineForm() {
           setSelectedRegions(wineData.regions || []);
 
           setVintages(
-            (wineData.vintages || []).map((v) => ({
+            (wineData.vintages ?? []).map((v) => ({
               id: v.id,
-              year: v.year,
+              year: v.year == null ? "" : String(v.year),
               prompt: v.prompt || "",
-              price: v.price ?? "",
+              price: v.price == null ? "" : String(v.price),
               no_vintage: Boolean(v.no_vintage),
             })),
           );
 
-          if (wineData.parameters && wineData.parameters.length > 0) {
+          const savedScores = wineData.parameters;
+          if (savedScores && savedScores.length > 0) {
             initialScores = initialScores.map((scoreObj) => {
-              const matchingParam = wineData.parameters.find(
+              const matchingParam = savedScores.find(
                 (wp) => wp.taste_parameter_id === scoreObj.taste_parameter_id,
               );
               if (matchingParam) {
@@ -138,7 +188,7 @@ function WineForm() {
 
         setTasteScores(initialScores);
       } catch (err) {
-        setError(err.message || "Failed to initialize form options");
+        setError(errorMessage(err, "Failed to initialize form options"));
       } finally {
         setLoading(false);
       }
@@ -163,22 +213,31 @@ function WineForm() {
     autoName,
   ]);
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     if (e.target.name === "name" && autoName) setAutoName(false);
     const target = e.target;
-    const value = target.type === "checkbox" ? target.checked : target.value;
+    // A checkbox reports `checked`; selects and text inputs report `value`.
+    const value =
+      target instanceof HTMLInputElement && target.type === "checkbox"
+        ? target.checked
+        : target.value;
     setFormData((prev) => ({ ...prev, [target.name]: value }));
   }
 
-  function handleVintageChange(index, field, value) {
+  function handleVintageChange<K extends keyof VintageFormRow>(
+    index: number,
+    field: K,
+    value: VintageFormRow[K],
+  ) {
     setVintages((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const row = updated[index];
+      if (row) updated[index] = { ...row, [field]: value };
       return updated;
     });
   }
 
-  function handleTasteChange(index, value) {
+  function handleTasteChange(index: number, value: string) {
     setTasteScores((prev) => {
       const updated = [...prev];
       if (updated[index]) {
@@ -192,11 +251,11 @@ function WineForm() {
     setVintages((prev) => [...prev, { ...INITIAL_VINTAGE }]);
   }
 
-  function removeVintage(index) {
+  function removeVintage(index: number) {
     setVintages((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleProducerChange(id, name) {
+  function handleProducerChange(id: number | string, name: string) {
     setFormData((prev) => ({
       ...prev,
       producer_id: id ? String(id) : "",
@@ -204,7 +263,7 @@ function WineForm() {
     }));
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       setSubmitting(true);
@@ -238,8 +297,8 @@ function WineForm() {
         fortified: Boolean(formData.fortified),
         grape_ids: selectedGrapes.map((g) => g.id),
         region_ids: selectedRegions.map((r) => r.id),
-        vintages_attributes: vintages.map((v) => {
-          const attr = {
+        vintages_attributes: vintages.map((v): VintageWrite => {
+          const attr: VintageWrite = {
             year: parseInt(v.year, 10),
             prompt: v.prompt || null,
             price:
@@ -252,7 +311,9 @@ function WineForm() {
         wine_taste_parameters_attributes: wineTasteParametersAttributes,
       };
 
-      if (isEditing) {
+      // `isEditing` is `Boolean(slug)`, but that does not narrow `slug` itself,
+      // so guard on the value here rather than non-null asserting.
+      if (isEditing && slug) {
         await winesApi.update(slug, payload);
         if (images && images.length > 0) {
           await imagesApi.upload("wine", slug, images);
@@ -266,9 +327,7 @@ function WineForm() {
         navigate(`/wines/${result.slug}`, { replace: true });
       }
     } catch (err) {
-      const messages =
-        err.data?.errors?.join?.(", ") || err.data?.error || err.message;
-      setError(messages || "Failed to save wine");
+      setError(errorMessage(err, "Failed to save wine"));
     } finally {
       setSubmitting(false);
     }
@@ -587,7 +646,7 @@ function WineForm() {
             imageableId={isEditing ? slug : null}
             onFilesChange={(files) => setImages(files)}
             onImagesChange={async () => {
-              if (isEditing) {
+              if (slug) {
                 const reloaded = await winesApi.show(slug);
                 setExistingImages(reloaded.images || []);
                 setExistingImageIds(reloaded.image_ids || []);

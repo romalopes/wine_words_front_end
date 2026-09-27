@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import { errorMessage } from "../utils/errors";
 import type { AdminUser, AdminUserResults, RoleOption } from "../types/user";
-import type { Subscription } from "../types/producer";
+import type { Subscription } from "../types/subscription";
 
 function UserRoles() {
   const { user, startImpersonation } = useAuth();

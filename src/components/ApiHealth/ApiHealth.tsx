@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import styles from "./ApiHealth.module.css";
 import {
   API_CHECKS,
-  API_CATEGORIES,
   isWriteCheck,
 } from "../../services/apiHealth/apiHealthConfig";
+import type { ApiCheck } from "../../services/apiHealth/apiHealthConfig";
 import {
   runCheck,
   runWriteFlow,
+  type HealthCheckResult,
 } from "../../services/apiHealth/healthRunner";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAuthToken } from "../../services/api";
@@ -15,31 +16,53 @@ import { isAdmin } from "../../constants/roles";
 import { APP_VERSION } from "../../constants/versions";
 import ResponseInspector from "./components/ResponseInspector";
 import WriteSandbox from "./components/WriteSandbox";
+import type { DetailedHealthPayload } from "../../types/health";
 
-const methodClass = {
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+const methodClass: Record<HttpMethod, string | undefined> = {
   GET: styles.get,
   POST: styles.post,
   PATCH: styles.patch,
   DELETE: styles.delete,
 };
 
-function latencyClass(rating) {
+type LatencyRating = HealthCheckResult["latencyRating"];
+
+function latencyClass(rating: LatencyRating): string | undefined {
   if (rating === "excellent") return styles.pass;
   if (rating === "good") return styles.neutral;
   return styles.fail;
 }
 
-function StatusBadge({ passed }) {
+interface StatusBadgeProps {
+  passed: boolean | null | undefined;
+}
+
+function StatusBadge({ passed }: StatusBadgeProps) {
   const cls =
     passed == null ? styles.neutral : passed ? styles.pass : styles.fail;
   const label = passed == null ? "—" : passed ? "PASS" : "FAIL";
   return <span className={`${styles.badge} ${cls}`}>{label}</span>;
 }
 
+interface HistoryEntry {
+  at: string;
+  passed: number;
+  failed: number;
+  avgLatency: number;
+}
+
 // Renders a 2-column definition list (key/value pairs) for the new
 // infrastructure sections in /api/v1/health/detailed. Values that are
 // null/undefined render as "—" so the layout stays consistent.
-function InfoGrid({ entries }) {
+type InfoValue = string | number | boolean | null | undefined;
+
+interface InfoGridProps {
+  entries: Array<[string, InfoValue]>;
+}
+
+function InfoGrid({ entries }: InfoGridProps) {
   return (
     <dl className={styles.infoGrid}>
       {entries.map(([key, value]) => (
@@ -56,8 +79,12 @@ function InfoGrid({ entries }) {
   );
 }
 
-function InfrastructurePanel({ detailed }) {
-  const payload = detailed?.payload;
+interface InfrastructurePanelProps {
+  detailed: HealthCheckResult | null | undefined;
+}
+
+function InfrastructurePanel({ detailed }: InfrastructurePanelProps) {
+  const payload = detailed?.payload as DetailedHealthPayload | null | undefined;
   if (!payload) return null;
 
   // Some sections are always present (server/endpoint), others depend on
@@ -163,12 +190,12 @@ export default function ApiHealth() {
   const { user } = useAuth();
   const isAdminUser = isAdmin(user);
 
-  const [results, setResults] = useState({});
-  const [running, setRunning] = useState({}); // checkId -> bool
+  const [results, setResults] = useState<Record<string, HealthCheckResult>>({});
+  const [running, setRunning] = useState<Record<string, boolean>>({}); // checkId -> bool
   const [runningAll, setRunningAll] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [openCategories, setOpenCategories] = useState({});
-  const [expanded, setExpanded] = useState({}); // checkId -> bool
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({}); // checkId -> bool
 
   const regularChecks = useMemo(
     () => API_CHECKS.filter((c) => !isWriteCheck(c)),
@@ -176,10 +203,12 @@ export default function ApiHealth() {
   );
   const writeChecks = useMemo(() => API_CHECKS.filter(isWriteCheck), []);
   const grouped = useMemo(() => {
-    const map = {};
+    const map: Record<string, ApiCheck[]> = {};
     regularChecks.forEach((check) => {
-      if (!map[check.category]) map[check.category] = [];
-      map[check.category].push(check);
+      const list = map[check.category];
+      if (list) list.push(check);
+      else map[check.category] = [check];
+      return undefined;
     });
     return map;
   }, [regularChecks]);
@@ -194,7 +223,7 @@ export default function ApiHealth() {
     );
   }
 
-  async function runSingle(check) {
+  async function runSingle(check: ApiCheck): Promise<HealthCheckResult> {
     setRunning((prev) => ({ ...prev, [check.id]: true }));
     try {
       const result = await runCheck(check, { getAuthToken });
@@ -213,14 +242,14 @@ export default function ApiHealth() {
       );
       setResults((prev) => {
         const next = { ...prev };
-        outs.forEach((r) => {
+        outs.forEach((r: HealthCheckResult) => {
           next[r.id] = r;
         });
         return next;
       });
-      const passed = outs.filter((r) => r.passed).length;
+      const passed = outs.filter((r: HealthCheckResult) => r.passed).length;
       const avgLatency = Math.round(
-        outs.reduce((sum, r) => sum + (r.latencyMs || 0), 0) /
+        outs.reduce((sum: number, r: HealthCheckResult) => sum + (r.latencyMs || 0), 0) /
           Math.max(outs.length, 1),
       );
       setHistory((prev) =>
@@ -239,7 +268,7 @@ export default function ApiHealth() {
     }
   }
 
-  async function runWriteSingle(check) {
+  async function runWriteSingle(check: ApiCheck): Promise<void> {
     setRunning((prev) => ({ ...prev, [check.id]: true }));
     try {
       const result = await runWriteFlow(check, { getAuthToken });
@@ -249,10 +278,10 @@ export default function ApiHealth() {
     }
   }
 
-  function toggleCategory(name) {
+  function toggleCategory(name: string): void {
     setOpenCategories((prev) => ({ ...prev, [name]: !prev[name] }));
   }
-  function toggleInspector(id) {
+  function toggleInspector(id: string): void {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
@@ -267,10 +296,13 @@ export default function ApiHealth() {
     : 0;
 
   const detailed = results["system-detailed"];
-  const backendVersion = detailed?.payload?.version;
-  const versionMatched = backendVersion
-    ? backendVersion === APP_VERSION
-    : null;
+  const backendVersion =
+    typeof (detailed?.payload as Record<string, unknown> | undefined)?.version ===
+    "string"
+      ? ((detailed?.payload as Record<string, unknown>).version as string)
+      : null;
+  const versionMatched =
+    backendVersion === null ? null : backendVersion === APP_VERSION;
   return (
     <main className={styles.container}>
       <div className={styles.header}>
@@ -332,7 +364,7 @@ export default function ApiHealth() {
         </div>
       )}
 
-      {Object.entries(grouped).map(([category, checks]) => {
+      {Object.entries(grouped).map(([category, checks]: [string, ApiCheck[]]) => {
         const open = openCategories[category] !== false;
         return (
           <section key={category} className={styles.category}>
@@ -354,7 +386,7 @@ export default function ApiHealth() {
                     <div key={check.id}>
                       <div className={styles.row}>
                         <span
-                          className={`${styles.methodPill} ${methodClass[check.method]}`}
+                          className={`${styles.methodPill} ${methodClass[check.method as HttpMethod] ?? ""}`}
                         >
                           {check.method}
                         </span>
@@ -408,7 +440,7 @@ export default function ApiHealth() {
           key={check.id}
           check={check}
           result={results[check.id]}
-          running={running[check.id]}
+          running={running[check.id] === true}
           onRun={() => runWriteSingle(check)}
         />
       ))}

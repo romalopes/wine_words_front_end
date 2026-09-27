@@ -3,36 +3,49 @@ import { Link, useParams } from "react-router-dom";
 import { logsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
+import { errorMessage } from "../utils/errors";
+import type { AuditLog } from "../types/user";
 
-function formatDateTime(value) {
+/**
+ * Renders a timestamp, echoing the raw value back if it is unparseable. Kept
+ * local rather than using `utils/dates` because a malformed timestamp in an
+ * audit record should be shown verbatim, not replaced with a dash.
+ */
+function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
+/** One `[label, value]` row of the definition list. */
+type LogField = [label: string, value: string | number | null];
+
+/** Detail view for a single audit-log record. Admin only. */
 function LogDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const isAdminUser = isAdmin(user);
 
-  const [log, setLog] = useState(null);
+  const [log, setLog] = useState<AuditLog | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdminUser) return undefined;
 
+    // Captured as a const so the narrowing below survives into the closure.
+    const logId = id;
     let cancelled = false;
 
     async function fetchLog() {
-      if (!id) return;
+      if (!logId) return;
       setLoading(true);
       setError(null);
       try {
-        const data = await logsApi.fetchAuditLog(id);
+        const data = await logsApi.fetchAuditLog(logId);
         if (!cancelled) setLog(data);
       } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load log");
+        if (!cancelled) setError(errorMessage(err, "Failed to load log"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -61,22 +74,24 @@ function LogDetail() {
     );
   }
 
-  const fields = log
+  // The request id links back to the filtered list, so it is rendered as a link
+  // rather than plain text.
+  const fields: LogField[] = log
     ? [
         ["Description", log.description],
         [
           "User",
           log.user
-            ? `${log.user.user_name} (${log.user.email})`
+            ? `${log.user.user_name ?? "—"} (${log.user.email})`
             : "— (anonymous/system)",
         ],
         ["Action", log.action],
-        ["Method", log.method || "—"],
-        ["Path", log.path || "—"],
-        ["Status", log.status ?? "—"],
-        ["Request ID", log.request_id || "—"],
-        ["IP address", log.ip_address || "—"],
-        ["User agent", log.user_agent || "—"],
+        ["Method", log.method],
+        ["Path", log.path],
+        ["Status", log.status],
+        ["Request ID", log.request_id],
+        ["IP address", log.ip_address],
+        ["User agent", log.user_agent],
         ["Logged at", formatDateTime(log.created_at)],
       ]
     : [];
@@ -114,7 +129,7 @@ function LogDetail() {
                         {value}
                       </Link>
                     ) : (
-                      value
+                      (value ?? "—")
                     )}
                   </dd>
                 </div>

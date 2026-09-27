@@ -1,12 +1,51 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { articlesApi, categoriesApi, winesApi, producersApi, reviewsApi } from "../services/api";
+import type { ArticleWritePayload } from "../types/api";
+import type { Article } from "../types/article";
+import type { Category } from "../types/catalog";
+import { responseItems } from "../types/common";
+import type { Producer, ProducerSearchResult } from "../types/producer";
+import type { Review } from "../types/review";
+import type { Vintage, WineListItem } from "../types/wine";
+import { errorMessage } from "../utils/errors";
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
 
-function ArticleForm({ article, onSaved, onCancel }) {
+/**
+ * A vintage picked for the article. The wine context is kept alongside the id
+ * so the review list under each selection can label it.
+ */
+interface SelectedVintage {
+  id: number;
+  year: number | null;
+  name: string;
+  wine_slug: string | null;
+}
+
+interface ArticleFormState {
+  title: string;
+  abstract: string;
+  body: string;
+  category_ids: number[];
+  tag_names: string;
+  producer_ids: number[];
+  status: string;
+}
+
+/** Reviews per selected vintage; a missing key means "still loading". */
+type ReviewsByVintage = Record<number, Review[] | undefined>;
+
+interface ArticleFormProps {
+  article?: Article | null;
+  onSaved: (saved?: Article) => void;
+  onCancel?: () => void;
+}
+
+function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
   const isEditing = Boolean(article);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ArticleFormState>({
     title: article?.title || "",
     abstract: article?.abstract || "",
     body: article?.body || "",
@@ -16,7 +55,7 @@ function ArticleForm({ article, onSaved, onCancel }) {
     status: article?.status || "draft",
   });
   // Selected vintages keep the wine context so reviews can be listed per vintage.
-  const [selectedVintages, setSelectedVintages] = useState(
+  const [selectedVintages, setSelectedVintages] = useState<SelectedVintage[]>(
     (article?.vintages || []).map((v) => ({
       id: v.id,
       year: v.year,
@@ -24,56 +63,63 @@ function ArticleForm({ article, onSaved, onCancel }) {
       wine_slug: v.wine_slug,
     })),
   );
-  const [linkedReviewIds, setLinkedReviewIds] = useState(
+  const [linkedReviewIds, setLinkedReviewIds] = useState<number[]>(
     (article?.reviews || [])
       .filter((r) => r.link_status === "published" || r.link_status === undefined)
       .map((r) => r.id),
   );
-  const [categories, setCategories] = useState([]);
-  const [producers, setProducers] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [producers, setProducers] = useState<Producer[]>([]);
   const [wineQuery, setWineQuery] = useState("");
-  const [wineResults, setWineResults] = useState([]);
+  const [wineResults, setWineResults] = useState<WineListItem[]>([]);
   const [searchingWines, setSearchingWines] = useState(false);
   const [producerQuery, setProducerQuery] = useState("");
-  const [producerResults, setProducerResults] = useState([]);
+  const [producerResults, setProducerResults] = useState<ProducerSearchResult[]>([]);
   const [searchingProducers, setSearchingProducers] = useState(false);
-  const [reviewsByVintage, setReviewsByVintage] = useState({});
-  const searchTimer = useRef(null);
-  const producerSearchTimer = useRef(null);
-  const [images, setImages] = useState(null);
-  const [existingImages, setExistingImages] = useState(article?.images || []);
-  const [existingImageIds, setExistingImageIds] = useState(article?.image_ids || []);
+  const [reviewsByVintage, setReviewsByVintage] = useState<ReviewsByVintage>({});
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const producerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [images, setImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>(article?.images || []);
+  const [existingImageIds, setExistingImageIds] = useState<Array<number | null>>(
+    article?.image_ids || [],
+  );
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    categoriesApi.list().then(setCategories).catch(() => {});
-    producersApi.list().then((data) => setProducers(Array.isArray(data) ? data : [])).catch(() => {});
+    // A non-paginated request answers with a bare array, so `responseItems`
+    // is the safe way to read the rows here.
+    categoriesApi.list().then((data) => setCategories(responseItems(data))).catch(() => {});
+    producersApi.list().then((data) => setProducers(responseItems(data))).catch(() => {});
   }, []);
 
   // On edit, pre-existing vintages never run through toggleVintage, so their
   // reviews would stay "Loading…" forever. Fetch them once on mount.
   useEffect(() => {
-    if (!isEditing || selectedVintages.length === 0) return;
+    if (!isEditing || selectedVintages.length === 0) return undefined;
     let cancelled = false;
     Promise.all(
       selectedVintages.map(async (v) => {
-        if (!v.wine_slug) return { id: v.id, reviews: [] };
+        if (!v.wine_slug) return { id: v.id, reviews: [] as Review[] };
         try {
           const list = await reviewsApi.list(v.wine_slug, v.id);
           return { id: v.id, reviews: Array.isArray(list) ? list : [] };
         } catch {
-          return { id: v.id, reviews: [] };
+          return { id: v.id, reviews: [] as Review[] };
         }
       }),
     ).then((results) => {
       if (cancelled) return;
-      const next = {};
+      const next: ReviewsByVintage = {};
       results.forEach((r) => {
         next[r.id] = r.reviews;
       });
       setReviewsByVintage((prev) => ({ ...prev, ...next }));
     });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -82,7 +128,7 @@ function ArticleForm({ article, onSaved, onCancel }) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!wineQuery.trim()) {
       setWineResults([]);
-      return;
+      return undefined;
     }
     searchTimer.current = setTimeout(async () => {
       setSearchingWines(true);
@@ -95,7 +141,9 @@ function ArticleForm({ article, onSaved, onCancel }) {
         setSearchingWines(false);
       }
     }, 300);
-    return () => clearTimeout(searchTimer.current);
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
   }, [wineQuery]);
 
   // Debounced producer search for the producer picker.
@@ -103,7 +151,7 @@ function ArticleForm({ article, onSaved, onCancel }) {
     if (producerSearchTimer.current) clearTimeout(producerSearchTimer.current);
     if (!producerQuery.trim()) {
       setProducerResults([]);
-      return;
+      return undefined;
     }
     producerSearchTimer.current = setTimeout(async () => {
       setSearchingProducers(true);
@@ -116,14 +164,16 @@ function ArticleForm({ article, onSaved, onCancel }) {
         setSearchingProducers(false);
       }
     }, 300);
-    return () => clearTimeout(producerSearchTimer.current);
+    return () => {
+      if (producerSearchTimer.current) clearTimeout(producerSearchTimer.current);
+    };
   }, [producerQuery]);
 
-  function isVintageSelected(id) {
+  function isVintageSelected(id: number) {
     return selectedVintages.some((v) => v.id === id);
   }
 
-  async function toggleVintage(vintage, wine) {
+  async function toggleVintage(vintage: Vintage, wine: WineListItem) {
     if (isVintageSelected(vintage.id)) {
       setSelectedVintages((prev) => prev.filter((v) => v.id !== vintage.id));
       return;
@@ -146,7 +196,7 @@ function ArticleForm({ article, onSaved, onCancel }) {
     }
   }
 
-  function toggleReview(reviewId) {
+  function toggleReview(reviewId: number) {
     setLinkedReviewIds((prev) =>
       prev.includes(reviewId)
         ? prev.filter((id) => id !== reviewId)
@@ -154,11 +204,11 @@ function ArticleForm({ article, onSaved, onCancel }) {
     );
   }
 
-  function isProducerSelected(id) {
+  function isProducerSelected(id: number) {
     return form.producer_ids.includes(id);
   }
 
-  function toggleProducer(producer) {
+  function toggleProducer(producer: ProducerSearchResult) {
     const id = Number(producer.id);
     setForm((prev) => ({
       ...prev,
@@ -170,28 +220,30 @@ function ArticleForm({ article, onSaved, onCancel }) {
     setProducerResults([]);
   }
 
-  function removeProducer(id) {
+  function removeProducer(id: number) {
     setForm((prev) => ({
       ...prev,
       producer_ids: prev.producer_ids.filter((pid) => pid !== id),
     }));
   }
 
-  function updateField(field) {
-    return (e) => {
+  function updateField<K extends "title" | "abstract" | "tag_names">(
+    field: K,
+  ) {
+    return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const value = e.target.value;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
   }
 
-  async function save(payload) {
-    if (isEditing) {
+  async function save(payload: ArticleWritePayload | FormData) {
+    if (isEditing && article) {
       return articlesApi.update(article.id, payload);
     }
     return articlesApi.create(payload);
   }
 
-  function buildPayload() {
+  function buildPayload(): ArticleWritePayload {
     return {
       title: form.title,
       abstract: form.abstract,
@@ -205,35 +257,44 @@ function ArticleForm({ article, onSaved, onCancel }) {
     };
   }
 
-  function buildFormData() {
+  function buildFormData(): FormData {
     const formData = new FormData();
     formData.append("article[title]", form.title);
     formData.append("article[abstract]", form.abstract);
     formData.append("article[body]", form.body);
     formData.append("article[status]", form.status);
-    (form.category_ids || []).forEach((id) => formData.append("article[category_ids][]", id));
+    (form.category_ids || []).forEach((id) =>
+      formData.append("article[category_ids][]", String(id)),
+    );
     formData.append("article[tag_names]", form.tag_names);
-    selectedVintages.forEach((v) => formData.append("article[vintage_ids][]", v.id));
-    linkedReviewIds.forEach((id) => formData.append("article[review_ids][]", id));
+    selectedVintages.forEach((v) =>
+      formData.append("article[vintage_ids][]", String(v.id)),
+    );
+    linkedReviewIds.forEach((id) =>
+      formData.append("article[review_ids][]", String(id)),
+    );
     if (form.producer_ids.length > 0) {
-      form.producer_ids.forEach((id) => formData.append("article[producer_ids][]", id));
+      form.producer_ids.forEach((id) =>
+        formData.append("article[producer_ids][]", String(id)),
+      );
     }
-    Array.from(images).forEach((file) => formData.append("article[images][]", file));
+    images.forEach((file) => formData.append("article[images][]", file));
     return formData;
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
       // When new images are chosen, send multipart so Rails can attach them.
-      const payload = images && images.length > 0 ? buildFormData() : buildPayload();
-      await save(payload);
-      onSaved();
+      const payload =
+        images && images.length > 0 ? buildFormData() : buildPayload();
+      const saved = await save(payload);
+      onSaved(saved);
     } catch (err) {
-      setError(err.message || "Failed to save article");
+      setError(errorMessage(err, "Failed to save article"));
     } finally {
       setSubmitting(false);
     }
@@ -459,14 +520,16 @@ function ArticleForm({ article, onSaved, onCancel }) {
           imageableType="article"
           images={existingImages}
           imageIds={existingImageIds}
-          imageableId={isEditing ? article.id : null}
+          imageableId={article?.id ?? null}
           onFilesChange={(files) => setImages(files)}
           onImagesChange={async () => {
-            if (isEditing) {
-              const reloaded = await articlesApi.show(article.id);
-              setExistingImages(reloaded.images || []);
-              setExistingImageIds(reloaded.image_ids || []);
-            }
+            // `article` is absent in create mode, where there is nothing to
+            // refetch — the staged files upload after the record exists.
+            const articleId = article?.id;
+            if (articleId === undefined) return;
+            const reloaded = await articlesApi.show(articleId);
+            setExistingImages(reloaded.images || []);
+            setExistingImageIds(reloaded.image_ids || []);
           }}
         />
       </div>

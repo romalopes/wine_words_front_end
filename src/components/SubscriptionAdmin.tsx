@@ -3,8 +3,37 @@ import { subscriptionsApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { isAdmin } from "../constants/roles";
 import { Link } from "react-router-dom";
+import type {
+  Subscription,
+  SubscriptionFeature,
+  SubscriptionWritePayload,
+} from "../types/subscription";
+import { errorMessage } from "../utils/errors";
 
-const EMPTY_FORM = {
+/**
+ * The editable plan fields. Prices are held as the raw dollar strings the
+ * number inputs produce and converted to cents in `priceCents` on submit, so a
+ * half-typed "12." is not truncated to 12.00 mid-edit.
+ */
+interface PlanForm {
+  name: string;
+  slug: string;
+  description: string;
+  popular: boolean;
+  visible: boolean;
+  active: boolean;
+  is_default: boolean;
+  position: number;
+  monthly_price_cents: string;
+  yearly_price_cents: string;
+  currency: string;
+  selectedFeatureIds: number[];
+}
+
+/** The plan being edited, or the literal `"new"` when creating one. */
+type EditingTarget = Subscription | "new" | null;
+
+const EMPTY_FORM: PlanForm = {
   name: "",
   slug: "",
   description: "",
@@ -19,15 +48,31 @@ const EMPTY_FORM = {
   selectedFeatureIds: [],
 };
 
-function priceCents(value) {
-  const n = parseFloat(value);
+/** The plan's boolean toggles, in display order. */
+const TOGGLES = [
+  { key: "popular", label: "Most popular" },
+  { key: "visible", label: "Visible on the website" },
+  { key: "active", label: "Active (taking new subscriptions)" },
+  { key: "is_default", label: "Default plan for new users" },
+] as const satisfies ReadonlyArray<{ key: BooleanFormKey; label: string }>;
+
+type BooleanFormKey = "popular" | "visible" | "active" | "is_default";
+
+/** Dollars typed in the form → integer cents, or null when left blank. */
+function priceCents(value: string | number | null | undefined): number | null {
+  const n = parseFloat(String(value));
   if (value === "" || value == null || Number.isNaN(n)) return null;
   return Math.round(n * 100);
 }
 
-function toForm(sub) {
+/** Integer cents from the API → the dollars string the price inputs hold. */
+function centsToDollars(cents: number | null | undefined): string {
+  return cents == null ? "" : (cents / 100).toFixed(2);
+}
+
+/** Map a plan from the API onto the form, normalising nulls to empty strings. */
+function toForm(sub: Subscription): PlanForm {
   return {
-    id: sub.id,
     name: sub.name || "",
     slug: sub.slug || "",
     description: sub.description || "",
@@ -36,8 +81,9 @@ function toForm(sub) {
     active: sub.active !== false,
     is_default: Boolean(sub.is_default),
     position: sub.position || 0,
-    monthly_price_cents: sub.monthly_price_cents || "",
-    yearly_price_cents: sub.yearly_price_cents || "",
+    // The API stores integer cents; the inputs are labelled and typed in dollars.
+    monthly_price_cents: centsToDollars(sub.monthly_price_cents),
+    yearly_price_cents: centsToDollars(sub.yearly_price_cents),
     currency: sub.currency || "AUD",
     selectedFeatureIds: (sub.features || []).map((f) => f.id),
   };
@@ -47,11 +93,11 @@ function SubscriptionAdmin() {
   const { user } = useAuth();
   const isAdminUser = isAdmin(user);
 
-  const [plans, setPlans] = useState([]);
-  const [allFeatures, setAllFeatures] = useState([]);
-  const [editing, setEditing] = useState(null); // row object or "new"
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState(null);
+  const [plans, setPlans] = useState<Subscription[]>([]);
+  const [allFeatures, setAllFeatures] = useState<SubscriptionFeature[]>([]);
+  const [editing, setEditing] = useState<EditingTarget>(null); // row object or "new"
+  const [form, setForm] = useState<PlanForm>(EMPTY_FORM);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +107,7 @@ function SubscriptionAdmin() {
       const data = await subscriptionsApi.list({ auth: true });
       setPlans(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || "Failed to load plans");
+      setError(errorMessage(err, "Failed to load plans"));
     } finally {
       setLoading(false);
     }
@@ -77,17 +123,17 @@ function SubscriptionAdmin() {
     setError(null);
   }
 
-  function startEdit(sub) {
+  function startEdit(sub: Subscription) {
     setForm(toForm(sub));
     setEditing(sub);
     setError(null);
   }
 
-  function update(field, value) {
+  function update<K extends keyof PlanForm>(field: K, value: PlanForm[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function toggleFeature(id) {
+  function toggleFeature(id: number) {
     setForm((prev) => {
       const has = prev.selectedFeatureIds.includes(id);
       return {
@@ -103,7 +149,7 @@ function SubscriptionAdmin() {
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      const payload: SubscriptionWritePayload = {
         ...form,
         monthly_price_cents: priceCents(form.monthly_price_cents),
         yearly_price_cents: priceCents(form.yearly_price_cents),
@@ -111,7 +157,6 @@ function SubscriptionAdmin() {
           (featureId, index) => ({ subscription_feature_id: featureId, position: index }),
         ),
       };
-      delete payload.selectedFeatureIds;
 
       if (editing === "new") {
         await subscriptionsApi.create(payload);
@@ -122,26 +167,30 @@ function SubscriptionAdmin() {
       setForm(EMPTY_FORM);
       await loadPlans();
     } catch (err) {
-      setError(err.message || "Failed to save plan");
+      setError(errorMessage(err, "Failed to save plan"));
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(sub) {
+  async function remove(sub: Subscription) {
     if (!window.confirm(`Delete "${sub.name}"? This only works if no users are linked.`)) return;
     setError(null);
     try {
       await subscriptionsApi.destroy(sub.id);
       setPlans((prev) => prev.filter((x) => x.id !== sub.id));
     } catch (err) {
-      setError(err.message || "Failed to delete plan");
+      setError(errorMessage(err, "Failed to delete plan"));
     }
   }
 
+  // The set of features any plan uses, so the checkbox list stays complete even
+  // while a plan is being edited.
   useEffect(() => {
-    const byId = new Map();
-    plans.forEach((p) => (p.features || []).forEach((f) => byId.set(f.id, f)));
+    const byId = new Map<number, SubscriptionFeature>();
+    plans.forEach((p) =>
+      (p.features || []).forEach((f) => byId.set(f.id, f)),
+    );
     setAllFeatures(Array.from(byId.values()));
   }, [plans]);
 
@@ -213,12 +262,7 @@ function SubscriptionAdmin() {
           </div>
 
           <div style={fieldStyle}>
-            {[
-              { key: "popular", label: "Most popular" },
-              { key: "visible", label: "Visible on the website" },
-              { key: "active", label: "Active (taking new subscriptions)" },
-              { key: "is_default", label: "Default plan for new users" },
-            ].map((opt) => (
+            {TOGGLES.map((opt) => (
               <label key={opt.key} style={{ display: "block", fontWeight: 400 }}>
                 <input
                   type="checkbox"

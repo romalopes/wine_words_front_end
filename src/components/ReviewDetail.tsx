@@ -7,8 +7,11 @@ import { canManageWinesRole } from "../constants/roles";
 import DOMPurify from "dompurify";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import { errorMessage } from "../utils/errors";
+import type { Review } from "../types/review";
 
-function RichComment({ html }) {
+/** Renders a review comment, which is stored as HTML and must be sanitised. */
+function RichComment({ html }: { html: string }) {
   return (
     <div
       className="review-card__comment"
@@ -17,14 +20,15 @@ function RichComment({ html }) {
   );
 }
 
+/** Detail view for one review, with inline edit and delete. */
 function ReviewDetail() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const returnToLink = useReturnToLink();
-  const [review, setReview] = useState(null);
+  const [review, setReview] = useState<Review | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -33,13 +37,17 @@ function ReviewDetail() {
   const canEdit = canManageWinesRole(user) || isOwner;
 
   const loadReview = useCallback(async () => {
+    if (!slug) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const data = await reviewsApi.show(slug);
       setReview(data);
     } catch (err) {
-      setError(err.message || "Failed to load review");
+      setError(errorMessage(err, "Failed to load review"));
     } finally {
       setLoading(false);
     }
@@ -57,12 +65,16 @@ function ReviewDetail() {
     ) {
       return;
     }
+    // `review` is non-null by the time this button can be reached — the render
+    // below returns early while it is still null.
+    if (!review) return;
+
     try {
       setDeleting(true);
       await reviewsApi.destroy(review.id);
       navigate("/reviews");
     } catch (err) {
-      setError(err.message || "Failed to delete review");
+      setError(errorMessage(err, "Failed to delete review"));
       setDeleting(false);
     }
   }
@@ -126,7 +138,7 @@ function ReviewDetail() {
       {canEdit && editing && (
         <ReviewForm
           review={review}
-          vintageYear={review.vintage_year}
+          vintageYear={review.vintage_year ?? null}
           onSaved={() => {
             setEditing(false);
             loadReview();
@@ -163,10 +175,10 @@ function ReviewDetail() {
       {Array.isArray(review.categories) && review.categories.length > 0 && (
         <p className="review-card__comment">
           Categories:{" "}
-          {review.categories.map((cat, i) => (
+          {(review.categories ?? []).map((cat, i) => (
             <span key={cat.id}>
               <Link to={returnToLink(`/categories/${cat.slug}`)}>{cat.name}</Link>
-              {i < review.categories.length - 1 ? ", " : ""}
+              {i < (review.categories?.length ?? 0) - 1 ? ", " : ""}
             </span>
           ))}
         </p>

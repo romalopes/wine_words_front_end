@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { subscriptionsApi, billingApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import type { Subscription } from "../types/producer";
+import type { Subscription } from "../types/subscription";
 import type { ChangePreviewResponse } from "../types/api";
 import { errorMessage } from "../utils/errors";
 
@@ -45,8 +45,10 @@ type CheckoutConfirmState = "confirming" | "confirmed" | "error" | null;
 interface PlanCardProps {
   plan: Subscription
   isCurrent: boolean
-  onChoose?: (planId: number) => void
-  onManage?: () => void
+  // Free plans have no checkout and managed plans no "choose" CTA, so the
+  // matching handler is genuinely absent on some rows.
+  onChoose?: ((planId: number) => void) | undefined
+  onManage?: (() => void) | undefined
   loadingPlanId: number | null
 }
 
