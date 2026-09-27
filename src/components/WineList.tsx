@@ -1,37 +1,45 @@
 import { useState, useEffect } from "react";
+import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { winesApi, categoriesApi } from "../services/api";
+import type { WineGroup } from "../types/api";
+import type { WineListItem } from "../types/wine";
+import type { Category } from "../types/catalog";
+import { errorMessage } from "../utils/errors";
 import { useSelectedCategory } from "../hooks/useSelectedCategory";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import WineAdvancedSearch from "./WineAdvancedSearch";
+import type { SearchParams } from "./WineAdvancedSearch";
 
 function WineList() {
   const { user } = useAuth();
   // Admins, Reviewers and Editors may add, edit or delete wines.
   const canManageWines = canManageWinesRole(user);
-  const [groups, setGroups] = useState([]);
+  const [groups, setGroups] = useState<WineGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const selectedCategory = useSelectedCategory();
 
   // --- Advanced search state ---------------------------------------------
   // null => normal browsing; an object => show the advanced-search results.
-  const [searchFilters, setSearchFilters] = useState(null);
+  const [searchFilters, setSearchFilters] = useState<SearchParams | null>(
+    null,
+  );
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const advancedPaged = usePagedList({
     fetcher: (params) => winesApi.advancedSearch(params),
-    extraParams: searchFilters || {},
+    extraParams: searchFilters ?? {},
     perPage: 20,
     enabled: searchFilters !== null,
     paramKey: "asearch_page",
   });
 
-  function handleAdvancedSearch(filters) {
+  function handleAdvancedSearch(filters: SearchParams) {
     setSearchFilters(filters);
   }
 
@@ -41,14 +49,16 @@ function WineList() {
   }
 
   // Category name -> id map for resolving ?category= to category_id
-  const [categoryNameToId, setCategoryNameToId] = useState({});
+  const [categoryNameToId, setCategoryNameToId] = useState<
+    Record<string, number>
+  >({});
 
   useEffect(() => {
     categoriesApi
       .list()
       .then((cats) => {
-        const map = {};
-        (Array.isArray(cats) ? cats : []).forEach((c) => {
+        const map: Record<string, number> = {};
+        (Array.isArray(cats) ? (cats as Category[]) : []).forEach((c) => {
           map[c.name] = c.id;
         });
         setCategoryNameToId(map);
@@ -90,13 +100,13 @@ function WineList() {
       const data = await winesApi.grouped();
       setGroups(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || "Failed to load wines");
+      setError(errorMessage(err, "Failed to load wines"));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(wine, e) {
+  async function handleDelete(wine: WineListItem, e: MouseEvent) {
     e.stopPropagation();
     if (
       !window.confirm(`Delete "${wine.name}"? This action cannot be undone.`)
@@ -112,7 +122,7 @@ function WineList() {
         loadGroups();
       }
     } catch (err) {
-      alert(err.message || "Failed to delete wine");
+      alert(errorMessage(err, "Failed to delete wine"));
     }
   }
 
@@ -218,7 +228,7 @@ function WineList() {
                   {wine.sparkling && (
                     <p className="wine-management__sparkling">✨ Sparkling</p>
                   )}
-                  {wine.vintages_count > 0 && (
+                  {(wine.vintages_count ?? 0) > 0 && (
                     <p className="wine-management__vintage-count">
                       {wine.vintages_count} vintage
                       {wine.vintages_count !== 1 ? "s" : ""}
@@ -344,7 +354,7 @@ function WineList() {
                   {wine.sparkling && (
                     <p className="wine-management__sparkling">✨ Sparkling</p>
                   )}
-                  {wine.vintages_count > 0 && (
+                  {(wine.vintages_count ?? 0) > 0 && (
                     <p className="wine-management__vintage-count">
                       {wine.vintages_count} vintage
                       {wine.vintages_count !== 1 ? "s" : ""}
@@ -493,7 +503,7 @@ function WineList() {
                     {wine.sparkling && (
                       <p className="wine-management__sparkling">✨ Sparkling</p>
                     )}
-                    {wine.vintages_count > 0 && (
+                    {(wine.vintages_count ?? 0) > 0 && (
                       <p className="wine-management__vintage-count">
                         {wine.vintages_count} vintage
                         {wine.vintages_count !== 1 ? "s" : ""}

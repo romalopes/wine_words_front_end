@@ -76,6 +76,11 @@ export interface VintageWrite {
   no_vintage: boolean
 }
 
+/**
+ * The lean `WineListSerializer` payload (list, table and grouped views).
+ * Optional because the show/quick-create endpoints return a full `Wine`
+ * without the counter, and both are stored in the same component state.
+ */
 export interface WineListItem extends Wine {
   vintages_count?: number
 }

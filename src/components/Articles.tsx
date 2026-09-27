@@ -7,6 +7,7 @@ import ArticleForm from "./ArticleForm";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import usePagedList from "../hooks/usePagedList";
+import type { Article } from "../types/article";
 import Pagination from "./Pagination";
 
 function excerpt(text, max = 50) {
@@ -26,12 +27,12 @@ function Articles() {
   const canManageContent = canManageWinesRole(user);
   const categoryOrder = useCategoryOrder("sort_order_article");
   const selectedCategory = useSelectedCategory();
-  const [myArticles, setMyArticles] = useState([]);
+  const [myArticles, setMyArticles] = useState<Article[]>([]);
   // False until the first load of "my articles" completes (avoids flashing
   // the "You haven't written any articles yet." empty state while loading).
-  const [mineLoaded, setMineLoaded] = useState(false);
+  const [mineLoaded, setMineLoaded] = useState<boolean>(false);
   // Category name -> id map for resolving ?category= to category_id
-  const [categoryNameToId, setCategoryNameToId] = useState({});
+  const [categoryNameToId, setCategoryNameToId] = useState<Record<string, number>>({});
 
   useEffect(() => {
     categoriesApi
@@ -69,15 +70,15 @@ function Articles() {
   }, [selectedCategory]);
 
   const loading = feed.loading;
-  const [showForm, setShowForm] = useState(false);
-  const [scope, setScope] = useState("all"); // "all" | "mine"
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [showForm, setShowForm] = useState<boolean>(false);
+  const [scope, setScope] = useState<"all" | "mine">("all"); // "all" | "mine"
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Reload the paginated feed (used after create/delete/status changes).
   const loadArticles = feed.reload;
 
   // All articles, loaded once when no category is selected (grouped view).
-  const [groups, setGroups] = useState([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const loadGroups = useCallback(async () => {
     try {
@@ -551,3 +552,4 @@ function Articles() {
 }
 
 export default Articles;
+

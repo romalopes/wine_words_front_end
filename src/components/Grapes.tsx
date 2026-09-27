@@ -102,7 +102,10 @@ function Grapes() {
     void loadGrapes();
   }, [loadGrapes]);
 
-  function updateField<K extends keyof GrapeForm>(field: K, value: GrapeForm[K]) {
+  function updateField<K extends keyof GrapeForm>(
+    field: K,
+    value: GrapeForm[K],
+  ) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -371,7 +374,7 @@ function Grapes() {
                 className="btn-primary"
                 onClick={openCreateForm}
               >
-                + Add New Grape
+                + Add New Grape Variety
               </button>
             )}
           </div>
@@ -478,13 +481,13 @@ function Grapes() {
 
 /** Props for the tag-list editor shared by the three array fields. */
 interface ArrayFieldInputProps {
-  label: string
-  items: string[]
-  newValue: string
-  setNewValue: (value: string) => void
-  onAdd: () => void
-  onRemove: (index: number) => void
-  placeholder?: string
+  label: string;
+  items: string[];
+  newValue: string;
+  setNewValue: (value: string) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  placeholder?: string;
 }
 
 function ArrayFieldInput({

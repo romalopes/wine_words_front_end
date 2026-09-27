@@ -6,6 +6,7 @@ import { logsApi } from "../services/api";
 import { copyText } from "../utils/clipboard";
 import Pagination from "./Pagination";
 
+import type { LogEntry } from "../types/user";
 const LINE_COUNT_OPTIONS = [100, 250, 500, 1000, 2000];
 const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 

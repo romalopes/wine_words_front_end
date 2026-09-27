@@ -55,7 +55,7 @@ type SearchForm = Record<SearchFormField, string>;
  * the string form fields, the numeric taste ranges, and the id lists chosen
  * through the region / grape pickers.
  */
-type SearchParams = Record<
+export type SearchParams = Record<
   string,
   string | number | number[]
 >;
