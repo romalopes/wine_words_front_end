@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Reviews from "./Reviews";
@@ -17,7 +17,7 @@ const mockCategoriesList = vi.fn().mockResolvedValue([]);
 vi.mock("../services/api", () => ({
   reviewsApi: {
     all: (...args: unknown[]) => mockAll(...args),
-    grouped: () => mockGrouped(),
+    grouped: (...args: unknown[]) => mockGrouped(...args),
     myReviews: () => mockMyReviews(),
     update: vi.fn().mockResolvedValue({}),
     destroy: vi.fn().mockResolvedValue({}),
@@ -84,6 +84,9 @@ function renderReviews(initialEntry = "/reviews") {
 
 describe("Reviews", () => {
   beforeEach(() => {
+    // `useSearch` persists the query back to window.location, so without this
+    // a previous test's `?query=…` would leak into the next one.
+    window.history.replaceState({}, "", "/");
     mockAll.mockReset().mockResolvedValue(envelope([]));
     mockGrouped.mockReset().mockResolvedValue([]);
     mockMyReviews.mockReset().mockResolvedValue([]);
@@ -196,6 +199,61 @@ describe("Reviews", () => {
             typeof call[0] === "object" &&
             call[0] !== null &&
             (call[0] as { query?: string }).query === "malbec",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("re-requests the grouped view with the search term (no category)", async () => {
+    mockGrouped.mockResolvedValue(groupedPayload());
+    const user = userEvent.setup();
+
+    renderReviews();
+
+    const input = screen.getByPlaceholderText("Search reviews…");
+    await user.type(input, "malbec");
+
+    // With no category selected the list renders from `reviewsApi.grouped()`,
+    // so the term has to reach that request or search would appear to do
+    // nothing.
+    await waitFor(() => {
+      expect(
+        mockGrouped.mock.calls.some(
+          (call) =>
+            typeof call[0] === "object" &&
+            call[0] !== null &&
+            (call[0] as { query?: string }).query === "malbec",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("does not search until the term reaches three characters", async () => {
+    mockGrouped.mockResolvedValue(groupedPayload());
+    const user = userEvent.setup();
+
+    renderReviews();
+
+    const input = screen.getByPlaceholderText("Search reviews…");
+    await user.type(input, "ma");
+
+    // Let the input's debounce elapse: two characters must not be searched.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+
+    const sentQuery = () =>
+      [...mockAll.mock.calls, ...mockGrouped.mock.calls].some((call) =>
+        Boolean((call[0] as { query?: string } | undefined)?.query),
+      );
+    expect(sentQuery()).toBe(false);
+
+    // The third character triggers the search.
+    await user.type(input, "l");
+
+    await waitFor(() => {
+      expect(
+        mockGrouped.mock.calls.some(
+          (call) =>
+            (call[0] as { query?: string } | undefined)?.query === "mal",
         ),
       ).toBe(true);
     });

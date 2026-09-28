@@ -55,3 +55,22 @@ export function parseQuery(searchString: string): SearchParams {
   }
   return params;
 }
+
+/**
+ * Free-text search only runs once the term is at least this long. Shorter
+ * input is treated as "no search", so the API is not hit for every keystroke
+ * and a one- or two-letter term cannot blank out the listing.
+ */
+export const MIN_SEARCH_LENGTH = 3;
+
+/**
+ * The term that should actually be sent to the API (and used to highlight
+ * matches): blank while the user has typed fewer than `min` characters.
+ */
+export function effectiveSearchTerm(
+  value: string | number | undefined,
+  min: number = MIN_SEARCH_LENGTH,
+): string {
+  const term = String(value ?? '').trim();
+  return term.length >= min ? term : '';
+}

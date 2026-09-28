@@ -1,21 +1,133 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { articlesApi, categoriesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
-import { useSelectedCategory } from "../hooks/useSelectedCategory";
 import ArticleForm from "./ArticleForm";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
-import usePagedList from "../hooks/usePagedList";
-import type { Article } from "../types/article";
 import Pagination from "./Pagination";
+import { useSearch } from "../hooks/useSearch";
+import {
+  effectiveSearchTerm,
+  MIN_SEARCH_LENGTH,
+} from "../services/searchParams";
+import type { SearchParams } from "../services/searchParams";
+import type { Article } from "../types/article";
+import type { ArticleGroup } from "../types/api";
+import { SearchBar, SearchHighlight } from "./search";
 
-function excerpt(text, max = 50) {
+function excerpt(text: string | null | undefined, max = 50): string {
   if (!text) return "";
   // Strip HTML tags for a plain-text excerpt
   const stripped = text.replace(/<[^>]+>/g, "").trim();
   if (stripped.length <= max) return stripped;
   return stripped.slice(0, max) + "…";
+}
+
+interface ArticleCardProps {
+  article: Article;
+  query: string;
+  canManage: boolean;
+  canManageContent: boolean;
+  onOpen: () => void;
+  onToggleStatus: () => void;
+  onDelete: () => void;
+}
+
+/**
+ * A single article card in the grid. Mirrors the `wine-management__card`
+ * markup used by the other grouped listings, so the grid/typography match.
+ */
+function ArticleCard({
+  article,
+  query,
+  canManage,
+  canManageContent,
+  onOpen,
+  onToggleStatus,
+  onDelete,
+}: ArticleCardProps) {
+  const image =
+    Array.isArray(article.images) && article.images.length > 0
+      ? article.images[0]
+      : null;
+
+  return (
+    <div
+      className="wine-management__card"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      {image && (
+        <img
+          src={image}
+          alt={article.title}
+          className="wine-management__thumb"
+        />
+      )}
+      <div className="wine-management__card-header">
+        <h3>
+          <SearchHighlight text={article.title} query={query} />
+        </h3>
+        {canManageContent && (
+          <span
+            className={`wine-management__color-badge wine-management__color-badge--${article.status}`}
+          >
+            {article.status}
+          </span>
+        )}
+      </div>
+      <p className="wine-management__region">{`by ${article.author_name}`}</p>
+      {Array.isArray(article.tags) && article.tags.length > 0 && (
+        <p className="wine-management__vintage-count">
+          Tags: {article.tags.join(", ")}
+        </p>
+      )}
+      {excerpt(article.body, 50) && (
+        <p className="wine-management__region">{excerpt(article.body, 50)}</p>
+      )}
+
+      {canManage && (
+        <div
+          className="wine-management__card-actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link
+            to={`/articles/${article.slug}/edit`}
+            className="wine-management__edit-btn"
+          >
+            Edit
+          </Link>
+          <button
+            type="button"
+            className={
+              article.status === "draft"
+                ? "wine-management__edit-btn"
+                : "wine-management__delete-btn"
+            }
+            onClick={onToggleStatus}
+          >
+            {article.status === "draft" ? "Publish" : "Unpublish"}
+          </button>
+          <button
+            type="button"
+            className="wine-management__delete-btn"
+            onClick={onDelete}
+            title="Delete article"
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Articles() {
@@ -26,19 +138,25 @@ function Articles() {
   // add button; Guests/Readers only see published articles.
   const canManageContent = canManageWinesRole(user);
   const categoryOrder = useCategoryOrder("sort_order_article");
-  const selectedCategory = useSelectedCategory();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedCategory = searchParams.get("category") ?? null;
   const [myArticles, setMyArticles] = useState<Article[]>([]);
   // False until the first load of "my articles" completes (avoids flashing
   // the "You haven't written any articles yet." empty state while loading).
   const [mineLoaded, setMineLoaded] = useState<boolean>(false);
   // Category name -> id map for resolving ?category= to category_id
   const [categoryNameToId, setCategoryNameToId] = useState<Record<string, number>>({});
+  // Add-article form visibility.
+  const [showForm, setShowForm] = useState<boolean>(false);
+  // Scope and status filters.
+  const [scope, setScope] = useState<"all" | "mine">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
     categoriesApi
       .list()
       .then((cats) => {
-        const map = {};
+        const map: Record<string, number> = {};
         (Array.isArray(cats) ? cats : []).forEach((c) => {
           map[c.name] = c.id;
         });
@@ -52,103 +170,184 @@ function Articles() {
     : null;
   const isUncategorised = selectedCategory === "Uncategorised";
 
-  // Paginated main feed (20 per page when a category is selected).
-  // For "Uncategorised", send uncategorised=true instead of category_id.
-  const feed = usePagedList({
-    fetcher: (params) => articlesApi.list(params),
-    extraParams: isUncategorised
-      ? { uncategorised: "true" }
-      : categoryId
-        ? { category_id: categoryId }
-        : {},
-    perPage: 20,
-    enabled: true,
-  });
   // When the selected category changes, hide the add form (user navigated away).
   useEffect(() => {
     setShowForm(false);
   }, [selectedCategory]);
 
-  const loading = feed.loading;
-  const [showForm, setShowForm] = useState<boolean>(false);
-  const [scope, setScope] = useState<"all" | "mine">("all"); // "all" | "mine"
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  // Reload the paginated feed (used after create/delete/status changes).
-  const loadArticles = feed.reload;
-
-  // All articles, loaded once when no category is selected (grouped view).
-  const [groups, setGroups] = useState<any[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const loadGroups = useCallback(async () => {
-    try {
-      setLoadingGroups(true);
-      const data = await articlesApi.grouped();
-      setGroups(Array.isArray(data) ? data : []);
-    } catch {
-      setGroups([]);
-    } finally {
-      setLoadingGroups(false);
-    }
-  }, []);
-
-  // Reload whichever feed is active (paginated when a category is selected,
-  // the full grouped list otherwise). Stable unless the selected category
-  // changes, so effects can safely depend on it.
-  const reloadArticles = useCallback(() => {
-    if (selectedCategory) loadArticles();
-    else loadGroups();
-  }, [selectedCategory, loadArticles, loadGroups]);
-
-  const loadMyArticles = useCallback(async () => {
-    try {
-      const data = await articlesApi.myArticles();
-      setMyArticles(Array.isArray(data) ? data : []);
-    } catch {
-      setMyArticles([]);
-    } finally {
-      setMineLoaded(true);
-    }
-  }, []);
-
-  // `reloadArticles` is an inline dispatcher over the stable refs above — the
-  // effect re-runs when the user, the selected category, or either loader
-  // identity changes.
-  useEffect(() => {
-    reloadArticles();
-    if (user) loadMyArticles();
-    else {
-      setMyArticles([]);
-      setMineLoaded(true);
-    }
-  }, [user, selectedCategory, reloadArticles, loadMyArticles]);
-
-  function canManage(article) {
+  // Content managers can act on any article; everyone else only on their own.
+  function canManage(article: Article) {
     return Boolean(
       user && (canSeeAll || Number(article.user_id) === Number(user.id)),
     );
   }
 
-  async function handleDelete(id) {
+  // Bumped by `reload()` after a create/edit/delete. It is part of the fetch
+  // callback's identity, so changing it forces a refetch even when the page
+  // number and filters are unchanged.
+  const [reloadToken, setReloadToken] = useState(0);
+
+  // Fetch function for useSearch. Every non-search filter is passed as a
+  // primitive dependency so the callback identity stays stable between
+  // renders; otherwise useSearch would refetch on every single render.
+  const fetchArticles = useCallback(
+    async (params: SearchParams) => {
+      const merged = {
+        scope,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        ...(isUncategorised
+          ? { uncategorised: "true" }
+          : categoryId
+            ? { category_id: categoryId }
+            : {}),
+        ...params,
+      };
+      if (merged.per_page === undefined) merged.per_page = 20;
+      return articlesApi.list(merged);
+    },
+    [scope, statusFilter, isUncategorised, categoryId, reloadToken],
+  );
+
+  const {
+    data,
+    loading: listLoading,
+    params,
+    setPage,
+    setSort,
+    setFilter,
+    removeFilter,
+  } = useSearch(
+    fetchArticles,
+    {
+      page: 1,
+      per_page: 20,
+      sort: "relevance",
+      query: "",
+    },
+    { minQueryLength: MIN_SEARCH_LENGTH },
+  );
+
+  // The term that is actually searched for: blank until the user has typed
+  // enough characters, so short input shows the unfiltered listing.
+  const searchTerm = effectiveSearchTerm(params.query);
+
+  // All articles grouped by category. The paginated feed only backs the
+  // "category selected" listing; with no category selected the page renders
+  // the grouped view instead (cards capped at 12 per section).
+  const [groups, setGroups] = useState<ArticleGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  const loadGroups = useCallback(async () => {
+    try {
+      setLoadingGroups(true);
+      // The grouped view backs the no-category listing, so it must honour the
+      // same free-text search as the paginated feed; otherwise the query would
+      // be fetched and then thrown away.
+      const rows = await articlesApi.grouped(
+        searchTerm ? { query: searchTerm } : {},
+      );
+      setGroups(Array.isArray(rows) ? rows : []);
+    } catch {
+      setGroups([]);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, [searchTerm]);
+
+  // Load the grouped view whenever the listing is not scoped to one category,
+  // and re-run it when the search term changes.
+  useEffect(() => {
+    if (selectedCategory) return;
+    void loadGroups();
+  }, [selectedCategory, searchTerm, loadGroups]);
+
+  // The grouped view has its own loader, so either one counts as "loading".
+  const loading =
+    listLoading || (!selectedCategory && scope !== "mine" && loadingGroups);
+
+  // Refetch the active listing. Bumping the token guarantees a request even
+  // when the page number is already 1 and no filter changed.
+  const reload = () => {
+    setReloadToken((token) => token + 1);
+    setPage(1);
+    if (!selectedCategory) void loadGroups();
+  };
+
+  const loadMyArticles = useCallback(async () => {
+    try {
+      const rows = await articlesApi.myArticles();
+      setMyArticles(Array.isArray(rows) ? rows : []);
+    } catch {
+      setMyArticles([]);
+    } finally {
+      setMineLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) loadMyArticles();
+    else {
+      setMyArticles([]);
+      setMineLoaded(true);
+    }
+  }, [user, loadMyArticles]);
+
+  async function handleDelete(id: number) {
     if (!window.confirm("Delete this article?")) return;
     try {
       await articlesApi.destroy(id);
-      reloadArticles();
+      if (scope === "mine") {
+        setMyArticles((prev) => prev.filter((a) => a.id !== id));
+      }
+      reload();
     } catch (err) {
-      alert(err.message || "Failed to delete article");
+      alert((err as Error).message || "Failed to delete article");
     }
   }
 
-  async function togglePublish(article) {
+  async function togglePublish(article: Article) {
+    const nextStatus = article.status === "draft" ? "published" : "draft";
     try {
-      await articlesApi.update(article.id, {
-        status: article.status === "draft" ? "published" : "draft",
-      });
-      reloadArticles();
+      await articlesApi.update(article.id, { status: nextStatus });
+      if (scope === "mine") {
+        setMyArticles((prev) =>
+          prev.map((a) =>
+            a.id === article.id ? { ...a, status: nextStatus } : a,
+          ),
+        );
+      }
+      reload();
     } catch (err) {
-      alert(err.message || "Failed to update article");
+      alert((err as Error).message || "Failed to update article");
     }
   }
+
+  // Active-filter chips shown in the search bar.
+  const activeFilters: Record<string, string> = {};
+  if (scope !== "all") activeFilters.scope = scope;
+  if (statusFilter !== "all") activeFilters.status = statusFilter;
+  if (selectedCategory) activeFilters.category = selectedCategory;
+
+  // Each chip is backed by a different owner, so removal is dispatched per key
+  // rather than funnelled through the search hook's params.
+  const handleRemoveFilter = (key: string) => {
+    if (key === "scope") return setScope("all");
+    if (key === "status") return setStatusFilter("all");
+    if (key === "sort") return setSort("relevance");
+    if (key === "category") {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("category");
+        return next;
+      });
+      return;
+    }
+    removeFilter(key as keyof SearchParams);
+  };
+
+  const toggleFilterDrawer = () => {
+    // Placeholder for filter drawer toggle logic
+  };
 
   return (
     <main className="wine-app">
@@ -177,226 +376,177 @@ function Articles() {
           <ArticleForm
             onSaved={() => {
               setShowForm(false);
-              reloadArticles();
+              reload();
             }}
             onCancel={() => setShowForm(false)}
           />
         </div>
       )}
 
-      {!showForm &&
-        (loading || loadingGroups ? (
-          <p className="wine-management__loading">Loading articles…</p>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {(!canManageContent
-                ? []
-                : [
-                    { key: "all", label: "All Articles" },
-                    ...(user ? [{ key: "mine", label: "My Articles" }] : []),
-                  ]
-              ).map(({ key, label }) => (
+      {/* Search bar */}
+      <SearchBar
+        placeholder="Search articles…"
+        onSearch={(value) => setFilter("query", effectiveSearchTerm(value))}
+        activeFilters={activeFilters}
+        onRemoveFilter={handleRemoveFilter}
+        sortOptions={[
+          { value: "relevance", label: "Relevance" },
+          { value: "recent", label: "Most recent" },
+          { value: "oldest", label: "Oldest" },
+        ]}
+        currentSort={(params.sort as string) ?? "relevance"}
+        onSortChange={setSort}
+        showFilterButton={true}
+        onFilterToggle={toggleFilterDrawer}
+      />
+
+      {!showForm && loading ? (
+        <p className="wine-management__loading">Loading articles…</p>
+      ) : (
+        <>
+          {/* Scope: everyone's articles vs my articles */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {(!canManageContent
+              ? []
+              : [
+                  { key: "all", label: "All Articles" },
+                  ...(user ? [{ key: "mine", label: "My Articles" }] : []),
+                ]
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                style={{
+                  border: "1px solid #d7c8bb",
+                  borderRadius: "999px",
+                  padding: "8px 14px",
+                  fontWeight: 800,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  background: scope === key ? "#27615e" : "#fff",
+                  color: scope === key ? "#f7fff9" : "#4f4440",
+                  borderColor: scope === key ? "#27615e" : "#d7c8bb",
+                }}
+                onClick={() => setScope(key as "all" | "mine")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {canManageContent && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {["all", "draft", "published"].map((filter) => (
                 <button
-                  key={key}
+                  key={filter}
                   type="button"
                   style={{
                     border: "1px solid #d7c8bb",
                     borderRadius: "999px",
-                    padding: "8px 14px",
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
+                    padding: "6px 12px",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
                     cursor: "pointer",
-                    background: scope === key ? "#27615e" : "#fff",
-                    color: scope === key ? "#f7fff9" : "#4f4440",
-                    borderColor: scope === key ? "#27615e" : "#d7c8bb",
+                    background: statusFilter === filter ? "#8a273c" : "#fff",
+                    color: statusFilter === filter ? "#fff8f2" : "#4f4440",
+                    borderColor:
+                      statusFilter === filter ? "#8a273c" : "#d7c8bb",
                   }}
-                  onClick={() => setScope(key)}
+                  onClick={() => setStatusFilter(filter)}
                 >
-                  {label}
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </button>
               ))}
             </div>
+          )}
 
-            {canManageContent && (
-              <>
-                {/* Status filter: All / Draft / Published */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-                  {["all", "draft", "published"].map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      style={{
-                        border: "1px solid #d7c8bb",
-                        borderRadius: "999px",
-                        padding: "6px 12px",
-                        fontWeight: 700,
-                        fontSize: "0.8rem",
-                        cursor: "pointer",
-                        background:
-                          statusFilter === filter ? "#8a273c" : "#fff",
-                        color: statusFilter === filter ? "#fff8f2" : "#4f4440",
-                        borderColor:
-                          statusFilter === filter ? "#8a273c" : "#d7c8bb",
-                      }}
-                      onClick={() => setStatusFilter(filter)}
-                    >
-                      {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+          {(() => {
+            // Guests/Readers only ever see published articles.
+            const effectiveScope = canManageContent ? scope : "all";
+            const effectiveStatus = canManageContent
+              ? statusFilter
+              : "published";
+            const source: Article[] =
+              effectiveScope === "mine"
+                ? myArticles
+                : selectedCategory
+                  ? (data?.data ?? [])
+                  : groups.flatMap((group) =>
+                      Array.isArray(group.articles) ? group.articles : [],
+                    );
+            const filtered = (
+              effectiveStatus === "all"
+                ? source
+                : source.filter((a) => a?.status === effectiveStatus)
+            ).filter((a) => {
+              if (!selectedCategory) return true;
+              const catNames = Array.isArray(a.categories)
+                ? a.categories.map((c) => c.name)
+                : [];
+              if (catNames.length === 0)
+                return selectedCategory === "Uncategorised";
+              return catNames.includes(selectedCategory);
+            });
 
-            {(() => {
-              // Guests/Readers only ever see published articles.
-              const effectiveScope = canManageContent ? scope : "all";
-              const effectiveStatus = canManageContent
-                ? statusFilter
-                : "published";
-              const source =
-                effectiveScope === "mine"
-                  ? myArticles
-                                    : feed.items;
-              const filtered = (
-                effectiveStatus === "all"
-                  ? source
-                  : source.filter((a) => a?.status === effectiveStatus)
-              ).filter((a) => {
-                if (!selectedCategory) return true;
-                const catNames = Array.isArray(a.categories)
-                  ? a.categories.map((c) => c.name)
-                  : [];
-                if (catNames.length === 0)
-                  return selectedCategory === "Uncategorised";
-                return catNames.includes(selectedCategory);
-              });
+            // Deduplicate by article id (guards against eager-load joins in the
+            // API producing one row per article→category association).
+            const seen = new Set<number>();
+            const deduped = filtered.filter((a) => {
+              if (seen.has(a.id)) return false;
+              seen.add(a.id);
+              return true;
+            });
 
-              // Deduplicate by article id (guards against eager-load joins in the API
-              // producing one row per article→category association).
-              const seen = new Set();
-              const deduped = filtered.filter((a) => {
-                if (seen.has(a.id)) return false;
-                seen.add(a.id);
-                return true;
-              });
-
-              if (effectiveScope === "mine" && !user) {
-                return (
-                  <p className="wine-management__empty-state">
-                    Sign in to see your articles.
-                  </p>
-                );
-              }
-              if (effectiveScope === "mine" && !mineLoaded) {
-                return (
-                  <p className="wine-management__loading">Loading articles…</p>
-                );
-              }
-              if (deduped.length === 0) {
-                return (
-                  <p className="wine-management__empty-state">
-                    {source.length === 0
-                      ? scope === "mine"
+            if (effectiveScope === "mine" && !user) {
+              return (
+                <p className="wine-management__empty-state">
+                  Sign in to see your articles.
+                </p>
+              );
+            }
+            if (effectiveScope === "mine" && !mineLoaded) {
+              return (
+                <p className="wine-management__loading">Loading articles…</p>
+              );
+            }
+            if (deduped.length === 0) {
+              return (
+                <p className="wine-management__empty-state">
+                  {searchTerm
+                    ? `No articles matching “${searchTerm}”.`
+                    : source.length === 0
+                      ? effectiveScope === "mine"
                         ? "You haven't written any articles yet."
                         : "No articles yet. Write the first one!"
                       : `No ${statusFilter} articles.`}
-                  </p>
-                );
-              }
+                </p>
+              );
+            }
 
-              // When a category is selected, show a flat list (no grouping).
-              if (selectedCategory) {
-                return (
-                  <div className="content-grid">
-                    {deduped.map((article) => (
-                      <div
-                        key={article.id}
-                        className="wine-management__card"
-                        onClick={() => navigate(`/articles/${article.slug}`)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            navigate(`/articles/${article.slug}`);
-                          }
-                        }}
-                      >
-                        {Array.isArray(article.images) &&
-                          article.images.length > 0 && (
-                            <img
-                              src={article.images[0]}
-                              alt={article.title}
-                              className="wine-management__thumb"
-                            />
-                          )}
-                        <div className="wine-management__card-header">
-                          <h3>{article.title}</h3>
-                          {canManageContent && (
-                            <span
-                              className={`wine-management__color-badge wine-management__color-badge--${article.status}`}
-                            >
-                              {article.status}
-                            </span>
-                          )}
-                        </div>
-                        <p className="wine-management__region">{`by ${article.author_name}`}</p>
-                        {Array.isArray(article.tags) &&
-                          article.tags.length > 0 && (
-                            <p className="wine-management__vintage-count">
-                              Tags: {article.tags.join(", ")}
-                            </p>
-                          )}
-                        {excerpt(article.body, 50) && (
-                          <p className="wine-management__region">
-                            {excerpt(article.body, 50)}
-                          </p>
-                        )}
+            // When a category is selected, show a flat list (no grouping).
+            if (selectedCategory) {
+              return (
+                <div className="content-grid">
+                  {deduped.map((article) => (
+                    <ArticleCard
+                      key={article.id}
+                      article={article}
+                      query={searchTerm}
+                      canManage={canManage(article)}
+                      canManageContent={canManageContent}
+                      onOpen={() => navigate(`/articles/${article.slug}`)}
+                      onToggleStatus={() => togglePublish(article)}
+                      onDelete={() => handleDelete(article.id)}
+                    />
+                  ))}
+                </div>
+              );
+            }
 
-                        {canManage(article) && (
-                          <div
-                            className="wine-management__card-actions"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Link
-                              to={`/articles/${article.slug}/edit`}
-                              className="wine-management__edit-btn"
-                            >
-                              Edit
-                            </Link>
-                            <button
-                              type="button"
-                              className={
-                                article.status === "draft"
-                                  ? "wine-management__edit-btn"
-                                  : "wine-management__delete-btn"
-                              }
-                              onClick={() => togglePublish(article)}
-                            >
-                              {article.status === "draft"
-                                ? "Publish"
-                                : "Unpublish"}
-                            </button>
-                            <button
-                              type="button"
-                              className="wine-management__delete-btn"
-                              onClick={() => handleDelete(article.id)}
-                              title="Delete article"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-
-              // Group by category — an article can belong to multiple categories,
-              // so it is listed under every category it is tagged with.
-              const grouped = deduped.reduce((acc, article) => {
+            // Group by category — an article can belong to multiple categories,
+            // so it is listed under every category it is tagged with.
+            const grouped = deduped.reduce(
+              (acc, article) => {
                 const catNames = Array.isArray(article.categories)
                   ? article.categories.map((c) => c.name)
                   : [];
@@ -410,141 +560,76 @@ function Articles() {
                   });
                 }
                 return acc;
-              }, {});
+              },
+              {} as Record<string, Article[]>,
+            );
 
-              // True per-category totals from the grouped API (the rendered
-              // cards are capped at 12 per group, so counts can't be derived
-              // from `grouped`).
-              const groupCounts =
-                effectiveScope === "mine" || selectedCategory
-                  ? null
-                  : Object.fromEntries(
-                      groups.map((g) => [
-                        g.category,
-                        g.count ?? (g.articles || []).length,
-                      ]),
-                    );
+            // True per-category totals from the grouped API (the rendered cards
+            // are capped at 12 per group, so counts can't be derived from
+            // `grouped`).
+            const groupCounts =
+              effectiveScope === "mine" || selectedCategory
+                ? null
+                : Object.fromEntries(
+                    groups.map((g) => [
+                      g.category,
+                      g.count ?? (g.articles || []).length,
+                    ]),
+                  );
 
-              // Sort categories: by admin-defined sort order, Uncategorised last
-              const sortedCategories = sortCategoryNames(
-                Object.keys(grouped),
-                categoryOrder,
-              );
+            // Sort categories: by admin-defined sort order, Uncategorised last
+            const sortedCategories = sortCategoryNames(
+              Object.keys(grouped),
+              categoryOrder,
+            );
 
-              return (
-                <div className="content-grid-groups">
-                  {sortedCategories.map((category) => (
-                    <section key={category} className="content-grid-group">
-                      <h2 className="content-grid-group__title">
-                        {category}
-                        <Link
-                          className="group-show-all"
-                          to={`/articles?category=${encodeURIComponent(category)}`}
-                        >
-                          Show all ({groupCounts?.[category] ?? grouped[category].length})
-                        </Link>
-                      </h2>
-                      <div className="content-grid">
-                        {grouped[category].slice(0, 12).map((article) => (
-                          <div
-                            key={article.id}
-                            className="wine-management__card"
-                            onClick={() =>
-                              navigate(`/articles/${article.slug}`)
-                            }
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                navigate(`/articles/${article.slug}`);
-                              }
-                            }}
-                          >
-                            {Array.isArray(article.images) &&
-                              article.images.length > 0 && (
-                                <img
-                                  src={article.images[0]}
-                                  alt={article.title}
-                                  className="wine-management__thumb"
-                                />
-                              )}
-                            <div className="wine-management__card-header">
-                              <h3>{article.title}</h3>
-                              {canManageContent && (
-                                <span
-                                  className={`wine-management__color-badge wine-management__color-badge--${article.status}`}
-                                >
-                                  {article.status}
-                                </span>
-                              )}
-                            </div>
-                            <p className="wine-management__region">{`by ${article.author_name}`}</p>
-                            {Array.isArray(article.tags) &&
-                              article.tags.length > 0 && (
-                                <p className="wine-management__vintage-count">
-                                  Tags: {article.tags.join(", ")}
-                                </p>
-                              )}
-                            {excerpt(article.body, 50) && (
-                              <p className="wine-management__region">
-                                {excerpt(article.body, 50)}
-                              </p>
-                            )}
+            return (
+              <div className="content-grid-groups">
+                {sortedCategories.map((category) => (
+                  <section key={category} className="content-grid-group">
+                    <h2 className="content-grid-group__title">
+                      {category}
+                      <Link
+                        className="group-show-all"
+                        to={`/articles?category=${encodeURIComponent(category)}`}
+                      >
+                        Show all (
+                        {groupCounts?.[category] ??
+                          grouped[category]?.length ??
+                          0}
+                        )
+                      </Link>
+                    </h2>
+                    <div className="content-grid">
+                      {(grouped[category] ?? []).slice(0, 12).map((article) => (
+                        <ArticleCard
+                          key={article.id}
+                          article={article}
+                          query={searchTerm}
+                          canManage={canManage(article)}
+                          canManageContent={canManageContent}
+                          onOpen={() => navigate(`/articles/${article.slug}`)}
+                          onToggleStatus={() => togglePublish(article)}
+                          onDelete={() => handleDelete(article.id)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            );
+          })()}
 
-                            {canManage(article) && (
-                              <div
-                                className="wine-management__card-actions"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Link
-                                  to={`/articles/${article.slug}/edit`}
-                                  className="wine-management__edit-btn"
-                                >
-                                  Edit
-                                </Link>
-                                <button
-                                  type="button"
-                                  className={
-                                    article.status === "draft"
-                                      ? "wine-management__edit-btn"
-                                      : "wine-management__delete-btn"
-                                  }
-                                  onClick={() => togglePublish(article)}
-                                >
-                                  {article.status === "draft"
-                                    ? "Publish"
-                                    : "Unpublish"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="wine-management__delete-btn"
-                                  onClick={() => handleDelete(article.id)}
-                                  title="Delete article"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              );
-            })()}
-
-            {selectedCategory && (
-              <Pagination
-                page={feed.page}
-                totalPages={feed.totalPages}
-                totalCount={feed.totalCount}
-                onPageChange={feed.setPage}
-              />
-            )}
-          </>
-        ))}
+          {selectedCategory && (
+            <Pagination
+              page={params.page ?? 1}
+              totalPages={data?.totalPages ?? 1}
+              totalCount={data?.total ?? 0}
+              onPageChange={setPage}
+            />
+          )}
+        </>
+      )}
     </main>
   );
 }

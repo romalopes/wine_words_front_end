@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Articles from "./Articles";
@@ -17,7 +17,7 @@ const mockCategoriesList = vi.fn().mockResolvedValue([]);
 vi.mock("../services/api", () => ({
   articlesApi: {
     list: (...args: unknown[]) => mockList(...args),
-    grouped: () => mockGrouped(),
+    grouped: (...args: unknown[]) => mockGrouped(...args),
     myArticles: () => mockMyArticles(),
     update: vi.fn().mockResolvedValue({}),
     destroy: vi.fn().mockResolvedValue({}),
@@ -69,6 +69,9 @@ function renderArticles(initialEntry = "/articles") {
 
 describe("Articles", () => {
   beforeEach(() => {
+    // `useSearch` persists the query back to window.location, so without this
+    // a previous test's `?query=…` would leak into the next one.
+    window.history.replaceState({}, "", "/");
     mockList.mockReset().mockResolvedValue([]);
     mockGrouped.mockReset().mockResolvedValue([]);
     mockMyArticles.mockReset().mockResolvedValue([]);
@@ -144,6 +147,65 @@ describe("Articles", () => {
             typeof call[0] === "object" &&
             call[0] !== null &&
             (call[0] as { query?: string }).query === "barolo",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("re-requests the grouped view with the search term (no category)", async () => {
+    mockGrouped.mockResolvedValue([
+      { category: "Tasting notes", count: 1, articles: [makeArticle()] },
+    ]);
+    const user = userEvent.setup();
+
+    renderArticles();
+
+    const input = screen.getByPlaceholderText("Search articles…");
+    await user.type(input, "barolo");
+
+    // With no category selected the list renders from `articlesApi.grouped()`,
+    // so the term has to reach that request or search would appear to do
+    // nothing.
+    await waitFor(() => {
+      expect(
+        mockGrouped.mock.calls.some(
+          (call) =>
+            typeof call[0] === "object" &&
+            call[0] !== null &&
+            (call[0] as { query?: string }).query === "barolo",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("does not search until the term reaches three characters", async () => {
+    mockGrouped.mockResolvedValue([
+      { category: "Tasting notes", count: 1, articles: [makeArticle()] },
+    ]);
+    const user = userEvent.setup();
+
+    renderArticles();
+
+    const input = screen.getByPlaceholderText("Search articles…");
+    await user.type(input, "ba");
+
+    // Let the input's debounce elapse: two characters must not be searched.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+
+    const sentQuery = () =>
+      [...mockList.mock.calls, ...mockGrouped.mock.calls].some((call) =>
+        Boolean((call[0] as { query?: string } | undefined)?.query),
+      );
+    expect(sentQuery()).toBe(false);
+
+    // The third character triggers the search.
+    await user.type(input, "r");
+
+    await waitFor(() => {
+      expect(
+        mockGrouped.mock.calls.some(
+          (call) =>
+            (call[0] as { query?: string } | undefined)?.query === "bar",
         ),
       ).toBe(true);
     });

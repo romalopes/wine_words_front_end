@@ -9,11 +9,14 @@ import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
 import { useSearch } from "../hooks/useSearch";
+import {
+  effectiveSearchTerm,
+  MIN_SEARCH_LENGTH,
+} from "../services/searchParams";
 import type { SearchParams } from "../services/searchParams";
 import type { Review } from "../types/review";
 import type { ReviewGroup } from "../types/api";
 import { SearchBar, SearchHighlight } from "./search";
-import styles from "./ReviewsSearch.module.css";
 
 function excerpt(html: string | null | undefined, max = 50) {
   if (!html) return "";
@@ -278,11 +281,20 @@ function Reviews() {
     setSort,
     setFilter,
     removeFilter,
-  } = useSearch(fetchReviews, {
-    page: 1,
-    per_page: 20,
-    sort: "relevance",
-  });
+  } = useSearch(
+    fetchReviews,
+    {
+      page: 1,
+      per_page: 20,
+      sort: "relevance",
+      query: "",
+    },
+    { minQueryLength: MIN_SEARCH_LENGTH },
+  );
+
+  // The term that is actually searched for: blank until the user has typed
+  // enough characters, so short input shows the unfiltered listing.
+  const searchTerm = effectiveSearchTerm(params.query);
 
   // All reviews grouped by category. The paginated feed only backs the
   // "category selected" listing; with no category selected the page renders
@@ -293,20 +305,26 @@ function Reviews() {
   const loadGroups = useCallback(async () => {
     try {
       setLoadingGroups(true);
-      const rows = await reviewsApi.grouped();
+      // The grouped view backs the no-category listing, so it must honour the
+      // same free-text search as the paginated feed; otherwise the query would
+      // be fetched and then thrown away.
+      const rows = await reviewsApi.grouped(
+        searchTerm ? { query: searchTerm } : {},
+      );
       setGroups(Array.isArray(rows) ? rows : []);
     } catch {
       setGroups([]);
     } finally {
       setLoadingGroups(false);
     }
-  }, []);
+  }, [searchTerm]);
 
-  // Load the grouped view whenever the listing is not scoped to one category.
+  // Load the grouped view whenever the listing is not scoped to one category,
+  // and re-run it when the search term changes.
   useEffect(() => {
     if (selectedCategory) return;
     void loadGroups();
-  }, [selectedCategory, loadGroups]);
+  }, [selectedCategory, searchTerm, loadGroups]);
 
   // The grouped view has its own loader, so either one counts as "loading".
   const loading =
@@ -488,7 +506,7 @@ function Reviews() {
       {/* Search bar */}
       <SearchBar
         placeholder="Search reviews…"
-        onSearch={setFilter.bind(null, "query")}
+        onSearch={(value) => setFilter("query", effectiveSearchTerm(value))}
         activeFilters={activeFilters}
         onRemoveFilter={handleRemoveFilter}
         sortOptions={[
@@ -574,7 +592,7 @@ function Reviews() {
             const source: Review[] =
               effectiveScope === "mine"
                 ? myReviews
-                : true
+                : selectedCategory
                   ? (data?.data ?? [])
                   : groups.flatMap((group) =>
                       Array.isArray(group.reviews) ? group.reviews : [],
@@ -617,8 +635,8 @@ function Reviews() {
             if (deduped.length === 0) {
               return (
                 <p className="wine-management__empty-state">
-                  {params.query
-                    ? `No reviews matching “${params.query}”.`
+                  {searchTerm
+                    ? `No reviews matching “${searchTerm}”.`
                     : source.length === 0
                       ? effectiveScope === "mine"
                         ? "You haven't written any reviews yet."
@@ -635,7 +653,7 @@ function Reviews() {
                     <ReviewCard
                       key={review.id}
                       review={review}
-                      query={String(params.query ?? "")}
+                      query={searchTerm}
                       onOpen={() => navigate(`/reviews/${review.slug}`)}
                       canManage={canManage(review)}
                       onEdit={() => setEditingReview(review)}
@@ -721,7 +739,7 @@ function Reviews() {
                         <ReviewCard
                           key={review.id}
                           review={review}
-                          query={String(params.query ?? "")}
+                          query={searchTerm}
                           onOpen={() => navigate(`/reviews/${review.slug}`)}
                           canManage={canManage(review)}
                           onEdit={() => setEditingReview(review)}

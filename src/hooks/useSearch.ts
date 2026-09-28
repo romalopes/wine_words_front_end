@@ -66,9 +66,19 @@ const ROUTER_OWNED_KEYS = ["category"];
  * @param fetchFn Function that takes SearchParams and returns a list response
  * @param defaultParams Default search params (will be merged with parsed URL)
  */
+export interface UseSearchOptions {
+  /**
+   * Minimum number of characters before `query` is sent to the API. Shorter
+   * input is fetched as an empty query, so the listing stays unfiltered and no
+   * search request is made while the user is still typing.
+   */
+  minQueryLength?: number;
+}
+
 export function useSearch<T>(
   fetchFn: (params: SearchParams) => Promise<SearchResponse<T>>,
-  defaultParams: SearchParams = {}
+  defaultParams: SearchParams = {},
+  { minQueryLength = 0 }: UseSearchOptions = {}
 ) {
   // Initialize params from URL, then merge defaults (URL overrides defaults).
   // Router-owned keys are dropped so this hook can never stale-cache them.
@@ -90,9 +100,15 @@ export function useSearch<T>(
     return () => clearTimeout(handler);
   }, [params.query]);
 
+  // Blank the term out until it is long enough to search on, so one- and
+  // two-character input never triggers a search request.
+  const trimmedQuery = String(debouncedQuery ?? "").trim();
+  const effectiveQuery =
+    trimmedQuery.length >= minQueryLength ? trimmedQuery : "";
+
   // Fetch whenever the debounced query, the page, or any filter/sort changes.
   useEffect(() => {
-    const requestParams = { ...params, query: debouncedQuery };
+    const requestParams = { ...params, query: effectiveQuery };
     const fallbackPerPage = Number(requestParams.per_page) || 20;
     let cancelled = false;
     setLoading(true);
@@ -108,7 +124,7 @@ export function useSearch<T>(
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, params, fetchFn]);
+  }, [effectiveQuery, params, fetchFn]);
 
   // Reset to page 1 when the search term, sort or filters change (so a new
   // search never lands on a stale page). The page itself is excluded from the
