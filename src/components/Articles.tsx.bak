@@ -62,7 +62,7 @@ function Articles() {
         ? { category_id: categoryId }
         : {},
     perPage: 20,
-    enabled: true,
+    enabled: Boolean(selectedCategory),
   });
   // When the selected category changes, hide the add form (user navigated away).
   useEffect(() => {
@@ -257,7 +257,9 @@ function Articles() {
               const source =
                 effectiveScope === "mine"
                   ? myArticles
-                                    : feed.items;
+                  : selectedCategory
+                    ? feed.items
+                    : groups.flatMap((g) => g.articles);
               const filtered = (
                 effectiveStatus === "all"
                   ? source
@@ -535,7 +537,7 @@ function Articles() {
               );
             })()}
 
-            {selectedCategory && (
+            {selectedCategory && scope !== "mine" && (
               <Pagination
                 page={feed.page}
                 totalPages={feed.totalPages}

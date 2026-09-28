@@ -1,56 +1,225 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  reviewsApi,
-  winesApi,
-  vintagesApi,
-  categoriesApi,
-} from "../services/api";
+import { useState, useEffect, useCallback } from "react";
+import type { ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { reviewsApi, categoriesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
-import { useSelectedCategory } from "../hooks/useSelectedCategory";
 import ReviewForm from "./ReviewForm";
 import WineQuickCreate from "./WineQuickCreate";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
-import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
-import DOMPurify from "dompurify";
+import { useSearch } from "../hooks/useSearch";
+import type { SearchParams } from "../services/searchParams";
+import type { Review } from "../types/review";
+import type { ReviewGroup } from "../types/api";
+import { SearchBar, SearchHighlight } from "./search";
+import styles from "./ReviewsSearch.module.css";
 
-function excerpt(html, max = 50) {
+function excerpt(html: string | null | undefined, max = 50) {
   if (!html) return "";
   const stripped = html.replace(/<[^>]+>/g, "").trim();
   if (stripped.length <= max) return stripped;
   return stripped.slice(0, max) + "…";
 }
 
-function RichComment({ html }) {
+interface InlineReviewEditProps {
+  review: Review;
+  editingReview: Review | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+/**
+ * The inline edit form rendered inside a card when its Edit button is pressed.
+ * `ReviewForm` owns its own field state, so this only has to decide whether the
+ * card is the one being edited.
+ */
+function InlineReviewEdit({
+  review,
+  editingReview,
+  onClose,
+  onSaved,
+}: InlineReviewEditProps) {
+  if (!editingReview || editingReview.id !== review.id) return null;
   return (
     <div
-      className="review-card__comment"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
-    />
+      className="review-form-wrapper"
+      style={{ marginTop: 12 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <ReviewForm
+        review={editingReview}
+        vintageYear={editingReview.vintage_year ?? null}
+        vintageNoVintage={editingReview.vintage_no_vintage === true}
+        onSaved={onSaved}
+        onCancel={onClose}
+      />
+    </div>
+  );
+}
+
+interface ReviewCardProps {
+  review: Review;
+  query: string;
+  canManage: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+  onToggleStatus: () => void;
+  onDelete: () => void;
+  /** Rendered inside the card, used for the inline edit form. */
+  children?: ReactNode;
+}
+
+/**
+ * A single review card in the category grid. Mirrors the `wine-management__card`
+ * markup used by the other grouped listings, so the grid/typography match.
+ */
+function ReviewCard({
+  review,
+  query,
+  canManage,
+  onOpen,
+  onEdit,
+  onToggleStatus,
+  onDelete,
+  children,
+}: ReviewCardProps) {
+  const image =
+    (Array.isArray(review.images) && review.images.length > 0
+      ? review.images[0]
+      : null) ??
+    (typeof review.wine_image === "string" ? review.wine_image : null) ??
+    review.primary_image ??
+    null;
+  const hasDrinkWindow = review.drink_from != null || review.drink_to != null;
+
+  return (
+    <div
+      className="wine-management__card"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <div className="wine-management__card-header">
+        <h3>
+          <SearchHighlight
+            text={review.title || "Untitled review"}
+            query={query}
+          />
+        </h3>
+        {review.score != null && (
+          <span
+            className={`wine-management__color-badge wine-management__color-badge--${review.status}`}
+          >
+            {review.score}
+          </span>
+        )}
+      </div>
+
+      {(review.wine_name || review.vintage_year) && (
+        <p className="wine-management__region">
+          {review.wine_slug ? (
+            <Link
+              to={`/wines/${review.wine_slug}`}
+              className="my-reviews__wine-link"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {review.wine_name || "Unknown wine"}
+              {review.vintage_year ? ` (${review.vintage_year})` : ""}
+            </Link>
+          ) : (
+            <>
+              {review.wine_name}
+              {review.vintage_year ? ` (${review.vintage_year})` : ""}
+            </>
+          )}
+        </p>
+      )}
+
+      {review.reviewer_name && (
+        <p className="wine-management__region">by {review.reviewer_name}</p>
+      )}
+
+      {hasDrinkWindow && (
+        <p className="wine-management__vintage-count">
+          Drink {review.drink_from ?? ""}
+          {review.drink_to != null ? `–${review.drink_to}` : ""}
+          {review.drink_plus ? "+" : ""}
+        </p>
+      )}
+
+      {excerpt(review.comment, 50) && (
+        <p className="wine-management__region">{excerpt(review.comment, 50)}</p>
+      )}
+
+      {image && (
+        <img
+          src={image}
+          alt={review.title || review.wine_name || "review"}
+          className="wine-management__thumb"
+        />
+      )}
+
+      {canManage && (
+        <div
+          className="wine-management__card-actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="wine-management__edit-btn"
+            onClick={onEdit}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="wine-management__edit-btn"
+            onClick={onToggleStatus}
+          >
+            {review.status === "draft" ? "Publish" : "Unpublish"}
+          </button>
+          <button
+            type="button"
+            className="wine-management__delete-btn"
+            onClick={onDelete}
+            title="Delete review"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {children}
+    </div>
   );
 }
 
 function Reviews() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canSeeAll = canManageWinesRole(user);
-  // Admins, Editors and Reviewers see the management filters and the
-  // add button; Guests/Readers only see published reviews.
   const canManageContent = canManageWinesRole(user);
-  const [myReviews, setMyReviews] = useState([]);
-  // False until the first load of "my reviews" completes (avoids flashing
-  // the "You haven't written any reviews yet." empty state while loading).
+  const categoryOrder = useCategoryOrder("sort_order_review");
+  const [myReviews, setMyReviews] = useState<Review[]>([]);
   const [mineLoaded, setMineLoaded] = useState(false);
-  const selectedCategory = useSelectedCategory();
-  // Category name -> id map for resolving ?category= to category_id
-  const [categoryNameToId, setCategoryNameToId] = useState({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedCategory = searchParams.get("category") ?? null;
+  const [categoryNameToId, setCategoryNameToId] = useState<
+    Record<string, number>
+  >({});
 
   useEffect(() => {
     categoriesApi
       .list()
       .then((cats) => {
-        const map = {};
+        const map: Record<string, number> = {};
         (Array.isArray(cats) ? cats : []).forEach((c) => {
           map[c.name] = c.id;
         });
@@ -64,57 +233,68 @@ function Reviews() {
     : null;
   const isUncategorised = selectedCategory === "Uncategorised";
 
-  // Paginated main feed (20 per page when a category is selected).
-  // For "Uncategorised", send uncategorised=true instead of category_id.
-  const feed = usePagedList({
-    fetcher: (params) => reviewsApi.all(params),
-    extraParams: isUncategorised
-      ? { uncategorised: "true" }
-      : categoryId
-        ? { category_id: categoryId }
-        : {},
-    perPage: 20,
-    enabled: Boolean(selectedCategory),
-  });
-  // When the selected category changes, hide the add form (user navigated away).
-  useEffect(() => {
-    setShowForm(false);
-  }, [selectedCategory]);
+  // Content managers can act on any review; everyone else only on their own.
+  function canManage(review: Review) {
+    return Boolean(
+      user && (canSeeAll || Number(review.user_id) === Number(user.id)),
+    );
+  }
 
-  const loading = feed.loading;
-  const [showForm, setShowForm] = useState(false);
+  // Scope and status filters
   const [scope, setScope] = useState("all"); // "all" | "mine"
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [editingReview, setEditingReview] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "draft" | "published"
 
-  // Wine search state
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState(null); // null = not searched yet
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState(null);
+  // Bumped by `reload()` after a create/edit/delete. It is part of the fetch
+  // callback's identity, so changing it forces a refetch even when the page
+  // number and filters are unchanged.
+  const [reloadToken, setReloadToken] = useState(0);
 
-  // Selection / creation flow
-  const [selectedWine, setSelectedWine] = useState(null); // {id,name,slug,...,vintages}
-  const [selectedVintageId, setSelectedVintageId] = useState("");
-  const [showNewVintage, setShowNewVintage] = useState(false);
-  const [newVintage, setNewVintage] = useState({ year: "", prompt: "" });
-  const [creatingVintage, setCreatingVintage] = useState(false);
-  const [vintageError, setVintageError] = useState(null);
-  const [createdWineName, setCreatedWineName] = useState("");
+  // Fetch function for useSearch. Every non-search filter is passed as a
+  // primitive dependency so the callback identity stays stable between
+  // renders; otherwise useSearch would refetch on every single render.
+  const fetchReviews = useCallback(
+    async (params: SearchParams) => {
+      const merged = {
+        scope,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        ...(isUncategorised
+          ? { uncategorised: "true" }
+          : categoryId
+            ? { category_id: categoryId }
+            : {}),
+        ...params,
+      };
+      if (merged.per_page === undefined) merged.per_page = 20;
+      return reviewsApi.all(merged);
+    },
+    [scope, statusFilter, isUncategorised, categoryId, reloadToken],
+  );
 
-  const searchTimerRef = useRef(null);
+  const {
+    data,
+    loading: listLoading,
+    params,
+    setPage,
+    setSort,
+    setFilter,
+    removeFilter,
+  } = useSearch(fetchReviews, {
+    page: 1,
+    per_page: 20,
+    sort: "relevance",
+  });
 
-  // Reload the paginated feed (used after create/delete/status changes).
-  const loadReviews = feed.reload;
-
-  // All reviews, loaded once when no category is selected (grouped view).
-  const [groups, setGroups] = useState([]);
+  // All reviews grouped by category. The paginated feed only backs the
+  // "category selected" listing; with no category selected the page renders
+  // the grouped view instead (cards capped at 12 per section).
+  const [groups, setGroups] = useState<ReviewGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+
   const loadGroups = useCallback(async () => {
     try {
       setLoadingGroups(true);
-      const data = await reviewsApi.grouped();
-      setGroups(Array.isArray(data) ? data : []);
+      const rows = await reviewsApi.grouped();
+      setGroups(Array.isArray(rows) ? rows : []);
     } catch {
       setGroups([]);
     } finally {
@@ -122,19 +302,84 @@ function Reviews() {
     }
   }, []);
 
-  // Reload whichever feed is active (paginated when a category is selected,
-  // the full grouped list otherwise). Stable unless the selected category
-  // changes, so effects can safely depend on it.
-  const reloadReviews = useCallback(() => {
-    if (selectedCategory) loadReviews();
-    else loadGroups();
-  }, [selectedCategory, loadReviews, loadGroups]);
+  // Load the grouped view whenever the listing is not scoped to one category.
+  useEffect(() => {
+    if (selectedCategory) return;
+    void loadGroups();
+  }, [selectedCategory, loadGroups]);
+
+  // The grouped view has its own loader, so either one counts as "loading".
+  const loading =
+    listLoading || (!selectedCategory && scope !== "mine" && loadingGroups);
+
+  // Refetch the active listing. Bumping the token guarantees a request even
+  // when the page number is already 1 and no filter changed.
+  const reload = () => {
+    setReloadToken((token) => token + 1);
+    setPage(1);
+    if (!selectedCategory) void loadGroups();
+  };
+
+  // Quick-create state for the add-review form.
+  const [selectedWine, setSelectedWine] = useState<{
+    slug?: string;
+    name?: string;
+  } | null>(null);
+  const [selectedVintage, setSelectedVintage] = useState<{
+    id?: number;
+    year?: number | string;
+    no_vintage?: boolean;
+  } | null>(null);
+  // Add-review form visibility and the review currently being edited.
+  // `ReviewForm` owns its own field state, so only the wine selection and the
+  // review being edited need to live here.
+  const [showForm, setShowForm] = useState(false);
+  const toggleFilterDrawer = () => {
+    // Placeholder for filter drawer toggle logic
+  };
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+
+  const clearWineSelection = () => {
+    setSelectedWine(null);
+    setSelectedVintage(null);
+  };
+
+  // WineQuickCreate hands back the slug/id of the wine it just created.
+  const handleWineCreated = ({
+    slug,
+    vintageId,
+    name,
+  }: {
+    slug: string;
+    vintageId: number;
+    name: string;
+  }) => {
+    setSelectedWine({ slug, name });
+    setSelectedVintage({ id: vintageId });
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    clearWineSelection();
+  };
+  const cancelForm = () => {
+    setShowForm(false);
+    clearWineSelection();
+  };
+
+  const onSaved = () => {
+    closeForm();
+    void loadMyReviews();
+    reload();
+  };
 
   const loadMyReviews = useCallback(async () => {
+    setMineLoaded(false);
     try {
-      const data = await reviewsApi.myReviews();
-      setMyReviews(Array.isArray(data) ? data : []);
-    } catch {
+      const resp = await reviewsApi.myReviews();
+      setMyReviews(Array.isArray(resp) ? resp : []);
+    } catch (err) {
+      console.error("Failed to fetch my reviews", err);
       setMyReviews([]);
     } finally {
       setMineLoaded(true);
@@ -142,141 +387,72 @@ function Reviews() {
   }, []);
 
   useEffect(() => {
-    reloadReviews();
-    if (user) loadMyReviews();
-    else {
-      setMyReviews([]);
-      setMineLoaded(true);
+    loadMyReviews();
+  }, []);
+
+  // Status change and delete handlers
+  const onStatusChange = async (review: Review, newStatus: string) => {
+    try {
+      await reviewsApi.update(review.id, { status: newStatus });
+      if (scope === "mine") {
+        setMyReviews((prev) =>
+          prev.map((r) =>
+            r.id === review.id ? { ...r, status: newStatus } : r,
+          ),
+        );
+      }
+      reload();
+    } catch (err) {
+      console.error("Failed to update review status", err);
     }
-  }, [user, selectedCategory, reloadReviews, loadMyReviews]);
+  };
 
-  function canManage(review) {
-    return Boolean(
-      user && (canSeeAll || Number(review.user_id) === Number(user.id)),
-    );
-  }
-
-  async function handleDelete(reviewId) {
+  const onDelete = async (id: number) => {
     if (!window.confirm("Delete this review?")) return;
     try {
-      await reviewsApi.destroy(reviewId);
-      reloadReviews();
-      loadMyReviews();
+      await reviewsApi.destroy(id);
+      if (scope === "mine") {
+        setMyReviews((prev) => prev.filter((r) => r.id !== id));
+      }
+      reload();
     } catch (err) {
-      alert(err.message || "Failed to delete review");
+      console.error("Failed to delete review", err);
     }
-  }
+  };
 
-  async function handleStatusChange(review, status) {
-    try {
-      await reviewsApi.update(review.id, {
-        status,
-        ...(status === "published"
-          ? { published_at: new Date().toISOString() }
-          : {}),
+  // Active-filter chips shown in the search bar.
+  const activeFilters: Record<string, string> = {};
+  if (scope !== "all") activeFilters.scope = scope;
+  if (statusFilter !== "all") activeFilters.status = statusFilter;
+  if (selectedCategory) activeFilters.category = selectedCategory;
+
+  // Each chip is backed by a different owner, so removal is dispatched per key
+  // rather than funnelled through the search hook's params.
+  const handleRemoveFilter = (key: string) => {
+    if (key === "scope") return setScope("all");
+    if (key === "status") return setStatusFilter("all");
+    if (key === "sort") return setSort("relevance");
+    if (key === "category") {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("category");
+        return next;
       });
-      reloadReviews();
-      loadMyReviews();
-    } catch (err) {
-      alert(
-        err.message ||
-          `Failed to ${status === "published" ? "publish" : "unpublish"}`,
-      );
-    }
-  }
-
-  async function performSearch(q) {
-    const trimmed = q.trim();
-    if (trimmed.length < 2) {
-      setSearchResults(null);
-      setSelectedWine(null);
       return;
     }
-    try {
-      setSearching(true);
-      setSearchError(null);
-      const data = await winesApi.search(trimmed);
-      setSearchResults(Array.isArray(data) ? data : []);
-      setSelectedWine(null);
-      setSelectedVintageId("");
-      setShowNewVintage(false);
-    } catch (err) {
-      setSearchError(err.message || "Search failed");
-      setSearchResults(null);
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  function handleSearchChange(e) {
-    const value = e.target.value;
-    setQuery(value);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => performSearch(value), 300);
-  }
-
-  function handleSelectWine(wine) {
-    setSelectedWine(wine);
-    setSelectedVintageId("");
-    setShowNewVintage(false);
-    setVintageError(null);
-  }
-
-  async function handleCreateVintage(e) {
-    e.preventDefault();
-    setCreatingVintage(true);
-    setVintageError(null);
-    try {
-      const created = await vintagesApi.create(selectedWine.slug, {
-        year: parseInt(newVintage.year, 10),
-        prompt: newVintage.prompt || null,
-      });
-      // Refresh the wine's vintage list with the new vintage and select it.
-      const updatedWine = {
-        ...selectedWine,
-        vintages: [
-          { id: created.id, year: created.year },
-          ...(selectedWine.vintages || []),
-        ],
-      };
-      setSelectedWine(updatedWine);
-      setSelectedVintageId(created.id);
-      setShowNewVintage(false);
-      setNewVintage({ year: "", prompt: "" });
-    } catch (err) {
-      setVintageError(err.message || "Failed to create vintage");
-    } finally {
-      setCreatingVintage(false);
-    }
-  }
-
-  function handleWineCreated({ slug, vintageId, name }) {
-    setCreatedWineName(name);
-    setSelectedWine({ slug, name, vintages: [{ id: vintageId }] });
-    setSelectedVintageId(vintageId);
-  }
-
-  function closeForm() {
-    setShowForm(false);
-    setQuery("");
-    setSearchResults(null);
-    setSelectedWine(null);
-    setSelectedVintageId("");
-    setShowNewVintage(false);
-    setNewVintage({ year: "", prompt: "" });
-    setCreatedWineName("");
-  }
+    removeFilter(key as keyof SearchParams);
+  };
+  const quickCreateProps = {
+    ...(selectedWine?.slug != null ? { wineSlug: selectedWine.slug } : {}),
+    ...(selectedWine?.name != null ? { wineName: selectedWine.name } : {}),
+    ...(selectedVintage?.id != null ? { vintageId: selectedVintage.id } : {}),
+  };
 
   return (
     <main className="wine-app">
       <div className="wine-management__header">
         <div>
-          <h1>{selectedCategory || "Reviews"}</h1>
-          {selectedCategory && (
-            <Link className="group-show-all" to="/reviews">
-              ← Show all reviews
-            </Link>
-          )}
+          <h1>Reviews</h1>
         </div>
         {canManageContent && (
           <button
@@ -289,697 +465,300 @@ function Reviews() {
         )}
       </div>
 
-      {/* {!user && (
-        <p className="wine-management__empty-state">
-          Sign in to manage reviews
-        </p>
-      )} */}
-
       {showForm && (
         <div className="review-form-wrapper">
-          {selectedVintageId && selectedWine ? (
-            <>
-              <div className="review-card review-card--draft">
-                <div className="review-card__top">
-                  <h3 className="review-card__title">{selectedWine.name}</h3>
-                  <span className="review-card__status">
-                    {selectedWine.vintages?.find(
-                      (v) => String(v.id) === String(selectedVintageId),
-                    )?.year || "Vintage"}
-                  </span>
-                </div>
-              </div>
-              <ReviewForm
-                wineSlug={selectedWine.slug}
-                wineName={selectedWine.name}
-                vintageId={Number(selectedVintageId)}
-                vintageNoVintage={
-                  selectedWine.vintages?.find(
-                    (v) => String(v.id) === String(selectedVintageId),
-                  )?.no_vintage
-                }
-                vintageYear={
-                  selectedWine.vintages?.find(
-                    (v) => String(v.id) === String(selectedVintageId),
-                  )?.year
-                }
-                onSaved={() => {
-                  closeForm();
-                  reloadReviews();
-                }}
-                onCancel={closeForm}
-              />
-            </>
-          ) : (
-            <div className="review-form">
-              {/* Step 1: search for a wine */}
-              {!selectedWine && (
-                <>
-                  <div className="review-form__field">
-                    <label htmlFor="add-review-wine-search">
-                      Search for a wine
-                    </label>
-                    <input
-                      id="add-review-wine-search"
-                      type="text"
-                      value={query}
-                      onChange={handleSearchChange}
-                      placeholder="Start typing a wine name…"
-                      autoFocus
-                    />
-                    {searching && (
-                      <p className="wine-management__loading">Searching…</p>
-                    )}
-                    {searchError && (
-                      <p className="review-form__error">{searchError}</p>
-                    )}
-                  </div>
-
-                  {searchResults !== null && searchResults.length > 0 && (
-                    <div className="review-form__field">
-                      <span className="image-manager__label">
-                        {searchResults.length} wine
-                        {searchResults.length !== 1 ? "s" : ""} found — pick one
-                      </span>
-                      <div className="review-list">
-                        {searchResults.map((wine) => (
-                          <button
-                            key={wine.slug}
-                            type="button"
-                            className="review-card"
-                            onClick={() => handleSelectWine(wine)}
-                          >
-                            <div className="review-card__top">
-                              <strong>{wine.name}</strong>
-                              {wine.color && (
-                                <span className="review-card__status">
-                                  {wine.color}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {query.trim().length >= 2 &&
-                    !searching &&
-                    searchResults !== null &&
-                    searchResults.length === 0 && (
-                      <WineQuickCreate
-                        defaultName={query.trim()}
-                        onCreated={handleWineCreated}
-                        onCancel={() => setSearchResults(null)}
-                      />
-                    )}
-                </>
-              )}
-
-              {/* Step 2: vintage selection for the chosen (or new) wine */}
-              {selectedWine && !selectedVintageId && (
-                <>
-                  <p className="wine-management__empty-state">
-                    Reviewing <strong>{selectedWine.name}</strong>
-                    {createdWineName ? " (just added)" : ""} — choose a vintage.
-                  </p>
-
-                  {(selectedWine.vintages || []).length > 0 ? (
-                    <div className="review-form__field">
-                      <span className="image-manager__label">Vintages</span>
-                      <div className="review-list">
-                        {selectedWine.vintages.map((vintage) => (
-                          <button
-                            key={vintage.id}
-                            type="button"
-                            className="review-card"
-                            onClick={() => setSelectedVintageId(vintage.id)}
-                          >
-                            <div className="review-card__top">
-                              <strong>{vintage.year}</strong>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="wine-management__empty-state">
-                      No vintages yet for this wine.
-                    </p>
-                  )}
-
-                  {showNewVintage ? (
-                    <form
-                      className="review-form"
-                      onSubmit={handleCreateVintage}
-                    >
-                      <div className="review-form__field">
-                        <label htmlFor="new-vintage-year">
-                          New Vintage Year *
-                        </label>
-                        <input
-                          id="new-vintage-year"
-                          type="number"
-                          required
-                          min={1900}
-                          max={new Date().getFullYear() + 5}
-                          value={newVintage.year}
-                          onChange={(e) =>
-                            setNewVintage((prev) => ({
-                              ...prev,
-                              year: e.target.value,
-                            }))
-                          }
-                          placeholder="e.g. 2021"
-                        />
-                      </div>
-                      <div className="review-form__field">
-                        <label htmlFor="new-vintage-prompt">
-                          Prompt (optional)
-                        </label>
-                        <input
-                          id="new-vintage-prompt"
-                          type="text"
-                          value={newVintage.prompt}
-                          onChange={(e) =>
-                            setNewVintage((prev) => ({
-                              ...prev,
-                              prompt: e.target.value,
-                            }))
-                          }
-                          placeholder="Tasting notes for this vintage"
-                        />
-                      </div>
-                      {vintageError && (
-                        <p className="review-form__error">{vintageError}</p>
-                      )}
-                      <div className="review-form__actions">
-                        <button
-                          className="auth-form__submit"
-                          type="submit"
-                          disabled={creatingVintage}
-                        >
-                          {creatingVintage ? "Creating…" : "Create Vintage"}
-                        </button>
-                        <button
-                          type="button"
-                          className="review-form__cancel"
-                          onClick={() => setShowNewVintage(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="review-form__actions">
-                      <button
-                        type="button"
-                        className="auth-form__submit"
-                        onClick={() => setShowNewVintage(true)}
-                      >
-                        + New Vintage
-                      </button>
-                      <button
-                        type="button"
-                        className="review-form__cancel"
-                        onClick={() => {
-                          setSelectedWine(null);
-                          setSelectedVintageId("");
-                        }}
-                      >
-                        Back to search
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          <WineQuickCreate
+            onCreated={handleWineCreated}
+            onCancel={cancelForm}
+          />
+          <ReviewForm
+            {...quickCreateProps}
+            vintageNoVintage={selectedVintage?.no_vintage === true}
+            vintageYear={
+              typeof selectedVintage?.year === "number"
+                ? selectedVintage.year
+                : null
+            }
+            onSaved={onSaved}
+            onCancel={cancelForm}
+          />
         </div>
       )}
 
-      {!showForm &&
-        (loading || loadingGroups ? (
-          <p className="wine-management__loading">Loading reviews…</p>
-        ) : (
-          <>
-            {/* Scope toggle: everyone's reviews vs my reviews */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {(!canManageContent
-                ? []
-                : [
-                    { key: "all", label: "All Reviews" },
-                    ...(user ? [{ key: "mine", label: "My Reviews" }] : []),
-                  ]
-              ).map(({ key, label }) => (
+      {/* Search bar */}
+      <SearchBar
+        placeholder="Search reviews…"
+        onSearch={setFilter.bind(null, "query")}
+        activeFilters={activeFilters}
+        onRemoveFilter={handleRemoveFilter}
+        sortOptions={[
+          { value: "relevance", label: "Relevance" },
+          { value: "recent", label: "Most recent" },
+          { value: "oldest", label: "Oldest" },
+          { value: "score_high", label: "Score high→low" },
+          { value: "score_low", label: "Score low→high" },
+        ]}
+        currentSort={(params.sort as string) ?? "relevance"}
+        onSortChange={setSort}
+        showFilterButton={true}
+        onFilterToggle={toggleFilterDrawer}
+      />
+
+      
+      {!showForm && loading ? (
+        <p className="wine-management__loading">Loading reviews…</p>
+      ) : (
+        <>
+          {/* Scope: everyone's reviews vs my reviews */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {(!canManageContent
+              ? []
+              : [
+                  { key: "all", label: "All Reviews" },
+                  ...(user ? [{ key: "mine", label: "My Reviews" }] : []),
+                ]
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                style={{
+                  border: "1px solid #d7c8bb",
+                  borderRadius: "999px",
+                  padding: "8px 14px",
+                  fontWeight: 800,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  background: scope === key ? "#27615e" : "#fff",
+                  color: scope === key ? "#f7fff9" : "#4f4440",
+                  borderColor: scope === key ? "#27615e" : "#d7c8bb",
+                }}
+                onClick={() => setScope(key as "all" | "mine")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {canManageContent && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {["all", "draft", "published"].map((filter) => (
                 <button
-                  key={key}
+                  key={filter}
                   type="button"
-                  className={`wine-segmented button ${scope === key ? "active" : ""}`}
                   style={{
                     border: "1px solid #d7c8bb",
                     borderRadius: "999px",
-                    padding: "8px 14px",
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
+                    padding: "6px 12px",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
                     cursor: "pointer",
-                    background: scope === key ? "#27615e" : "#fff",
-                    color: scope === key ? "#f7fff9" : "#4f4440",
-                    borderColor: scope === key ? "#27615e" : "#d7c8bb",
+                    background: statusFilter === filter ? "#8a273c" : "#fff",
+                    color: statusFilter === filter ? "#fff8f2" : "#4f4440",
+                    borderColor:
+                      statusFilter === filter ? "#8a273c" : "#d7c8bb",
                   }}
-                  onClick={() => setScope(key)}
+                  onClick={() => setStatusFilter(filter)}
                 >
-                  {label}
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </button>
               ))}
             </div>
+          )}
 
-            {canManageContent && (
-              <>
-                {/* Status filter: All / Draft / Published */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-                  {["all", "draft", "published"].map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      style={{
-                        border: "1px solid #d7c8bb",
-                        borderRadius: "999px",
-                        padding: "6px 12px",
-                        fontWeight: 700,
-                        fontSize: "0.8rem",
-                        cursor: "pointer",
-                        background:
-                          statusFilter === filter ? "#8a273c" : "#fff",
-                        color: statusFilter === filter ? "#fff8f2" : "#4f4440",
-                        borderColor:
-                          statusFilter === filter ? "#8a273c" : "#d7c8bb",
-                      }}
-                      onClick={() => setStatusFilter(filter)}
+          {(() => {
+            // Guests/Readers only ever see published reviews.
+            const effectiveScope = canManageContent ? scope : "all";
+            const effectiveStatus = canManageContent
+              ? statusFilter
+              : "published";
+            const source: Review[] =
+              effectiveScope === "mine"
+                ? myReviews
+                : true
+                  ? (data?.data ?? [])
+                  : groups.flatMap((group) =>
+                      Array.isArray(group.reviews) ? group.reviews : [],
+                    );
+            const filtered = (
+              effectiveStatus === "all"
+                ? source
+                : source.filter((r) => r?.status === effectiveStatus)
+            ).filter((r) => {
+              if (!selectedCategory) return true;
+              const catNames = Array.isArray(r.categories)
+                ? r.categories.map((c) => c.name)
+                : [];
+              if (catNames.length === 0)
+                return selectedCategory === "Uncategorised";
+              return catNames.includes(selectedCategory);
+            });
+
+            // Deduplicate by review id (guards against eager-load joins in the
+            // API producing one row per review→category association).
+            const seen = new Set<number>();
+            const deduped = filtered.filter((r) => {
+              if (seen.has(r.id)) return false;
+              seen.add(r.id);
+              return true;
+            });
+
+            if (effectiveScope === "mine" && !user) {
+              return (
+                <p className="wine-management__empty-state">
+                  Sign in to see your reviews.
+                </p>
+              );
+            }
+            if (effectiveScope === "mine" && !mineLoaded) {
+              return (
+                <p className="wine-management__loading">Loading reviews…</p>
+              );
+            }
+            if (deduped.length === 0) {
+              return (
+                <p className="wine-management__empty-state">
+                  {params.query
+                    ? `No reviews matching “${params.query}”.`
+                    : source.length === 0
+                      ? effectiveScope === "mine"
+                        ? "You haven't written any reviews yet."
+                        : "No reviews yet. Be the first!"
+                      : `No ${statusFilter} reviews.`}
+                </p>
+              );
+            }
+            // When a category is selected, show a flat list (no grouping).
+            if (selectedCategory) {
+              return (
+                <div className="content-grid">
+                  {deduped.map((review) => (
+                    <ReviewCard
+                      key={review.id}
+                      review={review}
+                      query={String(params.query ?? "")}
+                      onOpen={() => navigate(`/reviews/${review.slug}`)}
+                      canManage={canManage(review)}
+                      onEdit={() => setEditingReview(review)}
+                      onToggleStatus={() =>
+                        onStatusChange(
+                          review,
+                          review.status === "draft" ? "published" : "draft",
+                        )
+                      }
+                      onDelete={() => onDelete(review.id)}
                     >
-                      {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                    </button>
+                      <InlineReviewEdit
+                        review={review}
+                        editingReview={editingReview}
+                        onSaved={onSaved}
+                        onClose={() => setEditingReview(null)}
+                      />
+                    </ReviewCard>
                   ))}
                 </div>
-              </>
-            )}
+              );
+            }
 
-            <ReviewsList
-              reviews={scope === "mine" ? myReviews : (selectedCategory ? feed.items : groups.flatMap((g) => g.reviews || []))}
-              mineLoading={!mineLoaded}
-              groupCounts={
-                scope === "mine" || selectedCategory
-                  ? null
-                  : Object.fromEntries(
-                      groups.map((g) => [
-                        g.category,
-                        g.count ?? (g.reviews || []).length,
-                      ]),
-                    )
+            // Group by category — a review can belong to multiple categories,
+            // so it is listed under every category it is tagged with.
+            const grouped = deduped.reduce(
+              (acc, review) => {
+                const catNames = Array.isArray(review.categories)
+                  ? review.categories.map((c) => c.name)
+                  : [];
+                if (catNames.length === 0) {
+                  if (!acc["Uncategorised"]) acc["Uncategorised"] = [];
+                  acc["Uncategorised"].push(review);
+                } else {
+                  catNames.forEach((name) => {
+                    if (!acc[name]) acc[name] = [];
+                    acc[name].push(review);
+                  });
                 }
-              scope={scope}
-              user={user}
-              statusFilter={canManageContent ? statusFilter : "published"}
-              canManage={canManage}
-              editingReview={editingReview}
-              setEditingReview={setEditingReview}
-              onDelete={handleDelete}
-              onStatusChange={handleStatusChange}
-              onSaved={() => {
-                setEditingReview(null);
-                reloadReviews();
-                loadMyReviews();
-              }}
+                return acc;
+              },
+              {} as Record<string, Review[]>,
+            );
+
+            // True per-category totals from the grouped API (the rendered cards
+            // are capped at 12 per group, so counts can't be derived from
+            // `grouped`).
+            const groupCounts =
+              effectiveScope === "mine" || selectedCategory
+                ? null
+                : Object.fromEntries(
+                    groups.map((g) => [
+                      g.category,
+                      g.count ?? (g.reviews || []).length,
+                    ]),
+                  );
+
+            // Sort categories: by admin-defined sort order, Uncategorised last
+            const sortedCategories = sortCategoryNames(
+              Object.keys(grouped),
+              categoryOrder,
+            );
+
+            return (
+              <div className="content-grid-groups">
+                {sortedCategories.map((category) => (
+                  <section key={category} className="content-grid-group">
+                    <h2 className="content-grid-group__title">
+                      {category}
+                      <Link
+                        className="group-show-all"
+                        to={`/reviews?category=${encodeURIComponent(category)}`}
+                      >
+                        Show all (
+                        {groupCounts?.[category] ??
+                          grouped[category]?.length ??
+                          0}
+                        )
+                      </Link>
+                    </h2>
+                    <div className="content-grid">
+                      {(grouped[category] ?? []).slice(0, 12).map((review) => (
+                        <ReviewCard
+                          key={review.id}
+                          review={review}
+                          query={String(params.query ?? "")}
+                          onOpen={() => navigate(`/reviews/${review.slug}`)}
+                          canManage={canManage(review)}
+                          onEdit={() => setEditingReview(review)}
+                          onToggleStatus={() =>
+                            onStatusChange(
+                              review,
+                              review.status === "draft" ? "published" : "draft",
+                            )
+                          }
+                          onDelete={() => onDelete(review.id)}
+                        >
+                          <InlineReviewEdit
+                            review={review}
+                            editingReview={editingReview}
+                            onSaved={onSaved}
+                            onClose={() => setEditingReview(null)}
+                          />
+                        </ReviewCard>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            );
+          })()}
+
+          {selectedCategory && (
+            <Pagination
+              page={params.page ?? 1}
+              totalPages={data?.totalPages ?? 1}
+              totalCount={data?.total ?? 0}
+              onPageChange={setPage}
             />
-
-            {selectedCategory && scope === "all" && (
-              <Pagination
-                page={feed.page}
-                totalPages={feed.totalPages}
-                totalCount={feed.totalCount}
-                onPageChange={feed.setPage}
-              />
-            )}
-          </>
-        ))}
+          )}
+        </>
+      )}
     </main>
-  );
-}
-
-function ReviewsList({
-  reviews,
-  groupCounts,
-  mineLoading,
-  scope,
-  user,
-  statusFilter,
-  canManage,
-  editingReview,
-  setEditingReview,
-  onDelete,
-  onStatusChange,
-  onSaved,
-}) {
-  const navigate = useNavigate();
-  const categoryOrder = useCategoryOrder("sort_order_review");
-  const selectedCategory = useSelectedCategory();
-  const filtered = (
-    statusFilter === "all"
-      ? reviews
-      : reviews.filter((r) => r?.status === statusFilter)
-  ).filter((r) => {
-    if (!selectedCategory) return true;
-    const catNames = Array.isArray(r.categories)
-      ? r.categories.map((c) => c.name)
-      : [];
-    if (catNames.length === 0) return selectedCategory === "Uncategorised";
-    return catNames.includes(selectedCategory);
-  });
-
-  // Deduplicate by review id (guards against eager-load joins in the API
-  // producing one row per review→category association).
-  const seen = new Set();
-  const deduped = filtered.filter((r) => {
-    if (seen.has(r.id)) return false;
-    seen.add(r.id);
-    return true;
-  });
-
-  // Group by category — a review can belong to multiple categories,
-  // so it is listed under every category it is tagged with.
-  const grouped = deduped.reduce((acc, review) => {
-    const catNames = Array.isArray(review.categories)
-      ? review.categories.map((c) => c.name)
-      : [];
-    if (catNames.length === 0) {
-      if (!acc["Uncategorised"]) acc["Uncategorised"] = [];
-      acc["Uncategorised"].push(review);
-    } else {
-      catNames.forEach((name) => {
-        if (!acc[name]) acc[name] = [];
-        acc[name].push(review);
-      });
-    }
-    return acc;
-  }, {});
-
-  // Sort categories: by admin-defined sort order, Uncategorised last
-  const sortedCategories = sortCategoryNames(
-    Object.keys(grouped),
-    categoryOrder,
-  );
-
-  if (scope === "mine" && !user) {
-    return (
-      <p className="wine-management__empty-state">
-        Sign in to see your reviews.
-      </p>
-    );
-  }
-  if (deduped.length === 0) {
-    if (scope === "mine" && mineLoading) {
-      return <p className="wine-management__loading">Loading reviews…</p>;
-    }
-    return (
-      <p className="wine-management__empty-state">
-        {reviews.length === 0
-          ? scope === "mine"
-            ? "You haven't written any reviews yet."
-            : "No reviews yet. Be the first!"
-          : `No ${statusFilter} reviews.`}
-      </p>
-    );
-  }
-
-  // When a category is selected, show a flat list (no grouping).
-  if (selectedCategory) {
-    return (
-      <div className="content-grid">
-        {deduped.map((review) => (
-          <div
-            key={review.id}
-            className="wine-management__card"
-            onClick={() => navigate(`/reviews/${review.slug}`)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigate(`/reviews/${review.slug}`);
-              }
-            }}
-          >
-            <div className="wine-management__card-header">
-              <h3>{review.title || "Untitled review"}</h3>
-              <span
-                className={`wine-management__color-badge wine-management__color-badge--${review.status}`}
-              >
-                {review.score}
-              </span>
-            </div>
-            {(review.wine_name || review.vintage_year) && (
-              <p className="wine-management__producer">
-                {review.wine_name}
-                {review.vintage_year ? ` ${review.vintage_year}` : ""}
-              </p>
-            )}
-            {review.reviewer_name && (
-              <p className="wine-management__region">
-                by {review.reviewer_name}
-              </p>
-            )}
-            {(review.drink_from != null || review.drink_to != null) && (
-              <p className="wine-management__vintage-count">
-                Drink {review.drink_from ?? ""}
-                {review.drink_to != null ? `–${review.drink_to}` : ""}
-                {review.drink_plus ? "+" : ""}
-              </p>
-            )}
-            {excerpt(review.comment, 50) && (
-              <p className="wine-management__region">
-                {excerpt(review.comment, 50)}
-              </p>
-            )}
-            {(Array.isArray(review.images) && review.images.length > 0
-              ? review.images[0]
-              : review.wine_image) && (
-              <img
-                src={
-                  Array.isArray(review.images) && review.images.length > 0
-                    ? review.images[0]
-                    : review.wine_image
-                }
-                alt={review.title || review.wine_name || "review"}
-                className="wine-management__thumb"
-              />
-            )}
-
-            {canManage(review) && (
-              <div
-                className="wine-management__card-actions"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  className="wine-management__edit-btn"
-                  onClick={() => setEditingReview(review)}
-                >
-                  Edit
-                </button>
-                {review.status === "draft" ? (
-                  <button
-                    type="button"
-                    className="wine-management__edit-btn"
-                    onClick={() => onStatusChange(review, "published")}
-                  >
-                    Publish
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="wine-management__delete-btn"
-                    onClick={() => onStatusChange(review, "draft")}
-                  >
-                    Unpublish
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="wine-management__delete-btn"
-                  onClick={() => onDelete(review.id)}
-                  title="Delete review"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            {editingReview && editingReview.id === review.id && (
-              <div
-                className="review-form-wrapper"
-                style={{ marginTop: 12 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ReviewForm
-                  wineSlug={review.wine_slug}
-                  wineName={editingReview?.wine_name}
-                  vintageId={review.vintage_id}
-                  vintageYear={editingReview?.vintage_year}
-                  review={editingReview}
-                  onSaved={onSaved}
-                  onCancel={() => setEditingReview(null)}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // No category selected: grouped-by-category view.
-  return (
-    <div className="content-grid-groups">
-      {sortedCategories.map((category) => (
-        <section key={category} className="content-grid-group">
-          <h2 className="content-grid-group__title">
-            {category}
-            <Link
-              className="group-show-all"
-              to={`/reviews?category=${encodeURIComponent(category)}`}
-            >
-              Show all ({groupCounts?.[category] ?? grouped[category].length})
-            </Link>
-          </h2>
-          <div className="content-grid">
-            {grouped[category].slice(0, 12).map((review) => (
-              <div
-                key={review.id}
-                className="wine-management__card"
-                onClick={() => navigate(`/reviews/${review.slug}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/reviews/${review.slug}`);
-                  }
-                }}
-              >
-                <div className="wine-management__card-header">
-                  <h3>{review.title || "Untitled review"}</h3>
-                  <span
-                    className={`wine-management__color-badge wine-management__color-badge--${review.status}`}
-                  >
-                    {review.score}
-                  </span>
-                </div>
-                {(review.wine_name || review.vintage_year) && (
-                  <p className="wine-management__region">
-                    <Link
-                      to={review.wine_slug ? `/wines/${review.wine_slug}` : "#"}
-                      className="my-reviews__wine-link"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {review.wine_name || "Unknown wine"}
-                      {review.vintage_year ? ` (${review.vintage_year})` : ""}
-                    </Link>
-                  </p>
-                )}
-                {review.reviewer_name && (
-                  <p className="wine-management__region">
-                    by {review.reviewer_name}
-                  </p>
-                )}
-                {(review.drink_from != null || review.drink_to != null) && (
-                  <p className="wine-management__vintage-count">
-                    Drink {review.drink_from ?? ""}
-                    {review.drink_to != null ? `–${review.drink_to}` : ""}
-                    {review.drink_plus ? "+" : ""}
-                  </p>
-                )}
-                {excerpt(review.comment, 50) && (
-                  <p className="wine-management__region">
-                    {excerpt(review.comment, 50)}
-                  </p>
-                )}
-                {(Array.isArray(review.images) && review.images.length > 0
-                  ? review.images[0]
-                  : review.wine_image) && (
-                  <img
-                    src={
-                      Array.isArray(review.images) && review.images.length > 0
-                        ? review.images[0]
-                        : review.wine_image
-                    }
-                    alt={review.title || review.wine_name || "review"}
-                    className="wine-management__thumb"
-                  />
-                )}
-
-                {canManage(review) && (
-                  <div
-                    className="wine-management__card-actions"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className="wine-management__edit-btn"
-                      onClick={() => setEditingReview(review)}
-                    >
-                      Edit
-                    </button>
-                    {review.status === "draft" ? (
-                      <button
-                        type="button"
-                        className="wine-management__edit-btn"
-                        onClick={() => onStatusChange(review, "published")}
-                      >
-                        Publish
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="wine-management__delete-btn"
-                        onClick={() => onStatusChange(review, "draft")}
-                      >
-                        Unpublish
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="wine-management__delete-btn"
-                      onClick={() => onDelete(review.id)}
-                      title="Delete review"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-
-                {editingReview && editingReview.id === review.id && (
-                  <div
-                    className="review-form-wrapper"
-                    style={{ marginTop: 12 }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ReviewForm
-                      wineSlug={review.wine_slug}
-                      wineName={editingReview?.wine_name}
-                      vintageId={review.vintage_id}
-                      vintageYear={editingReview?.vintage_year}
-                      review={editingReview}
-                      onSaved={onSaved}
-                      onCancel={() => setEditingReview(null)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
   );
 }
 

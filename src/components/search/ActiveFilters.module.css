@@ -1,27 +1,40 @@
 .wrapper {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.chip {
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 12px;
-  padding: 2px 8px;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.remove {
-  background: transparent;
-  border: none;
-  color: #555;
-  cursor: pointer;
-  font-weight: bold;
-  padding: 0;
-  line-height: 1;
-}
-.remove:hover {
-  color: #000;
-}
+   display: flex;
+   flex-wrap: wrap;
+   gap: 0.5rem;
+ }
+ .chip {
+   background: #f0f0f0;
+   border: 1px solid #ccc;
+   border-radius: 12px;
+   padding: 2px 8px;
+   font-size: 0.875rem;
+   display: flex;
+   align-items: center;
+   gap: 0.25rem;
+ }
+ .chip__remove {
+   background: transparent;
+   border: none;
+   color: #555;
+   cursor: pointer;
+   font-weight: bold;
+   padding: 0;
+   line-height: 1;
+   font-size: 0.875rem;
+ }
+ .chip__remove:hover {
+   color: #000;
+ }
+ .remove {
+   background: transparent;
+   border: none;
+   color: #555;
+   cursor: pointer;
+   font-weight: bold;
+   padding: 0;
+   line-height: 1;
+ }
+ .remove:hover {
+   color: #000;
+ }

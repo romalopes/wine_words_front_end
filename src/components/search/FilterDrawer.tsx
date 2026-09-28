@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import styles from './FilterDrawer.module.css';
-import { SearchFilters } from './SearchFilters';
+import React from "react";
+import styles from "./FilterDrawer.module.css";
 
 interface FilterDrawerProps {
   open: boolean;
@@ -31,14 +30,15 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
             ×
           </button>
         </div>
-        <div className={styles.body}>
-          {children}
-        </div>
+        <div className={styles.body}>{children}</div>
         <div className={styles.footer}>
           <button className={styles.button} onClick={onReset}>
             Reset
           </button>
-          <button className={styles.button primary} onClick={() => onApply(currentFilters)}>
+          <button
+            className={`${styles.button} ${styles.primary}`}
+            onClick={() => onApply(currentFilters)}
+          >
             Apply
           </button>
         </div>
