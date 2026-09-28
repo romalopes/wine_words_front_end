@@ -1,0 +1,8 @@
+.container {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #555;
+}
+.container p {
+  margin: 0.5rem 0;
+}

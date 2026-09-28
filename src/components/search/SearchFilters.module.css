@@ -1,0 +1,22 @@
+.button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.button:hover {
+  opacity: 0.9;
+}
+.badge {
+  background: #000;
+  color: #fff;
+  border-radius: 50%;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1;
+}
