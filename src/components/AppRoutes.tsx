@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import About from "./About";
+import AboutPage from "./about/AboutPage";
 import AccountSettings from "./AccountSettings";
 import Dashboard from "./Dashboard";
 import Home from "./Home";
@@ -51,7 +51,7 @@ function AppRoutes() {
         <Route element={<Dashboard />} path="/" />
         <Route element={<Home />} path="/finder" />
         <Route element={<Quiz />} path="quiz" />
-        <Route element={<About />} path="about" />
+        <Route element={<AboutPage />} path="about" />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
