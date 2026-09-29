@@ -1196,6 +1196,13 @@ textarea {
   margin-bottom: 18px;
 }
 
+/* "N wines found" line above the simple-search results grid. */
+.wine-management__count {
+  color: #5d514b;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
 .wine-management__empty {
   background: #fffaf4;
   border: 1px solid #e4d9cd;
@@ -1422,6 +1429,34 @@ textarea {
   font-size: 1.1rem;
   font-weight: 700;
 }
+
+/* ----------------------------------------------------------------------- */
+/* Category chip styling – mimic the look of the filter chips used in
+   Articles/Reviews.  The classes are global, so they can be referenced from
+   the CategoryChip component without importing a CSS module. */
+/* ----------------------------------------------------------------------- */
+ .category-chip {
+   background: #f0f0f0;
+   border: 1px solid #ccc;
+   border-radius: 12px;
+   padding: 2px 8px;
+   font-size: 0.875rem;
+   display: flex;
+   align-items: center;
+   gap: 0.25rem;
+ }
+ .category-chip__remove {
+   background: transparent;
+   border: none;
+   color: #555;
+   cursor: pointer;
+   font-weight: bold;
+   padding: 0;
+   line-height: 1;
+ }
+ .category-chip__remove:hover {
+   color: #000;
+ }
 
 /* Wine form row for side-by-side inputs */
 .wine-form__row {

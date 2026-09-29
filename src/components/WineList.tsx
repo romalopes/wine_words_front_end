@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { winesApi, categoriesApi } from "../services/api";
 import type { WineGroup } from "../types/api";
 import type { WineListItem } from "../types/wine";
@@ -13,6 +13,167 @@ import usePagedList from "../hooks/usePagedList";
 import Pagination from "./Pagination";
 import WineAdvancedSearch from "./WineAdvancedSearch";
 import type { SearchParams } from "./WineAdvancedSearch";
+import { SearchHighlight, SearchInput } from "./search";
+import { CategoryChip } from "./CategoryChip";
+import {
+  effectiveSearchTerm,
+  MIN_SEARCH_LENGTH,
+} from "../services/searchParams";
+
+/**
+ * Card body for a simple-search hit: name, producer, grapes and regions with
+ * the query highlighted, reusing the same CSS classes as the grouped cards.
+ * Split out of the results branch below so the file stays within the editor
+ * and lint size budgets for a single JSX block.
+ */
+function SimpleResultCard({
+  wine,
+  query,
+  canManageWines,
+  onDelete,
+}: {
+  wine: WineListItem;
+  query: string;
+  canManageWines: boolean;
+  onDelete: (wine: WineListItem, e: MouseEvent) => void;
+}) {
+  return (
+    <>
+      <div className="wine-management__card-header">
+        <h3>
+          <SearchHighlight text={wine.name} query={query} />
+        </h3>
+        <span
+          className={`wine-management__color-badge wine-management__color-badge--${wine.color}`}
+        >
+          {wine.color}
+        </span>
+      </div>
+      {wine.producer && (
+        <p className="wine-management__producer">
+          <SearchHighlight text={wine.producer.name} query={query} />
+        </p>
+      )}
+      {Array.isArray(wine.grapes) && wine.grapes.length > 0 && (
+        <p className="wine-management__grapes">
+          <strong>Grapes:</strong>{" "}
+          {wine.grapes.slice(0, 3).map((g, index) => (
+            <span key={`${g.name}-${index}`}>
+              {index > 0 && ", "}
+              <SearchHighlight text={g.name} query={query} />
+            </span>
+          ))}
+          {wine.grapes.length > 3 ? "…" : ""}
+        </p>
+      )}
+      {Array.isArray(wine.regions) && wine.regions.length > 0 && (
+        <p className="wine-management__regions">
+          <strong>Regions:</strong>{" "}
+          {wine.regions.slice(0, 3).map((r, index) => {
+            const name = typeof r === "string" ? r : (r.name ?? String(r));
+            return (
+              <span key={`${name}-${index}`}>
+                {index > 0 && ", "}
+                <SearchHighlight text={name} query={query} />
+              </span>
+            );
+          })}
+          {wine.regions.length > 3 ? "…" : ""}
+        </p>
+      )}
+      {(wine.vintages_count ?? 0) > 0 && (
+        <p className="wine-management__vintage-count">
+          {wine.vintages_count} vintage
+          {wine.vintages_count !== 1 ? "s" : ""}
+        </p>
+      )}
+      {canManageWines && (
+        <div
+          className="wine-management__card-actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link
+            to={`/wines/${wine.slug}/edit`}
+            className="wine-management__edit-btn"
+          >
+            Edit
+          </Link>
+          <button
+            className="wine-management__delete-btn"
+            onClick={(e) => onDelete(wine, e)}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function SimpleResultsSummary({
+  simpleQuery,
+  onClear,
+}: {
+  simpleQuery: string;
+  onClear: () => void;
+}) {
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      <p
+        style={{
+          fontSize: "0.8rem",
+          color: "#666",
+          margin: "0.35rem 0 0",
+        }}
+      >
+        Showing wines matching “{simpleQuery}”.{" "}
+        <button
+          type="button"
+          onClick={onClear}
+          className="btn-secondary"
+          style={{ padding: "0.1rem 0.6rem", fontSize: "0.8rem" }}
+        >
+          Clear
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function SearchModeControls({
+  searchMode,
+  onSimple,
+  onAdvanced,
+}: {
+  searchMode: "simple" | "advanced";
+  onSimple: () => void;
+  onAdvanced: () => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Wine search mode"
+      style={{ display: "flex", gap: "0.5rem", margin: "1rem 0" }}
+    >
+      <button
+        type="button"
+        onClick={onSimple}
+        aria-pressed={searchMode === "simple"}
+        className={searchMode === "simple" ? "btn-primary" : "btn-secondary"}
+      >
+        Simple search
+      </button>
+      <button
+        type="button"
+        onClick={onAdvanced}
+        aria-pressed={searchMode === "advanced"}
+        className={searchMode === "advanced" ? "btn-primary" : "btn-secondary"}
+      >
+        Advanced search
+      </button>
+    </div>
+  );
+}
 
 function WineList() {
   const { user } = useAuth();
@@ -23,6 +184,18 @@ function WineList() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const selectedCategory = useSelectedCategory();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ---------------------------------------------------------------------------
+  // One search mode is visible at a time. Simple search is the default quick
+  // bar; the existing advanced form stays available behind the toggle. Each
+  // mode owns its filters and pagination state, and entering one clears the
+  // other mode's results.
+  // ---------------------------------------------------------------------------
+  type WineSearchMode = "simple" | "advanced";
+  const [searchMode, setSearchMode] = useState<WineSearchMode>("simple");
+  const [simpleValue, setSimpleValue] = useState("");
+  const simpleQuery = effectiveSearchTerm(simpleValue, MIN_SEARCH_LENGTH);
 
   // --- Advanced search state ---------------------------------------------
   // null => normal browsing; an object => show the advanced-search results.
@@ -35,17 +208,44 @@ function WineList() {
     fetcher: (params) => winesApi.advancedSearch(params),
     extraParams: searchFilters ?? {},
     perPage: 20,
-    enabled: searchFilters !== null,
+    enabled: searchMode === "advanced" && searchFilters !== null,
     paramKey: "asearch_page",
   });
 
+  // Simple free-text results. Independent pagination (qsearch_page) so the two
+  // modes never fight over the URL page key. Enabled only from the third
+  // character, matching Reviews/Articles.
+  const simplePaged = usePagedList({
+    fetcher: (params) => winesApi.advancedSearch(params),
+    extraParams: { q: simpleQuery },
+    perPage: 20,
+    enabled: searchMode === "simple" && simpleQuery !== "",
+    paramKey: "qsearch_page",
+  });
+
   function handleAdvancedSearch(filters: SearchParams) {
+    setSearchMode("advanced");
     setSearchFilters(filters);
+  }
+
+  function showSimple() {
+    setSearchMode("simple");
+    setSearchFilters(null);
+  }
+
+  function showAdvanced() {
+    setSearchMode("advanced");
+    setSimpleValue("");
   }
 
   function handleAdvancedClear() {
     setSearchFilters(null);
+    showSimple();
     if (!selectedCategory) loadGroups();
+  }
+
+  function handleSimpleClear() {
+    setSimpleValue("");
   }
 
   // Category name -> id map for resolving ?category= to category_id
@@ -93,6 +293,30 @@ function WineList() {
     }
   }, [selectedCategory]);
 
+  // Simple query first: it spans the catalogue and must win over a stale
+  // category selection.
+  const showingSimpleResults =
+    searchMode === "simple" && simpleQuery !== "";
+  const showingAdvancedResults =
+    searchMode === "advanced" && searchFilters !== null;
+
+  // A simple query spans the whole catalogue, so it overrides the category
+  // view the same way the advanced results do. Typing takes precedence;
+  // picking a category clears the term (below) and browsing resumes.
+  useEffect(() => {
+    setSimpleValue("");
+  }, [selectedCategory]);
+
+  // Reset simple-search pagination when the effective query changes: a new
+  // search must not land on page 3 of the previous one. Skipped while
+  // already on page 1 so typing does not spam no-op history updates.
+  const prevSimpleQuery = useRef(simpleQuery);
+  useEffect(() => {
+    if (prevSimpleQuery.current === simpleQuery) return;
+    prevSimpleQuery.current = simpleQuery;
+    if (simplePaged.page !== 1) simplePaged.setPage(1);
+  }, [simpleQuery, simplePaged]);
+
   async function loadGroups() {
     try {
       setLoading(true);
@@ -115,7 +339,9 @@ function WineList() {
     }
     try {
       await winesApi.destroy(wine.slug);
-      if (selectedCategory) {
+      if (showingSimpleResults) {
+        simplePaged.reload();
+      } else if (selectedCategory) {
         pagedWines.reload();
       } else {
         // Re-fetch the grouped view (cheap: only 12 per category).
@@ -146,7 +372,7 @@ function WineList() {
   }
 
   // --- Advanced search results: flat paginated list -----------------------
-  if (searchFilters !== null) {
+  if (showingAdvancedResults) {
     return (
       <div className="wine-app">
         <div className="wine-management__header">
@@ -266,18 +492,112 @@ function WineList() {
     );
   }
 
-  // --- Category selected: flat paginated list ---
-  if (selectedCategory) {
+  // --- Simple search results: flat paginated list --------------------------
+  // The query spans the whole catalogue, so — like the advanced results — it
+  // takes precedence over the category view. It is checked before that view so
+  // typing always wins over a stale category selection.
+  if (showingSimpleResults) {
     return (
       <div className="wine-app">
         <div className="wine-management__header">
           <div>
             <p className="wine-kicker">Cellar</p>
-            <h1>"{selectedCategory}" Wines</h1>
-            <Link className="group-show-all" to="/wines">
-              ← Show all categories
-            </Link>
+            <h1>Search Results</h1>
           </div>
+        </div>
+
+        <SearchModeControls
+          searchMode={searchMode}
+          onSimple={showSimple}
+          onAdvanced={showAdvanced}
+        />
+        <SearchInput
+          value={simpleValue}
+          onChange={setSimpleValue}
+          placeholder="Search wines by name, producer, region, or grape…"
+        />
+        <SimpleResultsSummary
+          simpleQuery={simpleQuery}
+          onClear={handleSimpleClear}
+        />
+
+        {simplePaged.loading ? (
+          <p className="wine-management__loading">Searching wines…</p>
+        ) : simplePaged.error ? (
+          <p className="wine-management__error">{simplePaged.error}</p>
+        ) : simplePaged.items.length === 0 ? (
+          <div className="wine-management__empty">
+            <p>No wines found for “{simpleQuery}”.</p>
+            <button className="btn-secondary" onClick={handleSimpleClear}>
+              Clear search
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="wine-management__count">
+              {simplePaged.totalCount}{" "}
+              {simplePaged.totalCount !== 1 ? "wines" : "wine"} found
+            </p>
+            <div className="content-grid">
+              {simplePaged.items.map((wine) => (
+                <div
+                  key={wine.slug}
+                  className="wine-management__card"
+                  onClick={() => navigate(`/wines/${wine.slug}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/wines/${wine.slug}`);
+                    }
+                  }}
+                >
+                  <SimpleResultCard
+                    wine={wine}
+                    query={simpleQuery}
+                    canManageWines={canManageWines}
+                    onDelete={handleDelete}
+                  />
+                </div>
+              ))}
+            </div>
+            <Pagination
+              page={simplePaged.page}
+              totalPages={simplePaged.totalPages}
+              totalCount={simplePaged.totalCount}
+              onPageChange={simplePaged.setPage}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // --- Category selected: flat paginated list ---
+  if (selectedCategory) {
+    return (
+      <div className="wine-app">
+        <div className="wine-management__header">
+            <div>
+              <p className="wine-kicker">Cellar</p>
+              <h1>{selectedCategory} Wines</h1>
+              {selectedCategory && (
+                <CategoryChip
+                  label={selectedCategory}
+                  onClear={() => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete("category");
+                      return next;
+                    });
+                  }}
+                />
+              )}
+              <Link className="group-show-all" to="/wines">
+                ← Show all categories
+              </Link>
+            </div>
           {canManageWines && (
             <Link
               to="/wines/new"
@@ -287,6 +607,17 @@ function WineList() {
             </Link>
           )}
         </div>
+
+        <SearchModeControls
+          searchMode={searchMode}
+          onSimple={showSimple}
+          onAdvanced={showAdvanced}
+        />
+        <SearchInput
+          value={simpleValue}
+          onChange={setSimpleValue}
+          placeholder="Search wines by name, producer, region, or grape…"
+        />
 
         {pagedWines.loading ? (
           <p className="wine-management__loading">Loading wines…</p>
@@ -410,12 +741,43 @@ function WineList() {
         )}
       </div>
 
-      <WineAdvancedSearch
-        open={advancedOpen}
-        onToggleOpen={setAdvancedOpen}
-        onSearch={handleAdvancedSearch}
-        onClear={handleAdvancedClear}
+      {/* Search mode toggle — one mode visible at a time. Simple search is the
+          default; the existing Advanced Wine Search stays one click away. */}
+      <SearchModeControls
+        searchMode={searchMode}
+        onSimple={showSimple}
+        onAdvanced={showAdvanced}
       />
+      {searchMode === "advanced" && (
+        <WineAdvancedSearch
+          open={advancedOpen}
+          onToggleOpen={setAdvancedOpen}
+          onSearch={handleAdvancedSearch}
+          onClear={handleAdvancedClear}
+        />
+      )}
+      {searchMode === "simple" && (
+        <div style={{ marginBottom: "1rem" }}>
+          <SearchInput
+            value={simpleValue}
+            onChange={setSimpleValue}
+            placeholder="Search wines by name, producer, region, or grape…"
+          />
+          <p
+            style={{
+              fontSize: "0.8rem",
+              color: "#666",
+              margin: "0.35rem 0 0",
+            }}
+          >
+            Matches wine names, producers, regions and grapes
+            {simpleValue.trim() !== "" &&
+              simpleValue.trim().length < MIN_SEARCH_LENGTH &&
+              ` — keep typing (at least ${MIN_SEARCH_LENGTH} characters)`}
+            .
+          </p>
+        </div>
+      )}
 
       {groups.length === 0 ? (
         <div className="wine-management__empty">
