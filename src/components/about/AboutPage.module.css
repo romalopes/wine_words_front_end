@@ -255,6 +255,20 @@
   font-weight: 600;
 }
 
+/* ---------- Portrait ---------- */
+
+.portrait {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid #681a2a;
+  margin: 0 auto 1.5rem;
+}
+
 /* ---------- Timeline SVG ---------- */
 
 .timelineFigure {

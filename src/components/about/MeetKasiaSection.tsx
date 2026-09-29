@@ -1,5 +1,6 @@
 import type { MeetKasiaData } from "../../types/about";
 import { kasiaData } from "../../data/about/kasia";
+import kasiaPortrait from "../../assets/kasia.jpg";
 import styles from "./AboutPage.module.css";
 
 /** Vertical SVG timeline of Kasia's professional journey. */
@@ -89,6 +90,11 @@ function KasiaTimeline({ timeline }: { timeline: MeetKasiaData["timeline"] }) {
 function MeetKasiaSection({ data = kasiaData }: { data?: MeetKasiaData }) {
   return (
     <>
+      <img
+        src={kasiaPortrait}
+        alt="Kasia Sobiesiak"
+        className={styles.portrait}
+      />
       <p className={styles.lead}>{data.intro}</p>
 
       <ul className={styles.roleList} aria-label="Roles">

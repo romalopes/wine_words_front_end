@@ -38,9 +38,7 @@ function SubmissionFlowchart({ steps }: { steps: string[] }) {
                   fill={isLast ? "#681a2a" : "#fffaf4"}
                   stroke={isLast ? "#681a2a" : "#c9b8a8"}
                   strokeWidth="1.5"
-                  className={
-                    isLast ? styles.flowNodeFinal : styles.flowNode
-                  }
+                  className={isLast ? styles.flowNodeFinal : styles.flowNode}
                 />
                 <text
                   x={x + nodeWidth / 2}
@@ -104,7 +102,7 @@ function TradeSection({ data = tradeData }: { data?: TradeData }) {
           <h3>What We Don't Guarantee</h3>
           <ul className={styles.plainList}>
             {data.doesNotGuarantee.map((item) => (
-              <li key={item}>• {item}</li>
+              <li key={item}>{item}</li>
             ))}
           </ul>
         </div>
@@ -117,7 +115,10 @@ function TradeSection({ data = tradeData }: { data?: TradeData }) {
       <div className={styles.divider} />
 
       <h3>Editorial Independence</h3>
-      <p>Receiving a wine sample does not guarantee a review, a score, publication or positive coverage.</p>
+      <p>
+        Receiving a wine sample does not guarantee a review, a score,
+        publication or positive coverage.
+      </p>
       {data.editorialPolicy.map((policy) => (
         <p key={policy.slice(0, 40)}>{policy}</p>
       ))}
