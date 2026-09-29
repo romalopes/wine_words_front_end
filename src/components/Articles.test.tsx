@@ -211,6 +211,39 @@ describe("Articles", () => {
     });
   });
 
+  it("cancels the superseded request when the term changes", async () => {
+    mockGrouped.mockResolvedValue([
+      { category: "Tasting notes", count: 1, articles: [makeArticle()] },
+    ]);
+    const user = userEvent.setup();
+
+    renderArticles();
+
+    // Every grouped load takes a { signal }, so a keystroke can cancel the
+    // request that is still in flight instead of leaving it to complete and be
+    // discarded on arrival.
+    const groupedSignals = () =>
+      mockGrouped.mock.calls
+        .map((call) => (call[1] as { signal?: AbortSignal } | undefined)?.signal)
+        .filter((signal): signal is AbortSignal => Boolean(signal));
+
+    const input = screen.getByPlaceholderText("Search articles…");
+    await user.type(input, "barolo");
+    await waitFor(() => expect(groupedSignals().length).toBeGreaterThan(0));
+
+    await user.type(input, "x");
+
+    await waitFor(() => {
+      expect(groupedSignals().length).toBeGreaterThan(1);
+      // Every superseded load is aborted...
+      expect(groupedSignals().slice(0, -1).every((signal) => signal.aborted)).toBe(true);
+    });
+    // ...while the newest one is left to finish.
+    expect(groupedSignals().at(-1)?.aborted).toBe(false);
+    // No load went out without a signal, or cancellation would be impossible.
+    expect(groupedSignals().length).toBe(mockGrouped.mock.calls.length);
+  });
+
   it("survives a failed grouped request", async () => {
     mockGrouped.mockRejectedValue(new Error("network down"));
 

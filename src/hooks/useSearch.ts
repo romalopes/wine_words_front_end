@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { buildQuery, parseQuery } from '../services/searchParams';
 import type { SearchParams } from '../services/searchParams';
 import type { Paginated, ResourceResponse } from '../types/common';
+import type { RequestSignal } from '../types/api';
 
 /** The single shape this hook hands to components. */
 export interface PaginatedResult<T> {
@@ -54,6 +55,23 @@ export function toPaginatedResult<T>(
 }
 
 /**
+ * True for the rejection an aborted `fetch` produces. Browsers reject with a
+ * `DOMException` named AbortError, and jsdom/Node do the same, so the name is
+ * the portable check — an `instanceof DOMException` would not survive every
+ * runtime.
+ *
+ * Exported because the grouped loaders cancel their own requests too, and they
+ * must ignore an abort for the same reason this hook does.
+ */
+export function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
+/**
  * Query keys owned by React Router rather than this hook. `category` is driven
  * by `useSelectedCategory()`, so the router location is its single source of
  * truth: if this hook read or wrote it too, the two would fight each other
@@ -69,14 +87,14 @@ const ROUTER_OWNED_KEYS = ["category"];
 export interface UseSearchOptions {
   /**
    * Minimum number of characters before `query` is sent to the API. Shorter
-   * input is fetched as an empty query, so the listing stays unfiltered and no
-   * search request is made while the user is still typing.
+   * input is fetched as an empty query, so the listing stays unfiltered instead
+   * of being searched on a one- or two-character fragment.
    */
   minQueryLength?: number;
 }
 
 export function useSearch<T>(
-  fetchFn: (params: SearchParams) => Promise<SearchResponse<T>>,
+  fetchFn: (params: SearchParams, options?: RequestSignal) => Promise<SearchResponse<T>>,
   defaultParams: SearchParams = {},
   { minQueryLength = 0 }: UseSearchOptions = {}
 ) {
@@ -92,37 +110,43 @@ export function useSearch<T>(
 
   const [data, setData] = useState<PaginatedResult<T> | null>(null);
   const [loading, setLoading] = useState(false);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  // Debounce the free-text query (300ms)
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedQuery(params.query ?? ''), 300);
-    return () => clearTimeout(handler);
-  }, [params.query]);
-
+  // The typing debounce lives in the search input, which notifies this hook
+  // once per pause. Debouncing again here stacked a second 300ms delay on every
+  // keystroke — 600ms before a request even started — so the term is used as
+  // soon as it arrives.
+  //
   // Blank the term out until it is long enough to search on, so one- and
   // two-character input never triggers a search request.
-  const trimmedQuery = String(debouncedQuery ?? "").trim();
+  const trimmedQuery = String(params.query ?? "").trim();
   const effectiveQuery =
     trimmedQuery.length >= minQueryLength ? trimmedQuery : "";
 
-  // Fetch whenever the debounced query, the page, or any filter/sort changes.
+  // Fetch whenever the query, the page, or any filter/sort changes.
   useEffect(() => {
     const requestParams = { ...params, query: effectiveQuery };
     const fallbackPerPage = Number(requestParams.per_page) || 20;
+    // Abort the previous request as soon as a newer one starts: a searchable
+    // term can change on every pause, and the response to an outdated term is
+    // worthless. `cancelled` still guards mocked fetchers that ignore signals.
+    const controller = new AbortController();
     let cancelled = false;
     setLoading(true);
-    fetchFn(requestParams)
+    fetchFn(requestParams, { signal: controller.signal })
       .then((raw) => {
         if (!cancelled) setData(toPaginatedResult(raw, fallbackPerPage));
       })
-      .catch(console.error)
+      .catch((error) => {
+        // An abort is the expected outcome of superseding a request, not a
+        // failure worth logging.
+        if (!cancelled && !isAbortError(error)) console.error(error);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    // Guard against a slow earlier response overwriting a newer one.
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [effectiveQuery, params, fetchFn]);
 

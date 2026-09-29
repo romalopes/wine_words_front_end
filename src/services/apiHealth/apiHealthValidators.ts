@@ -65,3 +65,51 @@ export const areSubscriptionFeaturesValid = (data: unknown): boolean => {
 
 export const hasStatusOk = (data: unknown): boolean =>
   typeof data === "object" && data !== null && "status" in data && data.status === "ok";
+
+// --- Search index ----------------------------------------------------------
+// Full-text search runs on the `searchable` tsvector columns. A NULL tsvector
+// satisfies no match, so rows that were never indexed are invisible to every
+// `?query=` while the endpoint itself answers 200 with an empty list — which is
+// precisely how "search returns nothing" goes unnoticed. These helpers let the
+// health page report the index itself, not just the request.
+export interface SearchIndexVectorStatus {
+  total: number;
+  missing: number;
+}
+
+export interface SearchIndexPayload {
+  status: string;
+  reviews: SearchIndexVectorStatus;
+  articles: SearchIndexVectorStatus;
+}
+
+const isVectorStatus = (
+  data: unknown,
+): data is SearchIndexVectorStatus =>
+  isRecord(data) &&
+  typeof data.total === "number" &&
+  typeof data.missing === "number";
+
+export const isSearchIndexPayload = (
+  data: unknown,
+): data is SearchIndexPayload =>
+  isRecord(data) &&
+  isVectorStatus(data.reviews) &&
+  isVectorStatus(data.articles);
+
+export const isSearchIndexHealthy = (data: unknown): boolean =>
+  isSearchIndexPayload(data) &&
+  data.reviews.missing === 0 &&
+  data.articles.missing === 0;
+
+export const describeSearchIndexFailure = (data: unknown): string => {
+  if (!isSearchIndexPayload(data)) {
+    return "Expected { reviews: { total, missing }, articles: { total, missing } }";
+  }
+
+  const unindexed: string[] = [];
+  if (data.reviews.missing > 0) unindexed.push(`${data.reviews.missing} review(s)`);
+  if (data.articles.missing > 0) unindexed.push(`${data.articles.missing} article(s)`);
+
+  return `${unindexed.join(" and ")} are not indexed, so search cannot find them — run \`bin/rails search:reindex\``;
+};

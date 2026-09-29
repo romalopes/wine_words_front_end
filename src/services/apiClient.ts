@@ -10,6 +10,13 @@ export interface RequestOptions {
   body?: RequestBody
   auth?: boolean
   headers?: Record<string, string>
+  /**
+   * Cancels the request when the caller's `AbortController` aborts. Used by
+   * `useSearch`, where a keystroke supersedes the request that is still in
+   * flight: without it, every intermediate query would finish server-side and
+   * merely be discarded on arrival.
+   */
+  signal?: AbortSignal
 }
 
 export type AuthTokenProvider = () => string | null
@@ -94,6 +101,7 @@ export async function request<T>(
     body,
     auth = false,
     headers = {},
+    signal,
   }: RequestOptions = {},
 ): Promise<T> {
   const requestHeaders: Record<string, string> = {
@@ -114,10 +122,12 @@ export async function request<T>(
 
   // Spread rather than `body: payload`: under exactOptionalPropertyTypes a
   // present-but-undefined `body` is not assignable to RequestInit["body"].
+  // `signal` follows the same rule.
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method,
     headers: requestHeaders,
     ...(payload === undefined ? {} : { body: payload }),
+    ...(signal === undefined ? {} : { signal }),
     credentials: "include",
   })
 

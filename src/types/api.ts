@@ -144,15 +144,24 @@ export interface ReviewGroup {
   reviews: Review[]
 }
 
+/**
+ * The one option a cancellable read accepts. Declared here (rather than
+ * imported from the client) so `types/*` stays free of service imports — the
+ * shape is structurally identical to `RequestOptions['signal']`.
+ */
+export interface RequestSignal {
+  signal?: AbortSignal
+}
+
 export interface ReviewApi {
-  all(params?: QueryParams): Promise<ResourceResponse<Review>>
+  all(params?: QueryParams, options?: RequestSignal): Promise<ResourceResponse<Review>>
   list(wineSlug: string, vintageId: number): Promise<Review[]>
   show(id: string | number): Promise<Review>
   create(wineSlug: string, vintageId: number, payload: ReviewWritePayload): Promise<Review>
   update(id: string | number, payload: ReviewWritePayload): Promise<Review>
   destroy(id: string | number): Promise<unknown>
   myReviews(): Promise<Review[]>
-  grouped(params?: QueryParams): Promise<ReviewGroup[]>
+  grouped(params?: QueryParams, options?: RequestSignal): Promise<ReviewGroup[]>
 }
 
 export interface ArticleWritePayload {
@@ -169,13 +178,13 @@ export interface ArticleGroup {
 }
 
 export interface ArticleApi {
-  list(params?: QueryParams): Promise<ResourceResponse<Article>>
+  list(params?: QueryParams, options?: RequestSignal): Promise<ResourceResponse<Article>>
   myArticles(): Promise<Article[]>
   show(id: string | number): Promise<Article>
   create(payload: ArticleWritePayload | FormData): Promise<Article>
   update(id: string | number, payload: ArticleWritePayload | FormData): Promise<Article>
   destroy(id: string | number): Promise<unknown>
-  grouped(params?: QueryParams): Promise<ArticleGroup[]>
+  grouped(params?: QueryParams, options?: RequestSignal): Promise<ArticleGroup[]>
 }
 
 export interface WinePackageWritePayload {

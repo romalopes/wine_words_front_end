@@ -112,8 +112,8 @@ export function createProducersApi(request: ApiRequester): ProducerApi {
 
 export function createReviewsApi(request: ApiRequester): ReviewApi {
   return {
-    all(params) {
-      return request<ResourceResponse<Review>>(queryPath("/reviews", params), { auth: true })
+    all(params, options) {
+      return request<ResourceResponse<Review>>(queryPath("/reviews", params), { auth: true, ...options })
     },
     list(wineSlug, vintageId) {
       return request<Review[]>(`/wines/${wineSlug}/vintages/${vintageId}/reviews`, { auth: true })
@@ -133,16 +133,16 @@ export function createReviewsApi(request: ApiRequester): ReviewApi {
     myReviews() {
       return request<Review[]>("/reviews/my_reviews", { auth: true })
     },
-    grouped(params) {
-      return request<ReviewGroup[]>(queryPath("/reviews/grouped", params), { auth: true })
+    grouped(params, options) {
+      return request<ReviewGroup[]>(queryPath("/reviews/grouped", params), { auth: true, ...options })
     },
   }
 }
 
 export function createArticlesApi(request: ApiRequester): ArticleApi {
   return {
-    list(params) {
-      return request<ResourceResponse<Article>>(queryPath("/articles", params), { auth: true })
+    list(params, options) {
+      return request<ResourceResponse<Article>>(queryPath("/articles", params), { auth: true, ...options })
     },
     myArticles() {
       return request<Article[]>("/articles/my_articles", { auth: true })
@@ -159,8 +159,8 @@ export function createArticlesApi(request: ApiRequester): ArticleApi {
     destroy(id) {
       return request(`/articles/${id}`, { method: "DELETE", auth: true })
     },
-    grouped(params) {
-      return request<ArticleGroup[]>(queryPath("/articles/grouped", params), { auth: true })
+    grouped(params, options) {
+      return request<ArticleGroup[]>(queryPath("/articles/grouped", params), { auth: true, ...options })
     },
   }
 }

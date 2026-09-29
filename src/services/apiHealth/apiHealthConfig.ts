@@ -7,6 +7,8 @@ import {
   isSubscriptionListPayload,
   areSubscriptionFeaturesValid,
   hasStatusOk,
+  isSearchIndexHealthy,
+  describeSearchIndexFailure,
 } from "./apiHealthValidators";
 
 export const API_CATEGORIES = {
@@ -126,6 +128,22 @@ export const API_CHECKS: ApiCheck[] = [
       return `Backend version "${backendVersion}" does not match frontend APP_VERSION "${APP_VERSION}"`;
     },
   },
+  {
+    id: "search-index",
+    category: API_CATEGORIES.SYSTEM,
+    name: "Search Index Built (tsvector)",
+    method: "GET",
+    url: "/health/search_index",
+    expectedStatus: 200,
+    requiresAuth: true,
+    // Fails on `status: "degraded"`, i.e. any row whose vector was never built.
+    validate: isSearchIndexHealthy,
+    describeFailure: describeSearchIndexFailure,
+    latencyThresholds: { excellent: 150, good: 400, slow: 900 },
+    description:
+      "Full-text search only finds rows whose `searchable` vector exists; unindexed rows are invisible to every query.",
+  },
+
   {
     id: "auth-me-valid",
     category: API_CATEGORIES.AUTH,

@@ -6,14 +6,14 @@ import ArticleForm from "./ArticleForm";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
-import { useSearch } from "../hooks/useSearch";
+import { isAbortError, useSearch } from "../hooks/useSearch";
 import {
   effectiveSearchTerm,
   MIN_SEARCH_LENGTH,
 } from "../services/searchParams";
 import type { SearchParams } from "../services/searchParams";
 import type { Article } from "../types/article";
-import type { ArticleGroup } from "../types/api";
+import type { ArticleGroup, RequestSignal } from "../types/api";
 import { SearchBar, SearchHighlight } from "./search";
 
 function excerpt(text: string | null | undefined, max = 50): string {
@@ -191,7 +191,7 @@ function Articles() {
   // primitive dependency so the callback identity stays stable between
   // renders; otherwise useSearch would refetch on every single render.
   const fetchArticles = useCallback(
-    async (params: SearchParams) => {
+    async (params: SearchParams, options?: RequestSignal) => {
       const merged = {
         scope,
         status: statusFilter === "all" ? undefined : statusFilter,
@@ -203,7 +203,7 @@ function Articles() {
         ...params,
       };
       if (merged.per_page === undefined) merged.per_page = 20;
-      return articlesApi.list(merged);
+      return articlesApi.list(merged, options);
     },
     [scope, statusFilter, isUncategorised, categoryId, reloadToken],
   );
@@ -237,20 +237,25 @@ function Articles() {
   const [groups, setGroups] = useState<ArticleGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
 
-  const loadGroups = useCallback(async () => {
+  // `signal` lets a superseded load be cancelled: the term changes on every
+  // debounced pause, and a late response for the previous term must neither
+  // overwrite the new one nor clear its spinner.
+  const loadGroups = useCallback(async (options?: RequestSignal) => {
+    setLoadingGroups(true);
     try {
-      setLoadingGroups(true);
       // The grouped view backs the no-category listing, so it must honour the
       // same free-text search as the paginated feed; otherwise the query would
       // be fetched and then thrown away.
       const rows = await articlesApi.grouped(
         searchTerm ? { query: searchTerm } : {},
+        options,
       );
       setGroups(Array.isArray(rows) ? rows : []);
-    } catch {
-      setGroups([]);
+    } catch (error) {
+      // An abort is the expected outcome of a superseded search, not a failure.
+      if (!isAbortError(error)) setGroups([]);
     } finally {
-      setLoadingGroups(false);
+      if (!options?.signal?.aborted) setLoadingGroups(false);
     }
   }, [searchTerm]);
 
@@ -258,7 +263,9 @@ function Articles() {
   // and re-run it when the search term changes.
   useEffect(() => {
     if (selectedCategory) return;
-    void loadGroups();
+    const controller = new AbortController();
+    void loadGroups({ signal: controller.signal });
+    return () => controller.abort();
   }, [selectedCategory, searchTerm, loadGroups]);
 
   // The grouped view has its own loader, so either one counts as "loading".
