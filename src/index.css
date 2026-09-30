@@ -1753,6 +1753,47 @@ textarea {
   color: #b9475f;
 }
 
+.like-button {
+  background: transparent;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  color: #6d5f56;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 12px;
+}
+
+.like-button:hover:not(:disabled) {
+  border-color: #b9475f;
+  color: #b9475f;
+}
+
+.like-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.like-button--liked {
+  border-color: #b9475f;
+  color: #b9475f;
+}
+
+.like-button--readonly {
+  display: inline-block;
+}
+
+.like-button__wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.like-button__error {
+  color: #b9475f;
+  font-size: 0.78rem;
+}
+
 .review-add-btn {
   background: transparent;
   border: 1px dashed #d7c8bb;

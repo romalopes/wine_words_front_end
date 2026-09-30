@@ -4,6 +4,8 @@ export interface Review {
   id: number
   slug: string
   title: string
+  likes_count?: number
+  liked_by_current_user?: boolean
   comment?: string | null
   score?: number | null
   status: string

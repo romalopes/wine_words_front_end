@@ -16,6 +16,8 @@ export interface Wine {
   id: number
   slug: string
   name: string
+  likes_count?: number
+  liked_by_current_user?: boolean
   color?: string | null
   sparkling?: boolean | null
   fortified?: boolean | null

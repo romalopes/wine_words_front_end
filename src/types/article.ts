@@ -3,6 +3,8 @@ import type { ImageDetail } from "./image"
 export interface Article {
   id: number
   title: string
+  likes_count?: number
+  liked_by_current_user?: boolean
   slug?: string | null
   /** Short summary shown in cards and list views. */
   abstract?: string | null

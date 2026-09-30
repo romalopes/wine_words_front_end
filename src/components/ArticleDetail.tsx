@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { articlesApi } from "../services/api";
 import ArticleForm from "./ArticleForm";
+import LikeButton from "./LikeButton";
 import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
@@ -132,6 +133,17 @@ function ArticleDetail() {
       <div className="wine-detail__header">
         <div>
           <h1>{article.title}</h1>
+          <LikeButton
+            kind="article"
+            identifier={article.slug || article.id}
+            initialLiked={article.liked_by_current_user}
+            initialCount={article.likes_count}
+            onChange={({ liked, likes_count }) =>
+              setArticle((prev) =>
+                prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
+              )
+            }
+          />
         </div>
         <span className={`review-card__status ${article.status === "draft" ? "" : ""}`}>
           {article.status}
