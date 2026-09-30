@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { reviewsApi } from "../services/api";
 import ReviewForm from "./ReviewForm";
+import LikeButton from "./LikeButton";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import DOMPurify from "dompurify";
@@ -151,6 +152,17 @@ function ReviewDetail() {
         <h1>{review.title || "Untitled review"}</h1>
         <span className="review-card__score">{review.score}</span>
       </div>
+      <LikeButton
+        kind="review"
+        identifier={review.slug || review.id}
+        initialLiked={review.liked_by_current_user}
+        initialCount={review.likes_count}
+        onChange={({ liked, likes_count }) =>
+          setReview((prev) =>
+            prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
+          )
+        }
+      />
 
       <p className="review-card__comment">
         {review.wine_name && (

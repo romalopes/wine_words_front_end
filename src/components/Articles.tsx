@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { articlesApi, categoriesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
 import ArticleForm from "./ArticleForm";
+import LikeButton from "./LikeButton";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
@@ -93,6 +94,15 @@ function ArticleCard({
       {excerpt(article.body, 50) && (
         <p className="wine-management__region">{excerpt(article.body, 50)}</p>
       )}
+
+      <div onClick={(e) => e.stopPropagation()}>
+        <LikeButton
+          kind="article"
+          identifier={article.slug || article.id}
+          initialLiked={article.liked_by_current_user}
+          initialCount={article.likes_count}
+        />
+      </div>
 
       {canManage && (
         <div

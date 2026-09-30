@@ -11,6 +11,7 @@ import {
 } from "./packagesApi"
 import { createAccountApi, createBillingApi, createSubscriptionsApi, createUserApi, createUsersApi, createVintagesApi } from "./accountApi"
 import { createImagesApi, createWineProfilesApi } from "./imagesApi"
+import { createLikesApi } from "./likesApi"
 import { createCategoriesApi, createCountriesApi, createGrapesApi, createRegionsApi, createStatsApi, createTasteParametersApi } from "./referenceApi"
 import {
   createConfigurationApi,
@@ -143,6 +144,8 @@ export const tasteParametersApi = createTasteParametersApi(request);
 export const reviewsApi = createReviewsApi(request);
 
 export const articlesApi = createArticlesApi(request);
+
+export const likesApi = createLikesApi(request);
 
 export const categoriesApi = createCategoriesApi(request);
 

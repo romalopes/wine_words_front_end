@@ -5,6 +5,7 @@ import { reviewsApi, categoriesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
 import ReviewForm from "./ReviewForm";
 import WineQuickCreate from "./WineQuickCreate";
+import LikeButton from "./LikeButton";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
@@ -160,6 +161,15 @@ function ReviewCard({
       {excerpt(review.comment, 50) && (
         <p className="wine-management__region">{excerpt(review.comment, 50)}</p>
       )}
+
+      <div onClick={(e) => e.stopPropagation()}>
+        <LikeButton
+          kind="review"
+          identifier={review.slug || review.id}
+          initialLiked={review.liked_by_current_user}
+          initialCount={review.likes_count}
+        />
+      </div>
 
       {image && (
         <img

@@ -15,6 +15,7 @@ import WineAdvancedSearch from "./WineAdvancedSearch";
 import type { SearchParams } from "./WineAdvancedSearch";
 import { SearchHighlight, SearchInput } from "./search";
 import { CategoryChip } from "./CategoryChip";
+import LikeButton from "./LikeButton";
 import {
   effectiveSearchTerm,
   MIN_SEARCH_LENGTH,
@@ -87,6 +88,14 @@ function SimpleResultCard({
           {wine.vintages_count !== 1 ? "s" : ""}
         </p>
       )}
+      <div onClick={(e) => e.stopPropagation()}>
+        <LikeButton
+          kind="wine"
+          identifier={wine.slug || wine.id}
+          initialLiked={wine.liked_by_current_user}
+          initialCount={wine.likes_count}
+        />
+      </div>
       {canManageWines && (
         <div
           className="wine-management__card-actions"
@@ -871,6 +880,14 @@ function WineList() {
                         {wine.vintages_count !== 1 ? "s" : ""}
                       </p>
                     )}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <LikeButton
+                        kind="wine"
+                        identifier={wine.slug || wine.id}
+                        initialLiked={wine.liked_by_current_user}
+                        initialCount={wine.likes_count}
+                      />
+                    </div>
                     {canManageWines && (
                       <div className="wine-management__card-actions">
                         <Link

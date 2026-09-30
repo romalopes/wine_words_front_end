@@ -16,6 +16,7 @@ function RichComment({ html }) {
 }
 import ReviewForm from "./ReviewForm";
 import BackToSource from "./BackToSource";
+import LikeButton from "./LikeButton";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 
 function timeAgo(dateStr) {
@@ -191,6 +192,17 @@ function WineDetail() {
         <div>
           <p className="wine-kicker">{wine.producer?.name}</p>
           <h1>{wine.name}</h1>
+          <LikeButton
+            kind="wine"
+            identifier={wine.slug || wine.id}
+            initialLiked={wine.liked_by_current_user}
+            initialCount={wine.likes_count}
+            onChange={({ liked, likes_count }) =>
+              setWine((prev) =>
+                prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
+              )
+            }
+          />
         </div>
         <span
           className={`wine-management__color-badge wine-management__color-badge--${wine.color?.toLowerCase()}`}
