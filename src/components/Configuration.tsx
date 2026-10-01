@@ -22,7 +22,9 @@ function Configuration() {
   const [useTestEmail, setUseTestEmail] = useState(false);
   const [savedUseTestEmail, setSavedUseTestEmail] = useState(false);
   const [testEmail, setTestEmail] = useState("romalopes@yahoo.com.br");
-  const [savedTestEmail, setSavedTestEmail] = useState("romalopes@yahoo.com.br");
+  const [savedTestEmail, setSavedTestEmail] = useState(
+    "romalopes@yahoo.com.br",
+  );
 
   const [customSettings, setCustomSettings] = useState<Setting[]>([]);
   const [savedCustomSettings, setSavedCustomSettings] = useState<Setting[]>([]);
@@ -54,12 +56,15 @@ function Configuration() {
         setSavedCustomSettings(settings);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load configuration.");
+        if (!cancelled)
+          setError(err.message || "Failed to load configuration.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isAdminUser]);
 
   if (!isAdminUser) {
@@ -67,15 +72,19 @@ function Configuration() {
       <main className="wine-management">
         <div className="wine-management__container">
           <h1>Configuration</h1>
-          <p className="wine-management__hint">Access denied. Admin role required.</p>
+          <p className="wine-management__hint">
+            Access denied. Admin role required.
+          </p>
         </div>
       </main>
     );
   }
 
   const logsDirty = logsSaved !== savedLogsSaved;
-  const emailDirty = useTestEmail !== savedUseTestEmail || testEmail !== savedTestEmail;
-  const customDirty = JSON.stringify(customSettings) !== JSON.stringify(savedCustomSettings);
+  const emailDirty =
+    useTestEmail !== savedUseTestEmail || testEmail !== savedTestEmail;
+  const customDirty =
+    JSON.stringify(customSettings) !== JSON.stringify(savedCustomSettings);
   const dirty = logsDirty || emailDirty || customDirty;
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -106,8 +115,13 @@ function Configuration() {
         }
         for (const current of customSettings) {
           if (isTempId(current.id)) {
-            const created = await settingsApi.create({ key: current.key, value: current.value });
-            setCustomSettings((prev) => prev.map((s) => (s.id === current.id ? created : s)));
+            const created = await settingsApi.create({
+              key: current.key,
+              value: current.value,
+            });
+            setCustomSettings((prev) =>
+              prev.map((s) => (s.id === current.id ? created : s)),
+            );
           }
         }
       }
@@ -132,8 +146,12 @@ function Configuration() {
   function addCustomSetting() {
     const key = newKey.trim();
     if (!key) return;
-    const tempId = "new-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-    setCustomSettings((prev) => [...prev, { id: tempId, key, value: newValue.trim() }]);
+    const tempId =
+      "new-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    setCustomSettings((prev) => [
+      ...prev,
+      { id: tempId, key, value: newValue.trim() },
+    ]);
     setNewKey("");
     setNewValue("");
   }
@@ -153,7 +171,9 @@ function Configuration() {
   }
 
   function commitEdit(id: Setting["id"], newValue: string) {
-    setCustomSettings((prev) => prev.map((s) => (s.id === id ? { ...s, value: newValue } : s)));
+    setCustomSettings((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, value: newValue } : s)),
+    );
     setEditingId(null);
     setEditingValue("");
   }
@@ -162,71 +182,376 @@ function Configuration() {
     <main className="wine-management">
       <div className="wine-management__container">
         <h1>Configuration</h1>
-        <p className="wine-management__hint">Global application settings. Changes take effect immediately.</p>
+        <p className="wine-management__hint">
+          Global application settings. Changes take effect immediately.
+        </p>
         {loading ? (
           <p className="wine-management__hint">Loading configuration...</p>
         ) : (
           <form onSubmit={handleSave}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-              <div style={{ border: "1px solid #ccc", borderRadius: 6, padding: 16, background: "#fafafa" }}>
-                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#333", marginBottom: 10 }}>Logs</h2>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                  <input type="checkbox" checked={logsSaved} onChange={(e) => setLogsSaved(e.target.checked)} disabled={saving} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #ccc",
+                  borderRadius: 6,
+                  padding: 16,
+                  background: "#fafafa",
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#333",
+                    marginBottom: 10,
+                  }}
+                >
+                  Logs
+                </h2>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={logsSaved}
+                    onChange={(e) => setLogsSaved(e.target.checked)}
+                    disabled={saving}
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
                   <span style={{ fontSize: 14 }}>Save logs to database</span>
                 </label>
-                <p style={{ fontSize: 12, color: "#666", margin: "8px 0 0 0", lineHeight: 1.4 }}>
-                  When enabled (default), audited actions are persisted to the database audit trail. When disabled, no new log entries are written.
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#666",
+                    margin: "8px 0 0 0",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  When enabled (default), audited actions are persisted to the
+                  database audit trail. When disabled, no new log entries are
+                  written.
                 </p>
               </div>
-              <div style={{ border: "1px solid #ccc", borderRadius: 6, padding: 16, background: "#fafafa" }}>
-                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#333", marginBottom: 10 }}>Email testing</h2>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 10 }}>
-                  <input type="checkbox" checked={useTestEmail} onChange={(e) => setUseTestEmail(e.target.checked)} disabled={saving} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                  <span style={{ fontSize: 14 }}>Use test email for all mail</span>
+              <div
+                style={{
+                  border: "1px solid #ccc",
+                  borderRadius: 6,
+                  padding: 16,
+                  background: "#fafafa",
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#333",
+                    marginBottom: 10,
+                  }}
+                >
+                  Email testing
+                </h2>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={useTestEmail}
+                    onChange={(e) => setUseTestEmail(e.target.checked)}
+                    disabled={saving}
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <span style={{ fontSize: 14 }}>
+                    Use test email for all mail
+                  </span>
                 </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 0 }}>
-                  <span style={{ fontSize: 13, color: "#555", flexGrow: 1, flexShrink: 1, flexBasis: "0%" }}>Test email address</span>
-                  <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} disabled={saving || !useTestEmail} placeholder="romalopes@yahoo.com.br" style={{ width: 240, padding: "3px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3, background: useTestEmail ? "#fff" : "#f5f5f5" }} />
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#555",
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: "0%",
+                    }}
+                  >
+                    Test email address
+                  </span>
+                  <input
+                    type="text"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    disabled={saving || !useTestEmail}
+                    placeholder="romalopes@yahoo.com.br"
+                    style={{
+                      width: 240,
+                      padding: "3px 6px",
+                      fontSize: 13,
+                      border: "1px solid #ccc",
+                      borderRadius: 3,
+                      background: useTestEmail ? "#fff" : "#f5f5f5",
+                    }}
+                  />
                 </label>
-                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0 0", lineHeight: 1.4 }}>
-                  When enabled, all outgoing mail is redirected to this address with a [TEST] subject prefix.
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#888",
+                    margin: "6px 0 0 0",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  When enabled, all outgoing mail is redirected to this address
+                  with a [TEST] subject prefix.
                 </p>
               </div>
             </div>
-            <div style={{ border: "1px solid #ccc", borderRadius: 6, overflow: "hidden", marginBottom: 16 }}>
-              <div style={{ padding: "10px 14px", background: "#f5f5f5", borderBottom: "1px solid #ccc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#333" }}>Custom settings</h2>
-                <span style={{ fontSize: 11, color: "#888" }}>Arbitrary key/value pairs readable via AppSetting at runtime.</span>
+            <div
+              style={{
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                overflow: "hidden",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  padding: "10px 14px",
+                  background: "#f5f5f5",
+                  borderBottom: "1px solid #ccc",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#333",
+                  }}
+                >
+                  Custom settings
+                </h2>
+                <span style={{ fontSize: 11, color: "#888" }}>
+                  Arbitrary key/value pairs readable via AppSetting at runtime.
+                </span>
               </div>
               <div style={{ padding: "0 14px 10px 14px" }}>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10 }}>
-                  <input type="text" value={newKey} onChange={(e) => setNewKey(e.target.value)} disabled={saving} placeholder="Key" style={{ flexGrow: 0, flexShrink: 0, flexBasis: "140px", padding: "4px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3 }} />
-                  <input type="text" value={newValue} onChange={(e) => setNewValue(e.target.value)} disabled={saving} placeholder="Value" style={{ flexGrow: 1, flexShrink: 1, flexBasis: "0%", padding: "4px 6px", fontSize: 13, border: "1px solid #ccc", borderRadius: 3 }} />
-                  <button type="button" onClick={addCustomSetting} disabled={saving || !newKey.trim()} style={{ padding: "4px 10px", fontSize: 12, background: "#1a73e8", color: "#fff", border: "none", borderRadius: 3, cursor: "pointer", whiteSpace: "nowrap" }}>Add</button>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={newKey}
+                    onChange={(e) => setNewKey(e.target.value)}
+                    disabled={saving}
+                    placeholder="Key"
+                    style={{
+                      flexGrow: 0,
+                      flexShrink: 0,
+                      flexBasis: "140px",
+                      padding: "4px 6px",
+                      fontSize: 13,
+                      border: "1px solid #ccc",
+                      borderRadius: 3,
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newValue}
+                    onChange={(e) => setNewValue(e.target.value)}
+                    disabled={saving}
+                    placeholder="Value"
+                    style={{
+                      flexGrow: 1,
+                      flexShrink: 1,
+                      flexBasis: "0%",
+                      padding: "4px 6px",
+                      fontSize: 13,
+                      border: "1px solid #ccc",
+                      borderRadius: 3,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomSetting}
+                    disabled={saving || !newKey.trim()}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 12,
+                      background: "#1a73e8",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 3,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Add
+                  </button>
                 </div>
               </div>
               {customSettings.length > 0 && (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                  }}
+                >
                   <thead>
                     <tr style={{ background: "#fafafa" }}>
-                      <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em" }}>Key</th>
-                      <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em" }}>Value</th>
-                      <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #eee", color: "#555", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em", width: 50 }}></th>
+                      <th
+                        style={{
+                          textAlign: "left",
+                          padding: "6px 10px",
+                          borderBottom: "1px solid #eee",
+                          color: "#555",
+                          fontWeight: 500,
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.03em",
+                        }}
+                      >
+                        Key
+                      </th>
+                      <th
+                        style={{
+                          textAlign: "left",
+                          padding: "6px 10px",
+                          borderBottom: "1px solid #eee",
+                          color: "#555",
+                          fontWeight: 500,
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.03em",
+                        }}
+                      >
+                        Value
+                      </th>
+                      <th
+                        style={{
+                          textAlign: "right",
+                          padding: "6px 10px",
+                          borderBottom: "1px solid #eee",
+                          color: "#555",
+                          fontWeight: 500,
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.03em",
+                          width: 50,
+                        }}
+                      ></th>
                     </tr>
                   </thead>
                   <tbody>
                     {customSettings.map((setting, idx) => (
-                      <tr key={setting.id || idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
-                        <td style={{ padding: "5px 10px", fontWeight: 500 }}>{setting.key}</td>
+                      <tr
+                        key={setting.id || idx}
+                        style={{
+                          background: idx % 2 === 0 ? "#fff" : "#fafafa",
+                        }}
+                      >
+                        <td style={{ padding: "5px 10px", fontWeight: 500 }}>
+                          {setting.key}
+                        </td>
                         <td style={{ padding: "5px 10px" }}>
                           {editingId === setting.id ? (
-                            <input type="text" value={editingValue} onChange={(e) => setEditingValue(e.target.value)} onBlur={() => commitEdit(setting.id, editingValue)} onKeyDown={(e) => { if (e.key === "Enter") commitEdit(setting.id, editingValue); if (e.key === "Escape") cancelEdit(); }} autoFocus style={{ width: "100%", padding: "2px 4px", fontSize: 13, border: "1px solid #1a73e8", borderRadius: 2, boxSizing: "border-box" }} />
+                            <input
+                              type="text"
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              onBlur={() =>
+                                commitEdit(setting.id, editingValue)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter")
+                                  commitEdit(setting.id, editingValue);
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              autoFocus
+                              style={{
+                                width: "100%",
+                                padding: "2px 4px",
+                                fontSize: 13,
+                                border: "1px solid #1a73e8",
+                                borderRadius: 2,
+                                boxSizing: "border-box",
+                              }}
+                            />
                           ) : (
-                            <span style={{ cursor: "pointer", color: "#1a73e8", padding: "2px 4px", borderRadius: 2 }} onMouseOver={(e) => (e.currentTarget.style.background = "#e8f0fe")} onMouseOut={(e) => (e.currentTarget.style.background = "")} onClick={() => startEdit(setting)} title="Click to edit">{String(setting.value ?? "")}</span>
+                            <span
+                              style={{
+                                cursor: "pointer",
+                                color: "#1a73e8",
+                                padding: "2px 4px",
+                                borderRadius: 2,
+                              }}
+                              onMouseOver={(e) =>
+                                (e.currentTarget.style.background = "#e8f0fe")
+                              }
+                              onMouseOut={(e) =>
+                                (e.currentTarget.style.background = "")
+                              }
+                              onClick={() => startEdit(setting)}
+                              title="Click to edit"
+                            >
+                              {String(setting.value ?? "")}
+                            </span>
                           )}
                         </td>
                         <td style={{ padding: "5px 10px", textAlign: "right" }}>
-                          <button type="button" onClick={() => deleteCustomSetting(setting.id)} disabled={saving} style={{ background: "none", border: "none", color: "#c62828", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }} title="Delete setting">×</button>
+                          <button
+                            type="button"
+                            onClick={() => deleteCustomSetting(setting.id)}
+                            disabled={saving}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#c62828",
+                              cursor: "pointer",
+                              fontSize: 14,
+                              padding: 0,
+                              lineHeight: 1,
+                            }}
+                            title="Delete setting"
+                          >
+                            ×
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -234,13 +559,44 @@ function Configuration() {
                 </table>
               )}
               {customSettings.length === 0 && (
-                <div style={{ padding: "14px", textAlign: "center", color: "#999", fontSize: 13 }}>No custom settings. Add one above.</div>
+                <div
+                  style={{
+                    padding: "14px",
+                    textAlign: "center",
+                    color: "#999",
+                    fontSize: 13,
+                  }}
+                >
+                  No custom settings. Add one above.
+                </div>
               )}
             </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 4 }}>
-              <button type="submit" className="auth-form__submit" disabled={saving || !dirty} style={{ padding: "6px 18px", fontSize: 13 }}>{saving ? "Saving..." : "Save changes"}</button>
-              {savedAt && !error && <span style={{ fontSize: 12, color: "#666" }}>Saved at {savedAt.toLocaleTimeString()}</span>}
-              {error && <span style={{ fontSize: 12, color: "#c62828" }} role="alert">{error}</span>}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                marginTop: 4,
+              }}
+            >
+              <button
+                type="submit"
+                className="auth-form__submit"
+                disabled={saving || !dirty}
+                style={{ padding: "6px 18px", fontSize: 13 }}
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+              {savedAt && !error && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  Saved at {savedAt.toLocaleTimeString()}
+                </span>
+              )}
+              {error && (
+                <span style={{ fontSize: 12, color: "#c62828" }} role="alert">
+                  {error}
+                </span>
+              )}
             </div>
           </form>
         )}
