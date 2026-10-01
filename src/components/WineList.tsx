@@ -16,6 +16,7 @@ import type { SearchParams } from "./WineAdvancedSearch";
 import { SearchHighlight, SearchInput } from "./search";
 import { CategoryChip } from "./CategoryChip";
 import LikeButton from "./LikeButton";
+import CommentLink from "./comments/CommentLink";
 import {
   effectiveSearchTerm,
   MIN_SEARCH_LENGTH,
@@ -95,6 +96,7 @@ function SimpleResultCard({
           initialLiked={wine.liked_by_current_user}
           initialCount={wine.likes_count}
         />
+        <CommentLink kind="wine" identifier={wine.slug || wine.id} />
       </div>
       {canManageWines && (
         <div
@@ -886,6 +888,10 @@ function WineList() {
                         identifier={wine.slug || wine.id}
                         initialLiked={wine.liked_by_current_user}
                         initialCount={wine.likes_count}
+                      />
+                      <CommentLink
+                        kind="wine"
+                        identifier={wine.slug || wine.id}
                       />
                     </div>
                     {canManageWines && (

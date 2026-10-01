@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { reviewsApi } from "../services/api";
 import ReviewForm from "./ReviewForm";
 import LikeButton from "./LikeButton";
+import CommentSection from "./comments/CommentSection";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import DOMPurify from "dompurify";
@@ -201,6 +202,8 @@ function ReviewDetail() {
           <RichComment html={review.comment} />
         </div>
       )}
+
+      <CommentSection kind="review" identifier={review.slug || review.id} />
     </main>
   );
 }

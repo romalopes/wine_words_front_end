@@ -4,6 +4,7 @@ import { articlesApi, categoriesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
 import ArticleForm from "./ArticleForm";
 import LikeButton from "./LikeButton";
+import CommentLink from "./comments/CommentLink";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
@@ -102,6 +103,7 @@ function ArticleCard({
           initialLiked={article.liked_by_current_user}
           initialCount={article.likes_count}
         />
+        <CommentLink kind="article" identifier={article.slug || article.id} />
       </div>
 
       {canManage && (

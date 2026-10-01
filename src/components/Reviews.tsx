@@ -6,6 +6,7 @@ import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
 import ReviewForm from "./ReviewForm";
 import WineQuickCreate from "./WineQuickCreate";
 import LikeButton from "./LikeButton";
+import CommentLink from "./comments/CommentLink";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
@@ -169,6 +170,7 @@ function ReviewCard({
           initialLiked={review.liked_by_current_user}
           initialCount={review.likes_count}
         />
+        <CommentLink kind="review" identifier={review.slug || review.id} />
       </div>
 
       {image && (

@@ -3965,7 +3965,7 @@ textarea {
   cursor: default;
 }
 
-/* ===== WinePackage detail: read-only viewer gallery ===== */
+/* ===== ImageManager detail: read-only viewer gallery ===== */
 .image-manager__thumbs {
   display: flex;
   flex-wrap: wrap;
@@ -3974,4 +3974,331 @@ textarea {
 .image-manager__thumbs .image-manager__thumb {
   width: 8rem;
   height: 8rem;
+}
+
+/* ===== Comments ==========================================================
+   One thread UI shared by wines, reviews and articles (see the `kind` prop on
+   CommentSection). Colours and the card idiom follow the surrounding detail
+   pages: cream page, white cards, #e4d9cd borders, burgundy/teal accents.
+   ========================================================================= */
+
+.comments {
+  margin-top: 40px;
+}
+
+.comments__title {
+  border-bottom: 1px solid #e4d9cd;
+  color: #681a2a;
+  font-size: 1.35rem;
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+}
+
+/* Highlight while the section holds focus after a #comments deep link.
+   Driven by a class rather than :focus — :focus-visible does not reliably match
+   programmatic focus (it typically stays false for a mouse-click arrival), so a
+   pure-CSS ring would appear for keyboard users only. The class is dropped on
+   blur, so the resting state has no outline. */
+.comments--focused {
+  outline: 2px solid rgba(185, 71, 95, 0.45);
+  outline-offset: 8px;
+}
+
+/* Logged-out / not-permitted notice, and the loading + empty states. */
+.comments__status {
+  background: #fff;
+  border: 1px dashed #d7c8bb;
+  border-radius: 8px;
+  color: #6d5f56;
+  font-size: 0.9rem;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+}
+
+/* ===== Comment form (top level, reply and edit all share this) ============ */
+
+.comment-form {
+  background: #fff;
+  border: 1px solid #e4d9cd;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(63, 24, 24, 0.06);
+  margin-bottom: 20px;
+  padding: 14px 16px;
+}
+
+.comment-form__label {
+  color: #5d514b;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-bottom: 8px;
+}
+
+.comment-form__input {
+  background: #fdfbf8;
+  border: 1px solid #d7c8bb;
+  border-radius: 6px;
+  color: #241b19;
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.comment-form__input:focus {
+  background: #fff;
+  /* Focus ring in the brand burgundy, matching the header's active state. */
+  border-color: #b9475f;
+  outline: 2px solid rgba(185, 71, 95, 0.25);
+  outline-offset: 1px;
+}
+
+.comment-form__input:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.comment-form__error {
+  color: #b9475f;
+  font-size: 0.8rem;
+  margin: 8px 0 0;
+}
+
+.comment-form__actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.comment-form__actions button[type="submit"] {
+  background: #681a2a;
+  border: 1px solid #681a2a;
+  border-radius: 999px;
+  color: #fff8f2;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 7px 18px;
+}
+
+.comment-form__actions button[type="submit"]:hover:not(:disabled) {
+  background: #7d2133;
+  border-color: #7d2133;
+}
+
+.comment-form__actions button[type="button"] {
+  background: transparent;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  color: #6d5f56;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 16px;
+}
+
+.comment-form__actions button[type="button"]:hover:not(:disabled) {
+  border-color: #b9475f;
+  color: #b9475f;
+}
+
+/* Both buttons grey out while a request is in flight. */
+.comment-form__actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+/* ===== Thread ============================================================ */
+
+.comment-list,
+.comment__replies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.comment {
+  background: #fff;
+  border: 1px solid #e4d9cd;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(63, 24, 24, 0.06);
+  padding: 14px 16px;
+}
+
+/* Replies read as a nested sub-thread: indented, open on the left and free of
+   the heavy card, so the two levels stay visually distinct. */
+.comment--reply {
+  background: #fdfbf8;
+  border: 0;
+  border-left: 2px solid #e4d9cd;
+  border-radius: 0 6px 6px 0;
+  box-shadow: none;
+  padding: 10px 0 10px 14px;
+}
+
+.comment__meta {
+  align-items: center;
+  color: #786860;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  gap: 8px;
+}
+
+/* Monogram avatar. The burgundy→teal gradient echoes .wine-meter's, so the
+   thread belongs to the same visual family as the rest of the catalogue. */
+.comment__avatar {
+  align-items: center;
+  background: linear-gradient(135deg, #681a2a, #27615e);
+  border-radius: 999px;
+  color: #fff8f2;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  height: 26px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 26px;
+}
+
+.comment__author {
+  color: #5d514b;
+  font-weight: 700;
+}
+
+/* Inherits the muted meta tone; declared so the timestamp can be styled on its
+   own later without touching the whole meta row. */
+.comment__time {
+  color: inherit;
+}
+
+.comment__edited {
+  font-style: italic;
+}
+
+.comment__body {
+  color: #241b19;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin: 10px 0 0;
+  /* Keep long words (URLs, no-space pastes) from stretching the card. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* A soft-deleted comment keeps its slot but shows only the tombstone. */
+.comment__body--deleted {
+  color: #786860;
+  font-style: italic;
+}
+
+/* Heart + comment-link pill on a wine / review / article card. The LikeButton
+   stops the click from reaching the card's own handler; the gap keeps the two
+   controls from reading as one control. */
+.like-button + .comment-link,
+.comment-link + .like-button {
+  margin-left: 8px;
+}
+
+/* ===== Comment link (cards) ==============================================
+   Sits beside .like-button and shares its pill shape so a card reads as one
+   row of metadata. It is an <a>, so it must look and behave like a link.
+   ========================================================================= */
+
+.comment-link {
+  align-items: center;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  color: #786860;
+  display: inline-flex;
+  font-size: 0.9rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 5px 11px;
+  text-decoration: none;
+}
+
+.comment-link:hover {
+  border-color: #b9475f;
+  color: #b9475f;
+}
+
+.comment-link:focus-visible {
+  border-color: #b9475f;
+  outline: 2px solid rgba(185, 71, 95, 0.35);
+  outline-offset: 2px;
+}
+
+/* ===== Actions =========================================================== */
+
+.comment-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.comment-actions button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: #786860;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+}
+
+.comment-actions button:hover:not(:disabled) {
+  background: rgba(185, 71, 95, 0.08);
+  color: #b9475f;
+}
+
+.comment-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+/* An inline reply/edit form needs less presence than the top-level one. */
+.comment .comment-form {
+  box-shadow: none;
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding: 12px 14px;
+}
+
+/* Replies hang off their parent, separated by a hairline. */
+.comment__replies {
+  border-top: 1px solid #f0e8df;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+@media (max-width: 600px) {
+  .comments {
+    margin-top: 28px;
+  }
+
+  .comment,
+  .comment--reply {
+    padding: 12px 13px;
+  }
+
+  /* Deep nesting is meaningless on a narrow screen: keep the indent small so
+     the text column stays readable. */
+  .comment--reply {
+    padding-left: 10px;
+  }
 }

@@ -17,6 +17,7 @@ function RichComment({ html }) {
 import ReviewForm from "./ReviewForm";
 import BackToSource from "./BackToSource";
 import LikeButton from "./LikeButton";
+import CommentSection from "./comments/CommentSection";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 
 function timeAgo(dateStr) {
@@ -636,6 +637,8 @@ function WineDetail() {
           </p>
         )}
       </div>
+
+      <CommentSection kind="wine" identifier={wine.slug || wine.id} />
 
       {wine.parameters && wine.parameters.length > 0 && (
         <div className="wine-detail__section">
