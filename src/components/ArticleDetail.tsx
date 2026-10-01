@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { articlesApi } from "../services/api";
 import ArticleForm from "./ArticleForm";
+import ReviewCard from "./ReviewCard";
 import LikeButton from "./LikeButton";
 import CommentSection from "./comments/CommentSection";
 import DOMPurify from "dompurify";
@@ -220,16 +221,17 @@ function ArticleDetail() {
       {visibleReviews.length > 0 && (
         <div className="wine-detail__section">
           <h2>Reviews</h2>
-          <div className="review-list">
+          {/* Same card grid as the Reviews listing, read-only: the whole card
+              opens the review. */}
+          <div className="content-grid">
             {visibleReviews.map((review) => (
-              <div key={review.id} className="review-card">
-                <div className="review-card__top">
-                  <span>{review.title}</span>
-                  <span className="review-card__score">{review.score}</span>
-                </div>
-                <p className="review-card__comment">by {review.reviewer_name}</p>
-                {review.comment && <RichBody html={review.comment} />}
-              </div>
+              <ReviewCard
+                key={review.id}
+                review={review}
+                onOpen={() =>
+                  navigate(returnToLink(`/reviews/${review.slug}`))
+                }
+              />
             ))}
           </div>
         </div>

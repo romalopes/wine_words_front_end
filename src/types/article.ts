@@ -1,4 +1,5 @@
 import type { ImageDetail } from "./image"
+import type { Review } from "./review"
 
 export interface Article {
   id: number
@@ -36,17 +37,18 @@ export interface Article {
     region: string | null
   }>
   vintage_ids?: number[]
-  /** Linked reviews plus the per-link status from the `article_reviews` join. */
-  reviews?: Array<{
-    id: number
-    slug: string
-    title: string
-    score: number | null
-    status: string
-    comment: string | null
-    reviewer_name: string
-    link_status?: string | null
-  }>
+  /**
+   * Linked reviews plus the per-link status from the `article_reviews` join.
+   *
+   * `ArticleSerializer` ships the same review shape the Reviews listing renders
+   * (wine/vintage context, thumbnail and like counts) so the detail page can
+   * reuse the shared `ReviewCard`; `link_status` is the article-specific bit.
+   */
+  reviews?: Array<
+    Partial<Review> & Pick<Review, "id" | "slug" | "title" | "status"> & {
+      link_status?: string | null
+    }
+  >
   review_ids?: number[]
   created_at?: string | null
   updated_at?: string | null
