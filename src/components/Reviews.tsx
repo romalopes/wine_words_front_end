@@ -244,26 +244,35 @@ function Reviews() {
 
   const onSaved = () => {
     closeForm();
-    void loadMyReviews();
+    if (user) void loadMyReviews();
     reload();
   };
 
   const loadMyReviews = useCallback(async () => {
+    if (!user) {
+      setMyReviews([]);
+      setMineLoaded(true);
+      return;
+    }
     setMineLoaded(false);
     try {
       const resp = await reviewsApi.myReviews();
       setMyReviews(Array.isArray(resp) ? resp : []);
-    } catch (err) {
-      console.error("Failed to fetch my reviews", err);
+    } catch {
       setMyReviews([]);
     } finally {
       setMineLoaded(true);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    loadMyReviews();
-  }, []);
+    if (user) {
+      void loadMyReviews();
+    } else {
+      setMyReviews([]);
+      setMineLoaded(true);
+    }
+  }, [user, loadMyReviews]);
 
   // Status change and delete handlers
   const onStatusChange = async (review: Review, newStatus: string) => {

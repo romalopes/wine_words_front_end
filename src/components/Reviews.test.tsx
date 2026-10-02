@@ -25,10 +25,16 @@ vi.mock("../services/api", () => ({
   categoriesApi: { list: () => mockCategoriesList() },
 }));
 
-// Reviews only reads `user` for the manage/edit affordances.
+// Reviews reads `user` for manage/edit affordances and for gating the
+// "my reviews" fetch. `mockAuthUser` lets tests simulate signed-out state.
+let mockAuthUser: { id: number; user_name: string; roles: string[] } | null = {
+  id: 1,
+  user_name: "Reviewer",
+  roles: ["Editor"],
+};
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: 1, user_name: "Reviewer", roles: ["Editor"] },
+    user: mockAuthUser,
     loading: false,
   }),
 }));
@@ -87,10 +93,26 @@ describe("Reviews", () => {
     // `useSearch` persists the query back to window.location, so without this
     // a previous test's `?query=…` would leak into the next one.
     window.history.replaceState({}, "", "/");
+    mockAuthUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
     mockAll.mockReset().mockResolvedValue(envelope([]));
     mockGrouped.mockReset().mockResolvedValue([]);
     mockMyReviews.mockReset().mockResolvedValue([]);
     mockCategoriesList.mockReset().mockResolvedValue([]);
+  });
+
+  it("does not fetch my reviews when logged out", async () => {
+    mockAuthUser = null;
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderReviews();
+
+    // Let effects settle: the public feeds still load, but my_reviews must not.
+    await waitFor(() => expect(mockAll).toHaveBeenCalled());
+    await waitFor(() => expect(mockGrouped).toHaveBeenCalled());
+    expect(mockMyReviews).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 
   it("renders the category sections from the grouped endpoint", async () => {

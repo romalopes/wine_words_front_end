@@ -13,6 +13,7 @@ import type { Configuration, Setting } from "../types/notification"
 import type { AuditLog, ImpersonationResponse, LogEntry } from "../types/user"
 import type { ApiRequester } from "./apiClient"
 import { buildQuery } from "./apiClient"
+import { retryOnce } from "../utils/retry"
 
 export function createLogsApi(request: ApiRequester): LogsApi {
   return {
@@ -56,6 +57,9 @@ export function createSettingsApi(request: ApiRequester): SettingsApi {
 export function createTestAccessApi(request: ApiRequester): TestAccessApi {
   return {
     submit: (password) => request<TestAccessResponse>("/test_access", { method: "POST", body: { password } }),
-    verify: () => request<TestAccessResponse>("/test_access"),
+    // Boot probe fired on every page load: a transient 404 while the dev
+    // server draws its routes must not surface as console noise (a 401 gate
+    // rejection is not transient and still fails fast).
+    verify: () => retryOnce(() => request<TestAccessResponse>("/test_access")),
   }
 }

@@ -25,6 +25,7 @@ import type {
 } from "../types/reference"
 import type { Stats } from "../types/stats"
 import type { ApiRequester } from "./apiClient"
+import { retryOnce } from "../utils/retry"
 
 export function createTasteParametersApi(request: ApiRequester): TasteParametersApi {
   return { list: () => request<TasteParameter[]>("/taste_parameters") }
@@ -32,13 +33,17 @@ export function createTasteParametersApi(request: ApiRequester): TasteParameters
 
 export function createCategoriesApi(request: ApiRequester): CategoriesApi {
   return {
+    // list/counts feed the nav on every page load; a transient boot-race 404
+    // (see utils/retry) would otherwise leave the dropdowns empty until reload.
     list(type = null) {
       const params = new URLSearchParams()
       if (type) params.set("type", type)
-      return request<ResourceResponse<Category>>(`/categories${params.toString() ? `?${params}` : ""}`)
+      return retryOnce(() =>
+        request<ResourceResponse<Category>>(`/categories${params.toString() ? `?${params}` : ""}`),
+      )
     },
     show: (id) => request<CategoryDetail>(`/categories/${id}`, { auth: true }),
-    counts: () => request<CategoryCounts>("/categories/counts"),
+    counts: () => retryOnce(() => request<CategoryCounts>("/categories/counts")),
     create: (data) => request<Category>("/categories", { method: "POST", auth: true, body: { category: data as unknown as Record<string, never> } }),
     update: (id, data) => request<Category>(`/categories/${id}`, { method: "PATCH", auth: true, body: { category: data as unknown as Record<string, never> } }),
     remove: (id) => request(`/categories/${id}`, { method: "DELETE", auth: true }),
