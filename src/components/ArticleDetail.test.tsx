@@ -14,6 +14,8 @@ vi.mock("../services/api", () => ({
     show: (...args: unknown[]) => mockShow(...args),
     update: vi.fn().mockResolvedValue({}),
     destroy: vi.fn().mockResolvedValue({}),
+    // The "more articles" footer; empty keeps those assertions to their own file.
+    related: vi.fn().mockResolvedValue([]),
   },
   likesApi: { toggle: vi.fn().mockResolvedValue({ liked: true, likes_count: 1 }) },
 }));

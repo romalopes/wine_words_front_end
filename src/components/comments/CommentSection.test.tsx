@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import CommentSection from "./CommentSection"
@@ -179,6 +179,42 @@ describe("CommentSection", () => {
     await waitFor(() => expect(screen.getByText("I agree.")).toBeInTheDocument())
     // Only the comment id is sent: the API derives the commentable from it.
     expect(commentsApi.reply).toHaveBeenCalledWith(1, "I agree.")
+  })
+
+  it("puts a reply to a reply in the same thread, as the API's parent says", async () => {
+    // The user clicks Reply on comment 2 (a reply to comment 1). The API
+    // attaches the new reply to comment 1, so the client's clicked id and the
+    // new reply's parent_id disagree and only the server's answer is correct.
+    vi.mocked(commentsApi.list).mockResolvedValue({
+      comments: [
+        comment({ id: 1, replies: [comment({ id: 2, parent_id: 1, body: "First reply." })] }),
+      ],
+      comments_count: 2,
+    })
+    vi.mocked(commentsApi.reply).mockResolvedValue(
+      comment({ id: 3, body: "Same thread.", parent_id: 1 }),
+    )
+    const user = userEvent.setup()
+    renderSection({ kind: "wine", identifier: "some-wine" })
+
+    await waitFor(() => expect(screen.getByText("First reply.")).toBeInTheDocument())
+    // The nested comment's own Reply button, found by scoping to its row rather
+    // than by counting buttons on the page.
+    const nested = screen.getByText("First reply.").closest("li") as HTMLElement
+    await user.click(within(nested).getByRole("button", { name: "Reply" }))
+
+    const replyBox = screen.getByLabelText("Reply to Anderson (in this thread)")
+    await user.type(replyBox, "Same thread.")
+    const replyForm = replyBox.closest("form") as HTMLElement
+    await user.click(within(replyForm).getByRole("button", { name: "Reply" }))
+
+    await waitFor(() => expect(screen.getByText("Same thread.")).toBeInTheDocument())
+    expect(commentsApi.reply).toHaveBeenCalledWith(2, "Same thread.")
+
+    // It sits beside "First reply." inside comment 1's reply list, not under it.
+    const replyLists = document.querySelectorAll(".comment__replies")
+    expect(replyLists).toHaveLength(1)
+    expect(replyLists[0]?.querySelectorAll(".comment")).toHaveLength(2)
   })
 
   it("shows actions the server allows and hides the rest", async () => {

@@ -104,7 +104,13 @@ export default function CommentItem({
 
       {replying && !comment.deleted && (
         <CommentForm
-          label={`Reply to ${comment.author.name}`}
+          label={
+            // Replying to a reply lands beside it in the same thread (the API
+            // attaches it to this reply's parent), so say where it will appear.
+            isReply
+              ? `Reply to ${comment.author.name} (in this thread)`
+              : `Reply to ${comment.author.name}`
+          }
           submitLabel="Reply"
           pending={pending}
           error={error}

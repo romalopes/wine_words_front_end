@@ -162,6 +162,9 @@ export function createArticlesApi(request: ApiRequester): ArticleApi {
     grouped(params, options) {
       return request<ArticleGroup[]>(queryPath("/articles/grouped", params), { auth: true, ...options })
     },
+    related(id, params, options) {
+      return request<Article[]>(queryPath(`/articles/${id}/related`, params), { auth: true, ...options })
+    },
   }
 }
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { articlesApi } from "../services/api";
 import ArticleForm from "./ArticleForm";
 import ReviewCard from "./ReviewCard";
+import RelatedArticles from "./RelatedArticles";
 import LikeButton from "./LikeButton";
 import CommentSection from "./comments/CommentSection";
 import DOMPurify from "dompurify";
@@ -270,6 +271,8 @@ function ArticleDetail() {
       )}
 
       <CommentSection kind="article" identifier={article.slug || article.id} />
+
+      <RelatedArticles article={article} />
     </main>
   );
 }

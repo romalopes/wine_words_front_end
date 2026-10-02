@@ -185,6 +185,8 @@ export interface ArticleApi {
   update(id: string | number, payload: ArticleWritePayload | FormData): Promise<Article>
   destroy(id: string | number): Promise<unknown>
   grouped(params?: QueryParams, options?: RequestSignal): Promise<ArticleGroup[]>
+  /** Newest articles from the same categories, excluding this one. */
+  related(id: string | number, params?: QueryParams, options?: RequestSignal): Promise<Article[]>
 }
 
 export interface WinePackageWritePayload {

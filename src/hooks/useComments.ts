@@ -66,14 +66,32 @@ export function useComments({ kind, identifier }: UseCommentsOptions) {
     })
   }, [])
 
-  const appendReply = useCallback((parentId: number, reply: CommentDTO) => {
-    setComments((current) =>
-      current.map((comment) =>
-        comment.id === parentId
-          ? { ...comment, replies: [...comment.replies, reply] }
-          : comment,
-      ),
-    )
+  /**
+   * Adds a created reply to the thread.
+   *
+   * The parent comes from the API's own `parent_id`, NOT from the id the form was
+   * opened against: replying to a reply attaches the new comment to that reply's
+   * parent, so the row the user clicked and the row the reply belongs to can
+   * differ. Walking the whole tree (rather than only the top level) keeps the
+   * insertion correct wherever the server put it.
+   */
+  const appendReply = useCallback((reply: CommentDTO) => {
+    const parentId = reply.parent_id
+    if (parentId === null || parentId === undefined) return
+
+    setComments((current) => {
+      const apply = (list: CommentDTO[]): CommentDTO[] =>
+        list.map((comment) => {
+          if (comment.id === parentId) {
+            return { ...comment, replies: [...comment.replies, reply] }
+          }
+          if (comment.replies.length > 0) {
+            return { ...comment, replies: apply(comment.replies) }
+          }
+          return comment
+        })
+      return apply(current)
+    })
   }, [])
 
   /**
@@ -108,10 +126,11 @@ export function useComments({ kind, identifier }: UseCommentsOptions) {
   )
 
   const reply = useCallback(
-    (parentId: number, body: string) =>
+    (commentId: number, body: string) =>
       mutate(
-        () => commentsApi.reply(parentId, body),
-        (created) => appendReply(parentId, created),
+        () => commentsApi.reply(commentId, body),
+        // The server decides the parent (see appendReply), not the clicked id.
+        (created) => appendReply(created),
       ),
     [mutate, appendReply],
   )
