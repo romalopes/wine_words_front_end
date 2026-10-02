@@ -162,6 +162,8 @@ export interface ReviewApi {
   destroy(id: string | number): Promise<unknown>
   myReviews(): Promise<Review[]>
   grouped(params?: QueryParams, options?: RequestSignal): Promise<ReviewGroup[]>
+  /** Newest reviews from the same categories, excluding this one. */
+  related(id: string | number, params?: QueryParams, options?: RequestSignal): Promise<Review[]>
 }
 
 export interface ArticleWritePayload {

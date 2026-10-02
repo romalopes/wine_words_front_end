@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { articlesApi } from "../services/api";
+import { articlesApi, reviewsApi } from "../services/api";
 import { isAbortError } from "../hooks/useSearch";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 import LikeButton from "./LikeButton";
 import CommentLink from "./comments/CommentLink";
 import type { Article } from "../types/article";
+import type { Review } from "../types/review";
 
 /** Strips HTML and truncates, for the one- or two-line preview under a title. */
 function excerpt(text: string | null | undefined, max = 140): string {
@@ -16,40 +17,84 @@ function excerpt(text: string | null | undefined, max = 140): string {
 }
 
 /** First attached image, falling back to the primary one. */
-function coverImage(article: Article): string | null {
-  if (Array.isArray(article.images) && article.images.length > 0) return article.images[0] ?? null;
-  return article.primary_image ?? null;
+function coverImage(item: RelatedItem): string | null {
+  if (Array.isArray(item.images) && item.images.length > 0) return item.images[0] ?? null;
+  return item.primary_image ?? null;
 }
 
-interface RelatedArticlesProps {
-  article: Article;
-}
+/** Either kind of record the footer can list. */
+type RelatedItem = Article | Review;
 
 /**
- * The "more articles" footer below the comments on the article page.
- *
- * Modeled on the Substack post footer: one row per article, text on the left
- * (title, preview, date • author, like/comment controls) and the cover image on
- * the right, then a "See all" link to the Articles listing.
- *
- * The rows come from `GET /articles/:id/related`, which picks the newest
- * articles across this article's categories and deals the slots round-robin when
- * it belongs to more than one. Nothing renders when the article is uncategorised
- * or every sibling is hidden — the footer is optional, it never breaks the page.
+ * The parts that differ between an article and a review. Everything else — the
+ * markup, the abort handling, the "renders nothing when empty" contract — is
+ * shared, so the two detail pages stay visually identical.
  */
-export default function RelatedArticles({ article }: RelatedArticlesProps) {
-  const returnToLink = useReturnToLink();
-  const [related, setRelated] = useState<Article[]>([]);
+const KINDS = {
+  article: {
+    heading: "More articles",
+    seeAll: "/articles",
+    detailPath: (id: string | number) => `/articles/${id}`,
+    fetch: (
+      id: string | number,
+      params: { limit: number },
+      options: { signal: AbortSignal },
+    ) => articlesApi.related(id, params, options),
+    // Articles preview their summary, falling back to the body.
+    preview: (item: RelatedItem) => (item as Article).abstract || (item as Article).body,
+    byline: (item: RelatedItem) => (item as Article).author_name,
+  },
+  review: {
+    heading: "More reviews",
+    seeAll: "/reviews",
+    detailPath: (id: string | number) => `/reviews/${id}`,
+    fetch: (
+      id: string | number,
+      params: { limit: number },
+      options: { signal: AbortSignal },
+    ) => reviewsApi.related(id, params, options),
+    // A review's preview is its tasting note; there is no summary field.
+    preview: (item: RelatedItem) => (item as Review).comment,
+    byline: (item: RelatedItem) => (item as Review).reviewer_name,
+  },
+} as const;
 
-  const identifier = article.slug || article.id;
+export type RelatedKind = keyof typeof KINDS;
+
+interface RelatedContentProps {
+  kind: RelatedKind;
+  /** The record being viewed; only its slug/id are used to build the request. */
+  item: { slug?: string | null; id: number };
+}
+
+const LIMIT = 5;
+
+/**
+ * The "more <things>" footer below the comments on a detail page.
+ *
+ * Modeled on the Substack post footer: one row per record, text on the left
+ * (title, preview, date • author, like/comment controls) and the cover image on
+ * the right, then a "See all" link to the listing.
+ *
+ * The rows come from `GET /articles|reviews/:id/related`, which picks the newest
+ * records across this one's categories and deals the slots round-robin when it
+ * belongs to more than one. Nothing renders when the record is uncategorised or
+ * every sibling is hidden — the footer is optional, it never breaks the page.
+ */
+export default function RelatedContent({ kind, item }: RelatedContentProps) {
+  const returnToLink = useReturnToLink();
+  const config = KINDS[kind];
+  const [related, setRelated] = useState<RelatedItem[]>([]);
+
+  const identifier = item.slug || item.id;
 
   useEffect(() => {
     if (!identifier) return;
     const controller = new AbortController();
     let cancelled = false;
 
-    articlesApi
-      .related(identifier, { limit: 5 }, { signal: controller.signal })
+    config
+      .fetch(identifier, { limit: LIMIT }, { signal: controller.signal })
       .then((data) => {
         if (!cancelled) setRelated(Array.isArray(data) ? data : []);
       })
@@ -62,61 +107,61 @@ export default function RelatedArticles({ article }: RelatedArticlesProps) {
       cancelled = true;
       controller.abort();
     };
-  }, [identifier]);
+    // `config` is a constant per `kind`; the request is keyed on the record and
+    // the kind, so neither the object identity nor the refetching matters.
+  }, [identifier, kind, config]);
 
   if (related.length === 0) return null;
 
   return (
-    <section className="wine-detail__section related-articles">
-      <h2>More articles</h2>
+    <section className="wine-detail__section related">
+      <h2>{config.heading}</h2>
 
-      <div className="related-articles__list">
-        {related.map((item) => {
-          const image = coverImage(item);
-          const href = returnToLink(`/articles/${item.slug || item.id}`);
+      <div className="related__list">
+        {related.map((row) => {
+          const image = coverImage(row);
+          const href = returnToLink(config.detailPath(row.slug || row.id));
+          const preview = excerpt(config.preview(row));
+          const byline = config.byline(row);
 
           return (
-            <article key={item.id} className="related-article">
-              <div className="related-article__body">
-                <h3 className="related-article__title">
-                  <Link to={href}>{item.title}</Link>
+            <article key={row.id} className="related-row">
+              <div className="related-row__body">
+                <h3 className="related-row__title">
+                  <Link to={href}>{row.title}</Link>
                 </h3>
 
-                {excerpt(item.abstract || item.body) && (
-                  <p className="related-article__excerpt">
-                    {excerpt(item.abstract || item.body)}
-                  </p>
-                )}
+                {preview && <p className="related-row__excerpt">{preview}</p>}
 
-                <p className="related-article__meta">
-                  {item.published_at
-                    ? new Date(item.published_at).toLocaleDateString()
+                <p className="related-row__meta">
+                  {row.published_at
+                    ? new Date(row.published_at).toLocaleDateString()
                     : "Draft"}
-                  {item.author_name ? ` • ${item.author_name}` : ""}
+                  {byline ? ` • ${byline}` : ""}
                 </p>
 
                 <div
-                  className="related-article__actions"
+                  className="related-row__actions"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <LikeButton
-                    kind="article"
-                    identifier={item.slug || item.id}
+                    kind={kind}
+                    identifier={row.slug || row.id}
                     // `?? null` rather than passing the value through: the
                     // button's props are `exactOptionalPropertyTypes`.
-                    initialLiked={item.liked_by_current_user ?? null}
-                    initialCount={item.likes_count ?? null}
+                    initialLiked={row.liked_by_current_user ?? null}
+                    initialCount={row.likes_count ?? null}
                   />
-                  <CommentLink kind="article" identifier={item.slug || item.id} />
+                  <CommentLink kind={kind} identifier={row.slug || row.id} />
                 </div>
               </div>
 
               {image && (
-                <Link to={href} className="related-article__media" tabIndex={-1} aria-hidden="true">
+                <Link to={href} className="related-row__media" tabIndex={-1} aria-hidden="true">
                   <img
                     src={image}
                     alt=""
-                    className="related-article__thumb"
+                    className="related-row__thumb"
                     loading="lazy"
                   />
                 </Link>
@@ -126,7 +171,7 @@ export default function RelatedArticles({ article }: RelatedArticlesProps) {
         })}
       </div>
 
-      <Link to="/articles" className="group-show-all related-articles__see-all">
+      <Link to={config.seeAll} className="group-show-all related__see-all">
         See all →
       </Link>
     </section>

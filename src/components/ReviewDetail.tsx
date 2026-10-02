@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { reviewsApi } from "../services/api";
 import ReviewForm from "./ReviewForm";
+import RelatedContent from "./RelatedContent";
 import LikeButton from "./LikeButton";
 import CommentSection from "./comments/CommentSection";
 import { useAuth } from "../contexts/AuthContext";
@@ -204,6 +205,8 @@ function ReviewDetail() {
       )}
 
       <CommentSection kind="review" identifier={review.slug || review.id} />
+
+<RelatedContent kind="review" item={review} />
     </main>
   );
 }

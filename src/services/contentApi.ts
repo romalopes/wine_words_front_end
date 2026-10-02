@@ -136,6 +136,9 @@ export function createReviewsApi(request: ApiRequester): ReviewApi {
     grouped(params, options) {
       return request<ReviewGroup[]>(queryPath("/reviews/grouped", params), { auth: true, ...options })
     },
+    related(id, params, options) {
+      return request<Review[]>(queryPath(`/reviews/${id}/related`, params), { auth: true, ...options })
+    },
   }
 }
 
