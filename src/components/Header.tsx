@@ -5,6 +5,7 @@ import {
   isAdmin,
   canManageWinesRole,
   canAccessPackages,
+  canAccessArticleProjects,
 } from "../constants/roles";
 import { categoriesApi } from "../services/api";
 import { useTestAccess } from "../contexts/TestAccessContext";
@@ -100,6 +101,7 @@ function Header() {
   // render normally for the signed-in identity.
   const effectiveIdentity = realUser ?? user;
   const isAdminUser = isAdmin(effectiveIdentity);
+  const canSeeArticleProjects = canAccessArticleProjects(user);
   // Editors (and reviewers/admins) may manage categories, so show the
   // Settings menu for them too. The "Admin" menu (Users & Roles, API Health,
   // Subscriptions) is admin-only only.
@@ -253,6 +255,7 @@ function Header() {
           ]}
         />
         {canSeePackages && <NavLink to="/wine-packages">Wine Packages</NavLink>}
+        {canSeeArticleProjects && <NavLink to="/article-projects">Article Projects</NavLink>}
         <div
           className="settings-menu"
           onMouseEnter={() => setExtrasOpen(true)}

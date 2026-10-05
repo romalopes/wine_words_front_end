@@ -37,3 +37,5 @@ export function canAccessPackages(user: RoleUser | null | undefined): boolean {
 }
 
 export const canCreatePackage = canAccessPackages
+
+export const canAccessArticleProjects = canManageWinesRole

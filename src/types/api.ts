@@ -78,6 +78,7 @@ import type { ImageableType, ImageListResponse, ImageUploadResponse } from "./im
 import type { AdminUser, RoleOption } from "./user"
 import type { Vintage, Wine, WineListItem } from "./wine"
 import type { WinePackage, WinePackageItem, WinePackageListItem } from "./winePackage"
+import type { ArticleProject, ArticleProjectDetail, ArticleProjectLookupItem, ArticleProjectLookupKind, ArticleProjectWritePayload } from "./articleProject"
 
 export interface WineSearchInput {
   q?: string
@@ -108,6 +109,15 @@ export interface WineApi {
   show(id: string | number): Promise<Wine>
   create(payload: WineWritePayload): Promise<Wine>
   update(id: string | number, payload: WineWritePayload): Promise<Wine>
+  destroy(id: string | number): Promise<unknown>
+}
+
+export interface ArticleProjectsApi {
+  show(id: string | number): Promise<ArticleProjectDetail>
+  lookup(kind: ArticleProjectLookupKind, query: string, producerId?: number): Promise<ArticleProjectLookupItem[]>
+  show(id: string | number): Promise<ArticleProject>
+  create(payload: ArticleProjectWritePayload): Promise<ArticleProject>
+  update(id: string | number, payload: ArticleProjectWritePayload): Promise<ArticleProject>
   destroy(id: string | number): Promise<unknown>
 }
 
