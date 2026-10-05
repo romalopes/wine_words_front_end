@@ -106,6 +106,6 @@ describe("AboutPage", () => {
     ).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", { name: "Create Free Account" }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute("href", "/login");
   });
 });

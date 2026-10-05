@@ -10,7 +10,7 @@ function AboutCTA() {
         <Link className={styles.primaryButton} to="/reviews">
           Browse Reviews
         </Link>
-        <Link className={styles.secondaryButton} to="/subscribe">
+        <Link className={styles.secondaryButton} to="/login">
           Create Free Account
         </Link>
       </div>
