@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { subscriptionsApi, billingApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Subscription } from "../types/subscription";
@@ -46,9 +47,11 @@ interface PlanCardProps {
   plan: Subscription
   isCurrent: boolean
   // Free plans have no checkout and managed plans no "choose" CTA, so the
-  // matching handler is genuinely absent on some rows.
+  // matching handler is genuinely absent on some rows. Logged-out visitors
+  // get an `onLoginRequest` instead, which routes them through sign-in first.
   onChoose?: ((planId: number) => void) | undefined
   onManage?: (() => void) | undefined
+  onLoginRequest?: (() => void) | undefined
   loadingPlanId: number | null
 }
 
@@ -60,6 +63,7 @@ function PlanCard({
   isCurrent,
   onChoose,
   onManage,
+  onLoginRequest,
   loadingPlanId,
 }: PlanCardProps) {
   const isFree =
@@ -122,11 +126,12 @@ function PlanCard({
       <button
         type="button"
         className="auth-form__submit"
-        disabled={!isFree && !onChoose && !onManage}
+        disabled={!isFree && !onChoose && !onManage && !onLoginRequest}
         onClick={() => {
           if (isFree && isCurrent) return;
           if (onManage) onManage();
           else if (onChoose) onChoose(plan.id);
+          else if (onLoginRequest) onLoginRequest();
         }}
         title={isFree && isCurrent ? "FREE is your current plan" : undefined}
       >
@@ -140,7 +145,9 @@ function PlanCard({
               ? onManage
                 ? "Manage subscription"
                 : "Current plan"
-              : "Choose plan"}
+              : onLoginRequest
+                ? "Login to choose plan"
+                : "Choose plan"}
       </button>
     </article>
   );
@@ -148,6 +155,7 @@ function PlanCard({
 
 function Subscribe() {
   const { user, refreshSession } = useAuth();
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<Subscription[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -319,6 +327,12 @@ function Subscribe() {
 
   const canManageBilling = user?.can_manage_billing; // Stripe is available for this user
 
+  // Logged-out visitors can't start checkout — every CTA routes them through
+  // sign-in first, returning here afterwards (see Login's `from` state).
+  const handleLoginRequest = useCallback(() => {
+    navigate("/login", { state: { from: "/subscribe" } });
+  }, [navigate]);
+
   // FREE first, then the paid tiers sorted by price.
   const free =
     plans.find((p) => p.yearly_price_cents === 0) ||
@@ -410,6 +424,7 @@ function Subscribe() {
                 onManage={
                   isCurrent && canManageBilling ? handleManage : undefined
                 }
+                onLoginRequest={!user ? handleLoginRequest : undefined}
                 loadingPlanId={loadingPlanId}
               />
             );

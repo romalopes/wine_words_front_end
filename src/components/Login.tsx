@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authApi, emailVerificationsApi } from "../services/api";
 import type { SocialProvider } from "../types/api";
@@ -134,6 +134,17 @@ function Login() {
   // the same backend still validates the credential.
   const providers = availableProviders();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Callers (e.g. /subscribe) pass `state: { from }` so sign-in returns the
+  // visitor where they came from. Only same-origin in-app paths are honoured —
+  // anything else falls back to the wines list.
+  const requestedFrom = (location.state as { from?: unknown } | null)?.from;
+  const returnTo =
+    typeof requestedFrom === "string" &&
+    requestedFrom.startsWith("/") &&
+    !requestedFrom.startsWith("//")
+      ? requestedFrom
+      : "/wines";
 
   function updateField(field: keyof LoginForm) {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -207,7 +218,7 @@ function Login() {
         await signIn({ email, password });
       }
 
-      navigate("/wines", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (error) {
       console.error(error);
       // Sign-in blocked by the email-verification lock (403 + payload).
@@ -267,7 +278,7 @@ function Login() {
     try {
       const { credential, nonce } = await signInWith(provider);
       await socialSignIn(provider, { credential, nonce });
-      navigate("/wines", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (error) {
       // Closing the popup is a normal thing to do, not a failure. A
       // misconfigured provider (e.g. an unauthorised Google origin) IS a
