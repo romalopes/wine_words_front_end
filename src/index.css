@@ -47,10 +47,12 @@ textarea {
 .site-header {
   align-items: center;
   background: rgba(247, 243, 236, 0.92);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid #e4d9cd;
+  column-gap: clamp(16px, 3vw, 36px);
   display: flex;
-  gap: 12px;
   justify-content: space-between;
+  row-gap: 8px;
   padding: 10px clamp(18px, 5vw, 64px);
   position: sticky;
   top: 0;
@@ -58,32 +60,80 @@ textarea {
 }
 
 .site-logo {
-  color: #681a2a;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0;
+  align-items: center;
+  display: inline-flex;
+  gap: 12px;
   text-decoration: none;
+}
+
+.site-header__title {
+  color: #4a1020;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.site-header__subtitle {
+  color: #766963;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  margin: 4px 0 0;
+  text-transform: uppercase;
 }
 
 .site-header nav {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px 14px;
 }
 
-.site-header nav a {
-  align-items: center;
-  border-radius: 999px;
-  color: #5d514b;
+/* JR-style editorial nav: plain text with a bottom-rule on hover/active
+   instead of filled pills. Scoped to direct children so dropdown panel
+   links keep their own menu styling. */
+.site-header nav > a {
+  border-bottom: 2px solid transparent;
+  color: #4f4440;
   display: inline-flex;
-  padding: 8px 14px;
+  align-items: center;
+  padding: 8px 4px;
   text-decoration: none;
 }
 
-.site-header nav a.active,
-.site-header nav a:hover {
+.site-header nav > a.active,
+.site-header nav > a:hover {
+  background: transparent;
+  border-bottom-color: #681a2a;
+  color: #681a2a;
+}
+
+.site-header__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.site-header__cta {
   background: #681a2a;
+  border: 1px solid #681a2a;
+  border-radius: 999px;
+  color: #fff8f2;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 8px 18px;
+  text-decoration: none;
+  transition: background 0.1s ease;
+}
+
+.site-header__cta:hover,
+.site-header__cta.active {
+  background: #4a1020;
+  border-color: #4a1020;
   color: #fff8f2;
 }
 
@@ -707,11 +757,12 @@ textarea {
     flex-direction: column;
   }
 
-  .site-header nav {
+  .site-header nav,
+  .site-header__actions {
     width: 100%;
   }
 
-  .site-header nav a {
+  .site-header nav > a {
     text-align: center;
     flex: 1;
   }
@@ -723,6 +774,12 @@ textarea {
   .site-header nav .settings-menu__toggle {
     width: 100%;
     text-align: center;
+  }
+
+  .site-header__actions {
+    justify-content: center;
+    border-top: 1px solid #eee4db;
+    padding-top: 10px;
   }
 
   .site-header__user {
@@ -2503,17 +2560,18 @@ textarea {
 .settings-menu__toggle {
   background: none;
   border: none;
-  border-radius: 999px;
-  color: #5d514b;
+  border-bottom: 2px solid transparent;
+  color: #4f4440;
   cursor: pointer;
   font: inherit;
-  padding: 8px 14px;
+  padding: 8px 4px;
 }
 
 .settings-menu__toggle:hover,
 .settings-menu__toggle[aria-expanded="true"] {
-  background: #681a2a;
-  color: #fff8f2;
+  background: none;
+  border-bottom-color: #681a2a;
+  color: #681a2a;
 }
 
 .settings-menu__dropdown {
@@ -3494,6 +3552,8 @@ textarea {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  flex-basis: 100%;
+  order: -1;
   padding: 0.55rem clamp(18px, 5vw, 64px);
   background: #fef3c7;
   border-bottom: 2px solid #f59e0b;

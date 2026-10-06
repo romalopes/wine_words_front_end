@@ -180,7 +180,7 @@ function Header() {
     // `string | undefined` under `noUncheckedIndexedAccess`, and this input is
     // known to contain an "@", so take the part before it directly.
     const at = user.email?.indexOf("@") ?? -1;
-    return at > 0 ? user.email.slice(0, at) : user.email ?? null;
+    return at > 0 ? user.email.slice(0, at) : (user.email ?? null);
   }
 
   const displayName = getDisplayName();
@@ -214,15 +214,18 @@ function Header() {
         </div>
       )}
       <NavLink className="site-logo" to="/">
-        <img
-          src="/wine_words.jpg"
-          alt="Wine Words"
-          style={{ height: "2.5rem", display: "block", borderRadius: ".35rem" }}
-        />
         <div>
-          {/* <div className="site-header__title">Wine Words</div> */}
+          <img
+            src="/wine_words.jpg"
+            alt="Wine Words"
+            style={{
+              height: "2.5rem",
+              display: "block",
+              borderRadius: ".35rem",
+            }}
+          />
           <p className="site-header__subtitle">
-            Explore producers, wines and reviews
+            Explore producers,<br></br> wines and reviews
           </p>
         </div>
       </NavLink>
@@ -255,7 +258,9 @@ function Header() {
           ]}
         />
         {canSeePackages && <NavLink to="/wine-packages">Wine Packages</NavLink>}
-        {canSeeArticleProjects && <NavLink to="/article-projects">Article Projects</NavLink>}
+        {canSeeArticleProjects && (
+          <NavLink to="/article-projects">Article Projects</NavLink>
+        )}
         <div
           className="settings-menu"
           onMouseEnter={() => setExtrasOpen(true)}
@@ -285,7 +290,6 @@ function Header() {
           )}
         </div>
         <NavLink to="/about">About</NavLink>
-        <NavLink to="/subscribe">Subscribe</NavLink>
         {canManageSettings && (
           <div
             className="settings-menu"
@@ -370,7 +374,12 @@ function Header() {
             )}
           </div>
         )}
-
+      </nav>
+      <div className="site-header__actions">
+        <NavLink className="site-header__cta" to="/subscribe">
+          Subscribe
+        </NavLink>
+        {user && <NotificationBell />}
         {user ? (
           <div className="site-header__user">
             <span className="site-header__avatar" aria-hidden="true">
@@ -424,8 +433,7 @@ function Header() {
         >
           Exit Test Mode
         </button>
-      </nav>
-      {user && <NotificationBell />}
+      </div>
     </header>
   );
 }
