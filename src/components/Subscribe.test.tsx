@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import Subscribe from "./Subscribe";
@@ -153,7 +153,7 @@ describe("Subscribe (logged in, free tier)", () => {
 });
 
 describe("Subscribe (logged in, paid tier)", () => {
-  it("shows Manage subscription — not Current plan — on the FREE card", async () => {
+  it("shows Choose plan — not Current plan — on the FREE card", async () => {
     const user = userEvent.setup();
     authState.user = { subscription: { id: paidPlan.id }, can_manage_billing: true };
     mockPortal.mockResolvedValue({ url: "https://billing.stripe.com/p/session" });
@@ -166,11 +166,17 @@ describe("Subscribe (logged in, paid tier)", () => {
 
     renderSubscribe();
 
-    // The FREE card offers the Stripe portal (cancel/downgrade lives there —
-    // this page has no downgrade-to-FREE path).
-    const freeButtons = await screen.findAllByRole("button", { name: "Manage subscription" });
-    expect(freeButtons).toHaveLength(2);
-    await user.click(freeButtons[0]);
+    // The FREE card offers the Stripe portal via handleManage (cancel/downgrade
+    // lives there — this page has no downgrade-to-FREE path). Scope to the
+    // FREE article so the click can't land on another card.
+    const manageButtons = await screen.findAllByRole("button", { name: "Manage subscription" });
+    expect(manageButtons).toHaveLength(1);
+    const freeCard = screen.getByRole("heading", { name: "FREE" }).closest("article");
+    expect(freeCard).not.toBeNull();
+    const freeChooseButton = within(freeCard as HTMLElement).getByRole("button", {
+      name: "Choose plan",
+    });
+    await user.click(freeChooseButton);
 
     await waitFor(() => {
       expect(mockPortal).toHaveBeenCalled();

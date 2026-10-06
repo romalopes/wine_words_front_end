@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { accountApi, countriesApi, identitiesApi } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -15,17 +16,17 @@ import type { CountryListItem } from "../types/reference";
 
 /** The editable profile form. Every field is a string so the inputs stay controlled. */
 interface AccountForm {
-  first_name: string
-  last_name: string
-  phone: string
-  date_of_birth: string
+  first_name: string;
+  last_name: string;
+  phone: string;
+  date_of_birth: string;
   address: {
-    street_address: string
-    city: string
-    state: string
-    postal_code: string
-    country_id: string
-  }
+    street_address: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country_id: string;
+  };
 }
 
 const emptyAccount: AccountForm = {
@@ -48,10 +49,10 @@ function str(v: unknown): string {
 }
 
 interface FieldProps {
-  label: string
-  children: ReactNode
+  label: string;
+  children: ReactNode;
   /** Stretches the field across both columns of the profile grid. */
-  wide?: boolean
+  wide?: boolean;
 }
 
 function Field({ label, children, wide }: FieldProps) {
@@ -72,7 +73,9 @@ function parseApiError(err: unknown, fallback: string): string {
   try {
     const parsed: unknown = JSON.parse(message);
     if (parsed && typeof parsed === "object" && "errors" in parsed) {
-      return flattenErrors((parsed as { errors: FieldErrors }).errors) || message;
+      return (
+        flattenErrors((parsed as { errors: FieldErrors }).errors) || message
+      );
     }
   } catch {
     /* err.message is not JSON — use as-is */
@@ -93,7 +96,7 @@ function flattenErrors(errors: FieldErrors | null | undefined): string {
 }
 
 export default function AccountSettings() {
-  const { refreshSession } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [form, setForm] = useState<AccountForm>(emptyAccount);
   const [countries, setCountries] = useState<CountryListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +182,10 @@ export default function AccountSettings() {
   }
 
   function setAddressField(key: AddressField, value: string) {
-    setForm((prev) => ({ ...prev, address: { ...prev.address, [key]: value } }));
+    setForm((prev) => ({
+      ...prev,
+      address: { ...prev.address, [key]: value },
+    }));
   }
 
   async function handleSaveProfile(e: FormEvent<HTMLFormElement>) {
@@ -218,7 +224,11 @@ export default function AccountSettings() {
     try {
       await accountApi.changePassword(passwords);
       setPasswordNotice("Password updated.");
-      setPasswords({ current_password: "", password: "", password_confirmation: "" });
+      setPasswords({
+        current_password: "",
+        password: "",
+        password_confirmation: "",
+      });
     } catch (err) {
       setPasswordError(parseApiError(err, "Could not change your password."));
     } finally {
@@ -241,7 +251,7 @@ export default function AccountSettings() {
       // Dismissing the provider popup is not an error worth showing.
       if (err instanceof ProviderCancelledError) return;
       setIdentitiesError(
-        parseApiError(err, `Could not connect ${providerLabel(provider)}.`)
+        parseApiError(err, `Could not connect ${providerLabel(provider)}.`),
       );
     } finally {
       setConnectingProvider(null);
@@ -259,7 +269,7 @@ export default function AccountSettings() {
     } catch (err) {
       // The API refuses to remove the last remaining sign-in method.
       setIdentitiesError(
-        parseApiError(err, "Could not disconnect that sign-in method.")
+        parseApiError(err, "Could not disconnect that sign-in method."),
       );
     } finally {
       setDisconnectingId(null);
@@ -269,7 +279,7 @@ export default function AccountSettings() {
   // Providers this deployment exposes that are not connected yet.
   const connectedProviders = identities.map((identity) => identity.provider);
   const connectable = availableProviders().filter(
-    (provider) => !connectedProviders.includes(provider)
+    (provider) => !connectedProviders.includes(provider),
   );
 
   return (
@@ -285,15 +295,39 @@ export default function AccountSettings() {
 
       {!loading && (
         <div className="account-grid">
+          <section className="account-card" aria-labelledby="membership-title">
+            <div className="auth-form">
+              <h2 className="account-card__title" id="membership-title">
+                Membership
+              </h2>
+              <p className="account-card__lede">
+                Current plan:{" "}
+                <strong>{user?.subscription?.name ?? "Free"}</strong>
+                {user?.subscription_status && (
+                  <span> · {user.subscription_status}</span>
+                )}
+              </p>
+              <p className="account-card__lede">
+                <Link className="text-link" to="/subscribe">
+                  Manage your plan
+                </Link>
+              </p>
+            </div>
+          </section>
+
           <section className="account-card">
             <form className="auth-form" onSubmit={handleSaveProfile}>
               <h2 className="account-card__title">Profile</h2>
               {profileNotice && (
                 <p className="review-form__success">{profileNotice}</p>
               )}
-              {profileError && <p className="review-form__error">{profileError}</p>}
+              {profileError && (
+                <p className="review-form__error">{profileError}</p>
+              )}
 
-              <h3 className="account-section-title account-section-title--first">Personal information</h3>
+              <h3 className="account-section-title account-section-title--first">
+                Personal information
+              </h3>
               <div className="account-fields">
                 <Field label="First name">
                   <input
@@ -338,7 +372,9 @@ export default function AccountSettings() {
                   <input
                     type="text"
                     value={form.address.street_address}
-                    onChange={(e) => setAddressField("street_address", e.target.value)}
+                    onChange={(e) =>
+                      setAddressField("street_address", e.target.value)
+                    }
                     maxLength={200}
                   />
                 </Field>
@@ -360,14 +396,18 @@ export default function AccountSettings() {
                   <input
                     type="text"
                     value={form.address.postal_code}
-                    onChange={(e) => setAddressField("postal_code", e.target.value)}
+                    onChange={(e) =>
+                      setAddressField("postal_code", e.target.value)
+                    }
                     maxLength={20}
                   />
                 </Field>
                 <Field label="Country">
                   <select
                     value={form.address.country_id}
-                    onChange={(e) => setAddressField("country_id", e.target.value)}
+                    onChange={(e) =>
+                      setAddressField("country_id", e.target.value)
+                    }
                   >
                     <option value="">— Select country —</option>
                     {countries.map((c) => (
@@ -401,13 +441,18 @@ export default function AccountSettings() {
               {passwordNotice && (
                 <p className="review-form__success">{passwordNotice}</p>
               )}
-              {passwordError && <p className="review-form__error">{passwordError}</p>}
+              {passwordError && (
+                <p className="review-form__error">{passwordError}</p>
+              )}
               <Field label="Current password">
                 <input
                   type="password"
                   value={passwords.current_password}
                   onChange={(e) =>
-                    setPasswords((p) => ({ ...p, current_password: e.target.value }))
+                    setPasswords((p) => ({
+                      ...p,
+                      current_password: e.target.value,
+                    }))
                   }
                   required
                   autoComplete="current-password"
@@ -465,7 +510,9 @@ export default function AccountSettings() {
               )}
 
               {identitiesLoading ? (
-                <p className="wine-management__loading">Loading sign-in methods…</p>
+                <p className="wine-management__loading">
+                  Loading sign-in methods…
+                </p>
               ) : (
                 <>
                   <ul className="account-identities">
@@ -474,7 +521,9 @@ export default function AccountSettings() {
                         <span className="account-identity__label">
                           Email &amp; password
                         </span>
-                        <span className="account-identity__meta">Connected</span>
+                        <span className="account-identity__meta">
+                          Connected
+                        </span>
                       </li>
                     )}
                     {identities.map((identity) => (

@@ -10,6 +10,7 @@ import {
 import { categoriesApi } from "../services/api";
 import { useTestAccess } from "../contexts/TestAccessContext";
 import NotificationBell from "./NotificationBell";
+import { isPaidSubscriber } from "../utils/subscription";
 import { responseItems } from "../types/common";
 import type { Category, CategoryFlag } from "../types/catalog";
 import type { CategoryCountType, CategoryCounts } from "../types/api";
@@ -374,9 +375,13 @@ function Header() {
         )}
       </nav>
       <div className="site-header__actions">
-        <NavLink className="site-header__cta" to="/subscribe">
-          Subscribe
-        </NavLink>
+        {/* Paid subscribers manage via /subscribe → Stripe portal, so the
+            acquisition CTA is hidden once they hold a non-FREE plan. */}
+        {!isPaidSubscriber(user) && (
+          <NavLink className="site-header__cta" to="/subscribe">
+            Subscribe
+          </NavLink>
+        )}
         {user && <NotificationBell />}
         {user ? (
           <div className="site-header__user">
