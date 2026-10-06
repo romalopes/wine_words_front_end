@@ -4,6 +4,7 @@ import { reviewsApi } from "../services/api";
 import ReviewForm from "./ReviewForm";
 import RelatedContent from "./RelatedContent";
 import LikeButton from "./LikeButton";
+import ShareButton from "./ShareButton";
 import CommentSection from "./comments/CommentSection";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
@@ -11,14 +12,22 @@ import DOMPurify from "dompurify";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 import { errorMessage } from "../utils/errors";
+import { formatDate } from "../utils/dates";
+import { normalizeArticleBody } from "../utils/articleHtml";
 import type { Review } from "../types/review";
 
-/** Renders a review comment, which is stored as HTML and must be sanitised. */
+/**
+ * Renders a review comment, which is stored as Trix HTML: sanitised, then
+ * rebuilt into real paragraphs so the reading column can style it (legacy
+ * comments are one <div> full of <br><br>).
+ */
 function RichComment({ html }: { html: string }) {
   return (
     <div
-      className="review-card__comment"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+      className="article-page__body"
+      dangerouslySetInnerHTML={{
+        __html: DOMPurify.sanitize(normalizeArticleBody(html)),
+      }}
     />
   );
 }
@@ -101,6 +110,17 @@ function ReviewDetail() {
     );
   }
 
+  // Editorial header data: the primary image leads, the rest become a
+  // gallery; the byline date falls back to creation for drafts.
+  const images = Array.isArray(review.images) ? review.images : [];
+  const hero = review.primary_image ?? images[0] ?? null;
+  const gallery = images.filter((src) => src !== hero);
+  const categories = review.categories ?? [];
+  const kicker = categories[0]?.name ?? "Review";
+  const bylineDate = formatDate(review.published_at ?? review.created_at);
+  const hasDrinkWindow = review.drink_from != null || review.drink_to != null;
+  const showVintage = Boolean(review.vintage_year) && !review.vintage_no_vintage;
+
   return (
     <main className="wine-app">
       <BackToSource />
@@ -108,105 +128,156 @@ function ReviewDetail() {
         &larr; Back to Reviews
       </Link>
 
-      {Array.isArray(review.images) && review.images.length > 0 && (
-        <div className="wine-detail__images">
-          {review.images.map((src, i) => (
-            <img key={i} src={src} alt={`${review.title} ${i + 1}`} />
-          ))}
-        </div>
-      )}
-
       {error && <p className="wine-management__error">{error}</p>}
 
-      {canEdit && !editing && (
-        <div className="review-form__actions">
-          <button
-            type="button"
-            className="auth-form__submit"
-            onClick={() => setEditing(true)}
-          >
-            Edit Review
-          </button>
-          <button
-            type="button"
-            className="review-form__cancel"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {deleting ? "Deleting…" : "Delete Review"}
-          </button>
-        </div>
-      )}
+      <article className="article-page review-page">
+        <header className="article-page__header">
+          <p className="article-page__kicker">
+            {categories.length > 0 ? (
+              <Link to={returnToLink(`/categories/${categories[0].slug}`)}>
+                {kicker}
+              </Link>
+            ) : (
+              kicker
+            )}
+          </p>
 
-      {canEdit && editing && (
-        <ReviewForm
-          review={review}
-          vintageYear={review.vintage_year ?? null}
-          onSaved={() => {
-            setEditing(false);
-            loadReview();
-          }}
-          onCancel={() => setEditing(false)}
-        />
-      )}
+          <h1 className="article-page__title">
+            {review.title || "Untitled review"}
+          </h1>
 
-      <div className="wine-detail__header">
-        <h1>{review.title || "Untitled review"}</h1>
-        <span className="review-card__score">{review.score}</span>
-      </div>
-      <LikeButton
-        kind="review"
-        identifier={review.slug || review.id}
-        initialLiked={review.liked_by_current_user}
-        initialCount={review.likes_count}
-        onChange={({ liked, likes_count }) =>
-          setReview((prev) =>
-            prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
-          )
-        }
-      />
+          {review.wine_name && review.wine_slug ? (
+            <p className="article-page__deck">
+              <Link to={returnToLink(`/wines/${review.wine_slug}`)}>
+                {review.wine_name}
+                {showVintage ? ` ${review.vintage_year}` : ""}
+              </Link>
+            </p>
+          ) : (
+            showVintage && <p className="article-page__deck">{review.vintage_year}</p>
+          )}
 
-      <p className="review-card__comment">
-        {review.wine_name && (
-          <>
-            <Link to={returnToLink(`/wines/${review.wine_slug}`)}>
-              {review.wine_name}
-              {review.vintage_year ? ` ${review.vintage_year}` : ""}
-            </Link>
-            {" · "}
-          </>
-        )}
-        {`by ${review.reviewer_name}`}
-        {review.published_at && (
-          <>
-            {" · "}
-            {new Date(review.published_at).toLocaleDateString()}
-          </>
-        )}
-        <span className={`review-card__status`}> {review.status}</span>
-      </p>
+          <div className="review-page__facts">
+            {review.score != null && (
+              <span className="review-page__score">{review.score}</span>
+            )}
+            {showVintage && (
+              <span className="review-page__fact">
+                <b>Vintage</b> {review.vintage_year}
+              </span>
+            )}
+            {hasDrinkWindow && (
+              <span className="review-page__fact">
+                <b>Drink</b> {review.drink_from ?? ""}
+                {review.drink_to != null ? `–${review.drink_to}` : ""}
+                {review.drink_plus ? "+" : ""}
+              </span>
+            )}
+          </div>
 
-      {Array.isArray(review.categories) && review.categories.length > 0 && (
-        <p className="review-card__comment">
-          Categories:{" "}
-          {(review.categories ?? []).map((cat, i) => (
-            <span key={cat.id}>
-              <Link to={returnToLink(`/categories/${cat.slug}`)}>{cat.name}</Link>
-              {i < (review.categories?.length ?? 0) - 1 ? ", " : ""}
+          <div className="article-page__byline">
+            <span className="article-page__byline-info">
+              <span className="article-page__author">by {review.reviewer_name}</span>
+              {bylineDate && (
+                <>
+                  <span className="article-page__meta-dot" aria-hidden="true">
+                    ·
+                  </span>
+                  <time
+                    className="article-page__date"
+                    dateTime={review.published_at ?? review.created_at ?? undefined}
+                  >
+                    {bylineDate}
+                  </time>
+                </>
+              )}
+              {review.status === "draft" && (
+                <span className="article-page__badge">Draft</span>
+              )}
             </span>
-          ))}
-        </p>
-      )}
 
-      {review.comment && (
-        <div className="wine-detail__section">
-          <RichComment html={review.comment} />
-        </div>
-      )}
+            <span className="article-page__byline-actions">
+              <LikeButton
+                kind="review"
+                identifier={review.slug || review.id}
+                initialLiked={review.liked_by_current_user}
+                initialCount={review.likes_count}
+                onChange={({ liked, likes_count }) =>
+                  setReview((prev) =>
+                    prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
+                  )
+                }
+              />
+              <ShareButton label="this review" />
+            </span>
+          </div>
 
-      <CommentSection kind="review" identifier={review.slug || review.id} />
+          {categories.length > 1 && (
+            <div className="article-page__chips">
+              {categories.slice(1).map((cat) => (
+                <Link
+                  key={cat.id}
+                  to={returnToLink(`/categories/${cat.slug}`)}
+                  className="article-page__chip"
+                >
+                  {cat.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </header>
 
-<RelatedContent kind="review" item={review} />
+        {canEdit && !editing && (
+          <div className="wine-detail__actions article-page__actions">
+            <button
+              type="button"
+              className="auth-form__submit"
+              onClick={() => setEditing(true)}
+            >
+              Edit Review
+            </button>
+            <button
+              type="button"
+              className="review-form__cancel"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete Review"}
+            </button>
+          </div>
+        )}
+
+        {canEdit && editing && (
+          <ReviewForm
+            review={review}
+            vintageYear={review.vintage_year ?? null}
+            onSaved={() => {
+              setEditing(false);
+              loadReview();
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        )}
+
+        {hero && (
+          <figure className="article-page__hero">
+            <img src={hero} alt={review.title} />
+          </figure>
+        )}
+        {gallery.length > 0 && (
+          <div className="article-page__gallery">
+            {gallery.map((src, i) => (
+              <img key={src} src={src} alt={`${review.title} ${i + 2}`} />
+            ))}
+          </div>
+        )}
+
+        {review.comment && <RichComment html={review.comment} />}
+
+        <CommentSection kind="review" identifier={review.slug || review.id} />
+
+        <RelatedContent kind="review" item={review} />
+      </article>
     </main>
   );
 }

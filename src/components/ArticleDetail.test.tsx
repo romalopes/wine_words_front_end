@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ArticleDetail from "./ArticleDetail";
+import { formatDate } from "../utils/dates";
 
 /**
  * The article page renders its linked reviews with the shared `ReviewCard`
@@ -146,4 +147,53 @@ describe("ArticleDetail reviews", () => {
     expect(screen.queryByRole("heading", { name: "Reviews" })).not.toBeInTheDocument();
     expect(reviewCards()).toHaveLength(0);
   });
+
+describe("ArticleDetail header", () => {
+  function renderArticle() {
+    return render(
+      <MemoryRouter initialEntries={["/articles/barolo-vertical"]}>
+        <Routes>
+          <Route path="/articles/:slug" element={<ArticleDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it("shows the kicker, standfirst, chips and a created_at fallback date", async () => {
+    mockShow.mockResolvedValue({
+      ...makeArticle([]),
+      abstract: "Article about 15 vintages",
+      categories: [
+        { id: 3, name: "Australian Icons 2", slug: "australian-icons" },
+        { id: 2, name: "Tastings", slug: "tastings" },
+      ],
+      tags: ["Grenache"],
+      published_at: null,
+      created_at: "2026-09-07T05:56:00Z",
+    });
+    renderArticle();
+
+    await screen.findByRole("heading", { name: "Barolo vertical", level: 1 });
+
+    // First category becomes the section kicker, the rest become chips.
+    expect(screen.getByRole("link", { name: "Australian Icons 2" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tastings" })).toBeInTheDocument();
+    expect(screen.getByText("Grenache")).toBeInTheDocument();
+
+    // Standfirst carries the abstract.
+    expect(screen.getByText("Article about 15 vintages")).toBeInTheDocument();
+
+    // published_at is null on this record, so the byline falls back to created_at.
+    expect(
+      screen.getByText(formatDate("2026-09-07T05:56:00Z") ?? "missing"),
+    ).toBeInTheDocument();
+  });
+
+  it("flags drafts with a badge and stays quiet when published", async () => {
+    mockShow.mockResolvedValue({ ...makeArticle([]), status: "draft" });
+    renderArticle();
+    expect(await screen.findByText("Draft")).toBeInTheDocument();
+  });
+});
+
 });

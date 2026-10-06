@@ -4571,3 +4571,393 @@ textarea {
   }
 }
 
+
+/* ==========================================================================
+   Editorial detail pages (article + review), modelled on the reference
+   publications: section kicker, serif display headline, standfirst/deck,
+   byline row with like/share, and a narrow reading column. Everything is
+   scoped to .article-page / .review-page so the wine & review listings and
+   the shared detail pages keep their existing look.
+   ========================================================================== */
+
+.article-page {
+  display: block;
+  margin-top: 6px;
+}
+
+/* One reading measure for header, media and body. */
+.article-page__header,
+.article-page__actions,
+.article-page__hero,
+.article-page__gallery,
+.article-page__body {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 42rem;
+}
+
+.article-page__kicker {
+  color: #b9475f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin: 0 0 0.7rem;
+  text-transform: uppercase;
+}
+
+.article-page__kicker a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.article-page__kicker a:hover {
+  color: #681a2a;
+  text-decoration: underline;
+}
+
+.article-page__title {
+  color: #241b19;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.2rem, 5.5vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.04;
+  margin: 0;
+}
+
+.article-page__standfirst,
+.article-page__deck {
+  color: #5d514b;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  margin: 1rem 0 0;
+}
+
+.article-page__deck {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.article-page__deck a {
+  color: #681a2a;
+  text-decoration: none;
+}
+
+.article-page__deck a:hover {
+  text-decoration: underline;
+}
+
+/* Byline: author · date · draft flag on the left, like/share on the right. */
+.article-page__byline {
+  align-items: center;
+  border-top: 1px solid #e4d9cd;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 1.35rem;
+  padding-top: 1rem;
+}
+
+.article-page__byline-info {
+  align-items: center;
+  color: #766963;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+  gap: 0.5rem;
+}
+
+.article-page__author {
+  color: #4f4440;
+  font-weight: 700;
+}
+
+.article-page__meta-dot {
+  color: #c9b8a8;
+}
+
+.article-page__badge {
+  background: rgba(185, 71, 95, 0.1);
+  border-radius: 999px;
+  color: #8a2238;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  text-transform: uppercase;
+}
+
+.article-page__byline-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.article-page__share {
+  background: transparent;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  color: #681a2a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.article-page__share:hover {
+  background: rgba(104, 26, 42, 0.08);
+  border-color: #681a2a;
+}
+
+.article-page__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.article-page__chip {
+  background: #fffaf4;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  color: #5d514b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  text-decoration: none;
+  transition: border-color 0.1s ease, color 0.1s ease;
+}
+
+.article-page__chip:hover {
+  border-color: #681a2a;
+  color: #681a2a;
+}
+
+/* Editor toolbar: right-aligned above the body, quieter than a page CTA. */
+.article-page__actions {
+  justify-content: flex-end;
+  margin: 1.5rem auto 0;
+}
+
+.article-page__hero {
+  margin-top: 1.75rem;
+}
+
+.article-page__hero img {
+  background: #efe5dc;
+  border-radius: 10px;
+  display: block;
+  height: auto;
+  max-height: 26rem;
+  object-fit: cover;
+  width: 100%;
+}
+
+.article-page__gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.article-page__gallery img {
+  border-radius: 8px;
+  height: 6rem;
+  object-fit: cover;
+  width: 9rem;
+}
+
+/* Reading column: paragraphs, links and media inside the sanitised body. */
+.article-page__body {
+  color: #2f2622;
+  font-size: 1.08rem;
+  line-height: 1.75;
+  margin-top: 1.75rem;
+  overflow-wrap: break-word;
+}
+
+.article-page__body p {
+  margin: 0 0 1.15em;
+}
+
+.article-page__body > p:first-child {
+  color: #241b19;
+  font-size: 1.12rem;
+}
+
+.article-page__body a {
+  color: #681a2a;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.article-page__body a:hover {
+  color: #4a1020;
+}
+
+.article-page__body h2,
+.article-page__body h3,
+.article-page__body h4 {
+  color: #241b19;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.2;
+  margin: 1.8em 0 0.6em;
+}
+
+.article-page__body h2 {
+  font-size: 1.5rem;
+}
+
+.article-page__body h3 {
+  font-size: 1.28rem;
+}
+
+.article-page__body h4 {
+  font-size: 1.1rem;
+}
+
+.article-page__body ul,
+.article-page__body ol {
+  margin: 0 0 1.15em;
+  padding-left: 1.5em;
+}
+
+.article-page__body li {
+  margin-bottom: 0.4em;
+}
+
+.article-page__body li::marker {
+  color: #681a2a;
+}
+
+.article-page__body blockquote {
+  border-left: 3px solid #681a2a;
+  color: #5d514b;
+  font-style: italic;
+  margin: 1.6em 0;
+  padding: 0.3em 0 0.3em 1.1em;
+}
+
+.article-page__body figure {
+  margin: 1.75em 0;
+}
+
+.article-page__body img {
+  border-radius: 10px;
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.article-page__body figcaption {
+  color: #766963;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.article-page__body hr {
+  border: 0;
+  border-top: 1px solid #e4d9cd;
+  margin: 2em 0;
+}
+
+.article-page__body strong {
+  color: #241b19;
+}
+
+/* Linked-entity lists (wines & vintages, producers) as card rows. */
+.article-page__link-list {
+  display: grid;
+  gap: 0.6rem 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.article-page__link-list li {
+  background: #fffaf4;
+  border: 1px solid #e4d9cd;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+}
+
+.article-page__link-list a {
+  color: #681a2a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.article-page__link-list a:hover {
+  text-decoration: underline;
+}
+
+.article-page__link-meta {
+  color: #766963;
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 2px;
+}
+
+/* Review-only extras: score medallion plus vintage/drink-window facts. */
+.review-page__facts {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+}
+
+.review-page__score {
+  background: #27615e;
+  border-radius: 8px;
+  color: #f7fff9;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 0.25rem 0.85rem;
+}
+
+.review-page__fact {
+  background: #fffaf4;
+  border: 1px solid #e4d9cd;
+  border-radius: 999px;
+  color: #5d514b;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.3rem 0.85rem;
+}
+
+.review-page__fact b {
+  color: #9a8c84;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  margin-right: 0.4rem;
+  text-transform: uppercase;
+}
+
+/* Keep the reading column comfortable on small screens. */
+@media (max-width: 640px) {
+  .article-page__actions {
+    justify-content: flex-start;
+  }
+
+  .article-page__byline-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .article-page__gallery img {
+    height: 5rem;
+    width: 7rem;
+  }
+
+  .article-page__body > p:first-child {
+    font-size: 1.06rem;
+  }
+}
+

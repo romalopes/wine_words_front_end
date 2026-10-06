@@ -5,12 +5,15 @@ import ArticleForm from "./ArticleForm";
 import ReviewCard from "./ReviewCard";
 import RelatedContent from "./RelatedContent";
 import LikeButton from "./LikeButton";
+import ShareButton from "./ShareButton";
 import CommentSection from "./comments/CommentSection";
 import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import type { Article } from "../types/article";
 import { errorMessage } from "../utils/errors";
+import { formatDate } from "../utils/dates";
+import { normalizeArticleBody } from "../utils/articleHtml";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
 
@@ -18,11 +21,17 @@ interface RichBodyProps {
   html: string;
 }
 
+/**
+ * The article body: sanitised, then rebuilt into real paragraphs (legacy
+ * bodies are one <div> full of <br><br>, which CSS alone cannot space).
+ */
 function RichBody({ html }: RichBodyProps) {
   return (
     <div
-      className="article-detail__body"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+      className="article-page__body"
+      dangerouslySetInnerHTML={{
+        __html: DOMPurify.sanitize(normalizeArticleBody(html)),
+      }}
     />
   );
 }
@@ -118,6 +127,15 @@ function ArticleDetail() {
   const vintages = article.vintages ?? [];
   const producers = article.producers ?? [];
 
+  // Editorial header data: the primary image leads, the rest become a
+  // gallery; the byline date falls back to creation because drafts (and
+  // some seeded records) never get a published_at.
+  const images = Array.isArray(article.images) ? article.images : [];
+  const hero = article.primary_image ?? images[0] ?? null;
+  const gallery = images.filter((src) => src !== hero);
+  const kicker = categories[0]?.name ?? "Article";
+  const bylineDate = formatDate(article.published_at ?? article.created_at);
+
   return (
     <main className="wine-app">
       <BackToSource />
@@ -125,154 +143,185 @@ function ArticleDetail() {
         &larr; Back to Articles
       </Link>
 
-      {Array.isArray(article.images) && article.images.length > 0 && (
-        <div className="wine-detail__images">
-          {article.images.map((src, i) => (
-            <img key={i} src={src} alt={`${article.title} ${i + 1}`} />
-          ))}
-        </div>
-      )}
+      <article className="article-page">
+        <header className="article-page__header">
+          <p className="article-page__kicker">
+            {categories.length > 0 ? (
+              <Link to={returnToLink(`/categories/${categories[0].slug}`)}>
+                {kicker}
+              </Link>
+            ) : (
+              kicker
+            )}
+          </p>
 
-      <div className="wine-detail__header">
-        <div>
-          <h1>{article.title}</h1>
-          <LikeButton
-            kind="article"
-            identifier={article.slug || article.id}
-            initialLiked={article.liked_by_current_user}
-            initialCount={article.likes_count}
-            onChange={({ liked, likes_count }) =>
-              setArticle((prev) =>
-                prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
-              )
-            }
-          />
-        </div>
-        <span className={`review-card__status ${article.status === "draft" ? "" : ""}`}>
-          {article.status}
-        </span>
-      </div>
+          <h1 className="article-page__title">{article.title}</h1>
 
-      <p className="review-card__comment">
-        {categories.length > 0 ? (
-          <>
-            {categories.map((cat, i) => (
-              <span key={cat.id}>
-                <Link to={returnToLink(`/categories/${cat.slug}`)}>{cat.name}</Link>
-                {i < categories.length - 1 ? ", " : ""}
-              </span>
-            ))}{" "}
-            ·{" "}
-          </>
-        ) : null}
-        {`by ${article.author_name}`}
-        {article.published_at
-          ? ` · ${new Date(article.published_at).toLocaleDateString()}`
-          : ""}
-        {tags.length > 0 ? ` — ${tags.join(", ")}` : ""}
-      </p>
-
-      {canEdit && (
-        <div className="wine-detail__actions">
-          {!editing && (
-            <>
-              <button type="button" className="auth-form__submit" onClick={() => setEditing(true)}>
-                Edit Article
-              </button>
-              <button type="button" className="review-card__publish" onClick={togglePublish}>
-                {article.status === "draft" ? "Publish" : "Unpublish"}
-              </button>
-              <button
-                type="button"
-                className="review-form__cancel"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? "Deleting…" : "Delete Article"}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {editing ? (
-        <div className="review-form-wrapper">
-          <ArticleForm
-            article={article}
-            onSaved={() => {
-              setEditing(false);
-              loadArticle();
-            }}
-            onCancel={() => setEditing(false)}
-          />
-        </div>
-      ) : (
-        <>
           {article.abstract && (
-            <p className="wine-detail__prompt">{article.abstract}</p>
+            <p className="article-page__standfirst">{article.abstract}</p>
           )}
-          {article.body && (
-            <div className="wine-detail__section">
-              <RichBody html={article.body} />
-            </div>
-          )}
-        </>
-      )}
 
-      {visibleReviews.length > 0 && (
-        <div className="wine-detail__section">
-          <h2>Reviews</h2>
-          {/* Same card grid as the Reviews listing, read-only: the whole card
-              opens the review. */}
-          <div className="content-grid">
-            {visibleReviews.map((review) => (
-              <ReviewCard
-                key={review.id}
-                review={review}
-                onOpen={() =>
-                  navigate(returnToLink(`/reviews/${review.slug}`))
+          <div className="article-page__byline">
+            <span className="article-page__byline-info">
+              <span className="article-page__author">by {article.author_name}</span>
+              {bylineDate && (
+                <>
+                  <span className="article-page__meta-dot" aria-hidden="true">
+                    ·
+                  </span>
+                  <time
+                    className="article-page__date"
+                    dateTime={article.published_at ?? article.created_at ?? undefined}
+                  >
+                    {bylineDate}
+                  </time>
+                </>
+              )}
+              {article.status === "draft" && (
+                <span className="article-page__badge">Draft</span>
+              )}
+            </span>
+
+            <span className="article-page__byline-actions">
+              <LikeButton
+                kind="article"
+                identifier={article.slug || article.id}
+                initialLiked={article.liked_by_current_user}
+                initialCount={article.likes_count}
+                onChange={({ liked, likes_count }) =>
+                  setArticle((prev) =>
+                    prev ? { ...prev, liked_by_current_user: liked, likes_count } : prev,
+                  )
                 }
               />
+              <ShareButton label="this article" />
+            </span>
+          </div>
+
+          {(categories.length > 1 || tags.length > 0) && (
+            <div className="article-page__chips">
+              {categories.slice(1).map((cat) => (
+                <Link
+                  key={cat.id}
+                  to={returnToLink(`/categories/${cat.slug}`)}
+                  className="article-page__chip"
+                >
+                  {cat.name}
+                </Link>
+              ))}
+              {tags.map((tag) => (
+                <span key={tag} className="article-page__chip article-page__chip--tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </header>
+
+        {canEdit && !editing && (
+          <div className="wine-detail__actions article-page__actions">
+            <button type="button" className="auth-form__submit" onClick={() => setEditing(true)}>
+              Edit Article
+            </button>
+            <button type="button" className="review-card__publish" onClick={togglePublish}>
+              {article.status === "draft" ? "Publish" : "Unpublish"}
+            </button>
+            <button
+              type="button"
+              className="review-form__cancel"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete Article"}
+            </button>
+          </div>
+        )}
+
+        {hero && (
+          <figure className="article-page__hero">
+            <img src={hero} alt={article.title} />
+          </figure>
+        )}
+        {gallery.length > 0 && (
+          <div className="article-page__gallery">
+            {gallery.map((src, i) => (
+              <img key={src} src={src} alt={`${article.title} ${i + 2}`} />
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {(vintages.length > 0 || producers.length > 0) && (
-        <div className="wine-detail__section">
-          {vintages.length > 0 && (
-            <>
-              <h2>Wines &amp; vintages</h2>
-              <ul>
-                {vintages.map((vintage) => (
-                  <li key={vintage.id}>
-                    <Link to={returnToLink(`/wines/${vintage.wine_slug}`)}>
-                      {vintage.wine_name} {vintage.year}
-                    </Link>
-                    {vintage.region ? ` — ${vintage.region}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {producers.length > 0 && (
-            <>
-              <h2>Producers</h2>
-              <ul>
-                {producers.map((producer) => (
-                  <li key={producer.id}>
-                    <Link to={returnToLink(`/producers/${producer.slug}`)}>{producer.name}</Link>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
+        {editing ? (
+          <div className="review-form-wrapper">
+            <ArticleForm
+              article={article}
+              onSaved={() => {
+                setEditing(false);
+                loadArticle();
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          </div>
+        ) : (
+          article.body && <RichBody html={article.body} />
+        )}
 
-      <CommentSection kind="article" identifier={article.slug || article.id} />
+        {visibleReviews.length > 0 && (
+          <div className="wine-detail__section">
+            <h2>Reviews</h2>
+            {/* Same card grid as the Reviews listing, read-only: the whole card
+                opens the review. */}
+            <div className="content-grid">
+              {visibleReviews.map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onOpen={() =>
+                    navigate(returnToLink(`/reviews/${review.slug}`))
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-      <RelatedContent kind="article" item={article} />
+        {(vintages.length > 0 || producers.length > 0) && (
+          <div className="wine-detail__section">
+            {vintages.length > 0 && (
+              <>
+                <h2>Wines &amp; vintages</h2>
+                <ul className="article-page__link-list">
+                  {vintages.map((vintage) => (
+                    <li key={vintage.id}>
+                      <Link to={returnToLink(`/wines/${vintage.wine_slug}`)}>
+                        {vintage.wine_name} {vintage.year}
+                      </Link>
+                      {vintage.region && (
+                        <span className="article-page__link-meta">{vintage.region}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {producers.length > 0 && (
+              <>
+                <h2>Producers</h2>
+                <ul className="article-page__link-list">
+                  {producers.map((producer) => (
+                    <li key={producer.id}>
+                      <Link to={returnToLink(`/producers/${producer.slug}`)}>{producer.name}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        <CommentSection kind="article" identifier={article.slug || article.id} />
+
+        <RelatedContent kind="article" item={article} />
+      </article>
     </main>
   );
 }
