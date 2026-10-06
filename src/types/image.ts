@@ -22,6 +22,7 @@ export type Image = ImageDetail
 export interface ImageUploadResponse {
   imageable_type: string
   imageable_id: number
+  uploaded_image_ids?: number[]
   images: Image[]
 }
 

@@ -1,0 +1,14 @@
+.rich-text-editor { min-width: 0; }
+.rich-text-editor__tools { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
+.rich-text-editor trix-editor { background: #fff; color: #30221d; border: 1px solid #d8c8c0; border-radius: .45rem; min-height: 12rem; padding: 1rem; line-height: 1.7; overflow-wrap: anywhere; }
+.rich-text-editor--large trix-editor { min-height: 26rem; }
+.rich-text-editor trix-toolbar .trix-button-row { flex-wrap: wrap; }
+.rich-text-editor trix-toolbar .trix-button-group { border-color: #d8c8c0; }
+.rich-text-editor trix-editor:empty::before { color: #6b5855; }
+.rich-text-editor--no-upload [data-trix-button-group="file-tools"] { display: none; }
+.rich-text-editor__preview { min-height: 12rem; background: #fff; padding: 1rem; border: 1px solid #d8c8c0; border-radius: .45rem; overflow-wrap: anywhere; }
+.rich-text-editor img { max-width: 100%; height: auto; }
+.rich-text-editor__hint, .writing-draft { color: #6b5855; font-size: .9rem; }
+.writing-draft { padding: .75rem; border: 1px solid #d8c8c0; border-radius: .45rem; }
+.writing-draft button { margin-right: .75rem; }
+@media (max-width: 600px) { .rich-text-editor--large trix-editor { min-height: 20rem; } }

@@ -11,6 +11,10 @@ import type { Vintage, WineListItem } from "../types/wine";
 import { errorMessage } from "../utils/errors";
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
+import WritingDraftNotice from "./WritingDraftNotice";
+import { useWritingDraft } from "../hooks/useWritingDraft";
+import { useAuth } from "../contexts/AuthContext";
+import { uploadInlineImage } from "../services/inlineImages";
 
 /**
  * A vintage picked for the article. The wine context is kept alongside the id
@@ -86,6 +90,12 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [uploadingInline, setUploadingInline] = useState(false);
+  const writingDraft = useWritingDraft(
+    user ? `wine-words:writing:${user.id}:article:${article?.id ?? "new"}` : null,
+    { title: form.title, abstract: form.abstract, body: form.body },
+  );
 
   useEffect(() => {
     // A non-paginated request answers with a bare array, so `responseItems`
@@ -284,6 +294,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (uploadingInline) return;
     setSubmitting(true);
     setError(null);
 
@@ -292,6 +303,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
       const payload =
         images && images.length > 0 ? buildFormData() : buildPayload();
       const saved = await save(payload);
+      writingDraft.clear();
       onSaved(saved);
     } catch (err) {
       setError(errorMessage(err, "Failed to save article"));
@@ -302,6 +314,9 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
 
   return (
     <form className="review-form" onSubmit={handleSubmit}>
+      <WritingDraftNotice draft={writingDraft} onRestore={(fields) => {
+        setForm((prev) => ({ ...prev, title: fields.title ?? prev.title, abstract: fields.abstract ?? prev.abstract, body: fields.body ?? prev.body }));
+      }} />
       <div className="review-form__field">
         <label htmlFor="article-title">Title</label>
         <input
@@ -328,6 +343,14 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
       <div className="review-form__field">
         <span className="image-manager__label">Body</span>
         <RichTextEditor
+          label="Article body"
+          large
+          onUploadingChange={setUploadingInline}
+          uploadImage={article ? (file) => uploadInlineImage("article", article.id, file, (uploaded) => {
+            const withUrls = uploaded.filter((image) => Boolean(image.url));
+            setExistingImages(withUrls.map((image) => image.url!));
+            setExistingImageIds(withUrls.map((image) => image.id));
+          }) : undefined}
           value={form.body}
           onChange={(html) =>
             setForm((prev) => ({ ...prev, body: html }))
@@ -554,7 +577,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
       {error && <p className="review-form__error">{error}</p>}
 
       <div className="review-form__actions">
-        <button className="auth-form__submit" type="submit" disabled={submitting}>
+        <button className="auth-form__submit" type="submit" disabled={submitting || uploadingInline}>
           {submitting ? "Saving..." : isEditing ? "Update Article" : "Create Article"}
         </button>
         {onCancel && (

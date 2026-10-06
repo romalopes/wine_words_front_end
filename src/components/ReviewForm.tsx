@@ -9,6 +9,10 @@ import {
 } from "../services/api";
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
+import WritingDraftNotice from "./WritingDraftNotice";
+import { useWritingDraft } from "../hooks/useWritingDraft";
+import { useAuth } from "../contexts/AuthContext";
+import { uploadInlineImage } from "../services/inlineImages";
 import { responseItems } from "../types/common";
 import type { ReviewWritePayload } from "../types/api";
 import type { Category } from "../types/catalog";
@@ -181,6 +185,12 @@ function ReviewForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [uploadingInline, setUploadingInline] = useState(false);
+  const writingDraft = useWritingDraft(
+    user ? `wine-words:writing:${user.id}:review:${review?.id ?? `new:${packageId ?? "wine"}:${packageItemId ?? wineSlug}:${vintageId ?? ""}`}` : null,
+    { title: form.title, comment: form.comment },
+  );
   // Locally staged files, uploaded right after the review is saved.
   const [images, setImages] = useState<File[] | null>(null);
   const [existingImages, setExistingImages] = useState<string[]>(
@@ -231,6 +241,7 @@ function ReviewForm({
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (uploadingInline) return;
     setSubmitting(true);
     setError(null);
 
@@ -259,6 +270,7 @@ function ReviewForm({
         if (images && images.length > 0) {
           await imagesApi.upload("review", review.id, images);
         }
+        writingDraft.clear();
         onSaved();
       } else if (packageMode) {
         // Package mode is create-only: the backend creates the review through
@@ -271,6 +283,7 @@ function ReviewForm({
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
         }
+        writingDraft.clear();
         onSaved(saved);
       } else {
         // Neither editing nor a package line: this is a brand-new review, which
@@ -287,6 +300,7 @@ function ReviewForm({
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
         }
+        writingDraft.clear();
         onSaved(saved);
       }
     } catch (err) {
@@ -298,6 +312,10 @@ function ReviewForm({
 
   return (
     <form className="review-form" onSubmit={handleSubmit}>
+      <WritingDraftNotice draft={writingDraft} onRestore={(fields) => {
+        titleEditedRef.current = true;
+        setForm((prev) => ({ ...prev, title: fields.title ?? prev.title, comment: fields.comment ?? prev.comment }));
+      }} />
       {isEditing && (
         <div className="review-form__field">
           <label>Wine &amp; Vintage</label>
@@ -486,6 +504,13 @@ function ReviewForm({
       <div className="review-form__field">
         <span className="image-manager__label">Comment</span>
         <RichTextEditor
+          label="Review comment"
+          onUploadingChange={setUploadingInline}
+          uploadImage={review ? (file) => uploadInlineImage("review", review.id, file, (uploaded) => {
+            const withUrls = uploaded.filter((image) => Boolean(image.url));
+            setExistingImages(withUrls.map((image) => image.url!));
+            setExistingImageIds(withUrls.map((image) => image.id));
+          }) : undefined}
           value={form.comment}
           onChange={(html) => setForm((prev) => ({ ...prev, comment: html }))}
           placeholder="What did you think of this vintage?"
@@ -535,7 +560,7 @@ function ReviewForm({
         <button
           className="auth-form__submit"
           type="submit"
-          disabled={submitting}
+          disabled={submitting || uploadingInline}
         >
           {submitting
             ? "Saving..."
