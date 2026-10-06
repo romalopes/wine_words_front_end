@@ -6,6 +6,7 @@ import type { Subscription } from "../types/subscription";
 
 const mockList = vi.fn();
 const mockCheckout = vi.fn();
+const mockPortal = vi.fn();
 const mockRefreshSession = vi.fn();
 
 vi.mock("../services/api", () => ({
@@ -17,12 +18,15 @@ vi.mock("../services/api", () => ({
     changePreview: vi.fn(),
     changeConfirm: vi.fn(),
     confirm: vi.fn(),
-    portal: vi.fn(),
+    portal: (...args: unknown[]) => mockPortal(...args),
   },
 }));
 
 const authState = {
-  user: null as null | { subscription?: { id: number }; can_manage_billing?: boolean },
+  user: null as null | {
+    subscription?: { id: number } | null
+    can_manage_billing?: boolean
+  },
   refreshSession: (...args: unknown[]) => mockRefreshSession(...args),
 };
 
@@ -124,7 +128,65 @@ describe("Subscribe (logged out)", () => {
   });
 });
 
-describe("Subscribe (logged in)", () => {
+describe("Subscribe (logged in, free tier)", () => {
+  it("shows a disabled Current plan on FREE when the subscription id matches", async () => {
+    authState.user = { subscription: { id: freePlan.id }, can_manage_billing: true };
+    renderSubscribe();
+
+    const freeButton = await screen.findByRole("button", { name: "Current plan" });
+    expect(freeButton).toBeDisabled();
+    expect(freeButton).toHaveAttribute("title", "FREE is your current plan");
+    expect(screen.queryByRole("button", { name: /login to choose/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a disabled Current plan on FREE for stale sessions without a subscription stub", async () => {
+    // Sessions predating the backend's default-subscription backfill carry
+    // `subscription: null` even though the account is on FREE.
+    authState.user = { subscription: null, can_manage_billing: true };
+    renderSubscribe();
+
+    const freeButton = await screen.findByRole("button", { name: "Current plan" });
+    expect(freeButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /login to choose/i })).not.toBeInTheDocument();
+    expect(mockCheckout).not.toHaveBeenCalled();
+  });
+});
+
+describe("Subscribe (logged in, paid tier)", () => {
+  it("shows Manage subscription — not Current plan — on the FREE card", async () => {
+    const user = userEvent.setup();
+    authState.user = { subscription: { id: paidPlan.id }, can_manage_billing: true };
+    mockPortal.mockResolvedValue({ url: "https://billing.stripe.com/p/session" });
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, href: "" },
+      writable: true,
+      configurable: true,
+    });
+
+    renderSubscribe();
+
+    // The FREE card offers the Stripe portal (cancel/downgrade lives there —
+    // this page has no downgrade-to-FREE path).
+    const freeButtons = await screen.findAllByRole("button", { name: "Manage subscription" });
+    expect(freeButtons).toHaveLength(2);
+    await user.click(freeButtons[0]);
+
+    await waitFor(() => {
+      expect(mockPortal).toHaveBeenCalled();
+    });
+    expect(window.location.href).toBe("https://billing.stripe.com/p/session");
+    expect(
+      screen.queryByRole("button", { name: "Current plan" }),
+    ).not.toBeInTheDocument();
+
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+  });
+
   it("starts checkout directly for paid plans without a login detour", async () => {
     const user = userEvent.setup();
     authState.user = { can_manage_billing: true };

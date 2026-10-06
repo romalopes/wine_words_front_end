@@ -46,6 +46,13 @@ type CheckoutConfirmState = "confirming" | "confirmed" | "error" | null;
 interface PlanCardProps {
   plan: Subscription
   isCurrent: boolean
+  /**
+   * Whether the signed-in user is on a paid tier. The FREE row has no
+   * checkout and no downgrade path from this page (the backend 422s on
+   * free-plan checkout and rejects free change targets), so a paid user gets
+   * a portal button there instead of a plan CTA.
+   */
+  onPaidPlan: boolean
   // Free plans have no checkout and managed plans no "choose" CTA, so the
   // matching handler is genuinely absent on some rows. Logged-out visitors
   // get an `onLoginRequest` instead, which routes them through sign-in first.
@@ -61,6 +68,7 @@ interface PlanCardProps {
 function PlanCard({
   plan,
   isCurrent,
+  onPaidPlan,
   onChoose,
   onManage,
   onLoginRequest,
@@ -71,6 +79,35 @@ function PlanCard({
   const yearly = formatPrice(plan.yearly_price_cents);
   const monthly = formatPrice(plan.monthly_price_cents);
   const busy = loadingPlanId === plan.id;
+  // FREE has no checkout and no downgrade path from this page. Three states:
+  // - on the free tier → disabled "Current plan" status display;
+  // - on a paid tier → portal button (cancel/downgrade lives in Stripe);
+  // - logged out → routes through sign-in first.
+  const freeIsCurrent = isFree && isCurrent && !onPaidPlan;
+  const freeChoosePlan = Boolean(isFree && onPaidPlan && onManage);
+  // Logged-in free-tier user whose session hasn't resolved a handler yet —
+  // nothing to do, never an enabled dead button.
+  const freeNoop = Boolean(isFree && !isCurrent && !onPaidPlan && !onLoginRequest);
+  const buttonDisabled =
+    busy ||
+    freeIsCurrent ||
+    freeNoop ||
+    (!isFree && !onChoose && !onManage && !onLoginRequest);
+  const buttonLabel = busy
+    ? "Processing…"
+    : isFree
+      ? freeIsCurrent
+        ? "Current plan"
+        : freeChoosePlan
+          ? "Choose plan"
+          : "Login to choose"
+      : isCurrent
+        ? onManage
+          ? "Manage subscription"
+          : "Current plan"
+        : onLoginRequest
+          ? "Login to choose plan"
+          : "Choose plan";
 
   return (
     <article
@@ -126,28 +163,16 @@ function PlanCard({
       <button
         type="button"
         className="auth-form__submit"
-        disabled={!isFree && !onChoose && !onManage && !onLoginRequest}
+        disabled={buttonDisabled}
         onClick={() => {
-          if (isFree && isCurrent) return;
+          if (freeIsCurrent || freeNoop) return;
           if (onManage) onManage();
           else if (onChoose) onChoose(plan.id);
           else if (onLoginRequest) onLoginRequest();
         }}
-        title={isFree && isCurrent ? "FREE is your current plan" : undefined}
+        title={freeIsCurrent ? "FREE is your current plan" : undefined}
       >
-        {busy
-          ? "Processing…"
-          : isFree
-            ? isCurrent
-              ? "Current plan"
-              : "Login to choose"
-            : isCurrent
-              ? onManage
-                ? "Manage subscription"
-                : "Current plan"
-              : onLoginRequest
-                ? "Login to choose plan"
-                : "Choose plan"}
+        {buttonLabel}
       </button>
     </article>
   );
@@ -406,23 +431,37 @@ function Subscribe() {
           }}
         >
           {orderedPlans.map((plan) => {
-            const isCurrent = currentPlanId === plan.id;
+            const isCurrent =
+              currentPlanId === plan.id ||
+              // Stale/pre-backfill sessions can carry `subscription: null`
+              // even though the backend treats the account as FREE — the
+              // default plan still marks the signed-in user's current tier.
+              (!currentPlanId && Boolean(user) && plan.is_default);
             const isFree = isFreePlan(plan);
+            const userOnPaidPlan = Boolean(
+              currentPlan && !isFreePlan(currentPlan),
+            );
             // Paid plans that aren't the current plan get a "Choose plan"
             // button (which routes to the change flow for existing paid
-            // users). The current paid plan gets "Manage subscription".
+            // users). The current paid plan gets "Manage subscription". The
+            // FREE row for a paid user gets the portal button too — there is
+            // no downgrade-to-FREE path from this page, so cancel/downgrade
+            // lives in Stripe.
             return (
               <PlanCard
                 key={plan.id}
                 plan={plan}
                 isCurrent={isCurrent}
+                onPaidPlan={userOnPaidPlan}
                 onChoose={
                   !isFree && !isCurrent && canManageBilling
                     ? handleChoose
                     : undefined
                 }
                 onManage={
-                  isCurrent && canManageBilling ? handleManage : undefined
+                  (isCurrent || (isFree && userOnPaidPlan)) && canManageBilling
+                    ? handleManage
+                    : undefined
                 }
                 onLoginRequest={!user ? handleLoginRequest : undefined}
                 loadingPlanId={loadingPlanId}
