@@ -1,9 +1,8 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import RichTextEditor from "./RichTextEditor";
 
-// jsdom exposes ElementInternals but omits its form-validation methods.
+// jsdom does not implement the layout APIs used by Trix selection.
 beforeAll(() => {
-  Object.defineProperty(ElementInternals.prototype, "setValidity", { configurable: true, value: () => {} });
   Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => new DOMRect() });
   Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [] });
 });

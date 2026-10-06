@@ -179,7 +179,7 @@ function UserRoles() {
           type="text"
           value={query}
           onChange={handleSearchChange}
-          placeholder="Search by username or email…"
+          placeholder="Search by name or email…"
         />
         {searching && <p className="wine-management__loading">Searching…</p>}
         {error && <p className="review-form__error">{error}</p>}
@@ -193,8 +193,8 @@ function UserRoles() {
         {(results?.items || []).map((u) => (
           <div key={u.id} className="admin-user-card">
             <div className="admin-user-info">
-              <span className="admin-user-name" title={u.user_name || ""}>
-                {u.user_name || "(no name)"}
+              <span className="admin-user-name" title={u.display_name || ""}>
+                {u.display_name || "(no name)"}
               </span>
               <span className="admin-user-email" title={u.email}>
                 {u.email}
@@ -258,12 +258,12 @@ function UserRoles() {
                 <button
                   type="button"
                   className="admin-pagination__btn"
-                  title={`Act as ${u.user_name || u.email}`}
-                  aria-label={`Act as ${u.user_name || u.email}`}
+                  title={`Act as ${u.display_name || u.email}`}
+                  aria-label={`Act as ${u.display_name || u.email}`}
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Act as ${u.user_name || u.email}? You will operate as this user until you stop.`,
+                        `Act as ${u.display_name || u.email}? You will operate as this user until you stop.`,
                       )
                     ) {
                       startImpersonation(u.id).catch((err) =>

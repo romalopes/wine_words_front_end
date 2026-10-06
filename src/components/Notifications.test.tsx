@@ -26,7 +26,7 @@ vi.mock("../services/api", () => ({
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: 1, user_name: "Reviewer", roles: ["Editor"] },
+    user: { id: 1, display_name: "Reviewer", roles: ["Editor"] },
     loading: false,
   }),
 }));

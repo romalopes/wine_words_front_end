@@ -14,7 +14,7 @@ export interface Article {
   status: string
   published_at?: string | null
   user_id?: number | null
-  /** Byline, computed by the Rails serializers (`user_name` else `email`). */
+  /** Byline, computed by the Rails serializers (`display_name` else `email`). */
   author_name?: string | null
   tags?: string[]
   /** `tag_names` is the same list already comma-joined for the text input. */

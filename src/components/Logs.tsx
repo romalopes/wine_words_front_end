@@ -582,7 +582,7 @@ function AuditLogTable() {
               onClick={() => navigate(`/admin/logs/${entry.id}`)}
             >
               <td>{formatDateTime(entry.created_at)}</td>
-              <td>{entry.user ? entry.user.user_name : "—"}</td>
+              <td>{entry.user ? entry.user.display_name : "—"}</td>
               <td>{entry.action}</td>
               <td>{entry.description}</td>
               <td>{objectsSummary(entry)}</td>

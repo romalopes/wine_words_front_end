@@ -22,7 +22,7 @@ vi.mock("../services/api", () => ({
   usersApi: { search: (...args: unknown[]) => mockUsersSearch(...args) },
 }));
 
-let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+let currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({ user: currentUser, loading: false }),
@@ -71,7 +71,7 @@ const packageRow = {
 describe("WinePackages list", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+    currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
     mockPackagesList.mockResolvedValue({
       items: [packageRow],
       page: 1,
@@ -129,7 +129,7 @@ describe("WinePackages list", () => {
   });
 
   it("hides the create actions from a user without a package role", async () => {
-    currentUser = { id: 9, user_name: "Reader", roles: ["Reader"] };
+    currentUser = { id: 9, display_name: "Reader", roles: ["Reader"] };
     renderList();
 
     await screen.findByText("Penfolds");

@@ -82,7 +82,7 @@ function LogDetail() {
         [
           "User",
           log.user
-            ? `${log.user.user_name ?? "—"} (${log.user.email})`
+            ? `${log.user.display_name ?? "—"} (${log.user.email})`
             : "— (anonymous/system)",
         ],
         ["Action", log.action],

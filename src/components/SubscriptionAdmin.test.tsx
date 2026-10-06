@@ -15,7 +15,7 @@ vi.mock("../services/api", () => ({
 }));
 
 vi.mock("../contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 1, user_name: "Admin", roles: ["Admin"] } }),
+  useAuth: () => ({ user: { id: 1, display_name: "Admin", roles: ["Admin"] } }),
 }));
 
 // Prices are stored as integer cents by the API but the inputs are labelled and

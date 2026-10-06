@@ -170,12 +170,10 @@ function Header() {
     navigate("/test-access");
   }
 
-  // `user_name` is the only display field the API sends; the email local-part is
-  // the fallback. (The `displayName` key some social payloads used to carry is
-  // no longer part of `user_json` — see `users_controller#user_json`.)
+  // Display names come from Account; email is the fallback for incomplete profiles.
   function getDisplayName(): string | null {
     if (!session || !user) return null;
-    if (user.user_name) return user.user_name;
+    if (user.display_name) return user.display_name;
     // The local-part of the email is the fallback. `split` yields
     // `string | undefined` under `noUncheckedIndexedAccess`, and this input is
     // known to contain an "@", so take the part before it directly.
@@ -191,7 +189,7 @@ function Header() {
       {isImpersonating && user && (
         <div className="impersonation-banner" role="status">
           <span className="impersonation-banner__text">
-            <strong>Acting as {user.user_name || user.email}</strong>
+            <strong>Acting as {user.display_name || user.email}</strong>
             <span className="impersonation-banner__sub">
               You are currently operating as this user. Actions will be
               attributed to them.
@@ -225,7 +223,7 @@ function Header() {
             }}
           />
           <p className="site-header__subtitle">
-            Explore producers,<br></br> wines and reviews
+            Explore producers, wines and reviews
           </p>
         </div>
       </NavLink>

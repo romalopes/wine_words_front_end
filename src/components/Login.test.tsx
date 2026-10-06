@@ -95,3 +95,36 @@ describe("Login return redirect", () => {
     });
   });
 });
+
+describe("account names on signup", () => {
+  it("collects first and last names instead of a username", async () => {
+    const user = userEvent.setup();
+    mockSignUp.mockResolvedValue({});
+    renderLoginAt("/login");
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    expect(screen.queryByLabelText(/user name|username/i)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("First name"), " Élodie ");
+    await user.type(screen.getByLabelText("Last name"), " O’Connor ");
+    await user.type(screen.getByLabelText("Email"), "elodie@example.com");
+    await user.type(screen.getByLabelText(/^Password$/), "secret123");
+    await user.type(screen.getByLabelText(/confirm password/i), "secret123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    await waitFor(() => expect(mockSignUp).toHaveBeenCalledWith({
+      first_name: "Élodie", last_name: "O’Connor", email: "elodie@example.com",
+      password: "secret123", password_confirmation: "secret123",
+    }));
+  });
+
+  it("requires both names before submitting signup", async () => {
+    const user = userEvent.setup();
+    renderLoginAt("/login");
+    await user.click(screen.getByRole("button", { name: "Create an account" }));
+    await user.type(screen.getByLabelText("First name"), "Élodie");
+    await user.type(screen.getByLabelText("Email"), "elodie@example.com");
+    await user.type(screen.getByLabelText(/^Password$/), "secret123");
+    await user.type(screen.getByLabelText(/confirm password/i), "secret123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(screen.getByText("First name and last name are required.")).toBeInTheDocument();
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+});

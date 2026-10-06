@@ -29,7 +29,9 @@ export interface SubscriptionChange {
 export interface User {
   id: number
   email: string
-  user_name: string | null
+  display_name: string | null
+  first_name: string | null
+  last_name: string | null
   roles: string[]
   subscription: SubscriptionStub | null
   /** Stripe provider attached to the live subscription, if any. */
@@ -54,11 +56,8 @@ export interface SignUpPayload {
   email: string
   password: string
   password_confirmation: string
-  // `| undefined` throughout: these are optional request fields, and callers
-  // read them off form state where an empty field is `undefined`. Under
-  // `exactOptionalPropertyTypes` an absent key and an explicitly-undefined key
-  // are different, and JSON.stringify drops the latter anyway.
-  user_name?: string | undefined
+  first_name: string
+  last_name: string
 }
 
 export interface ForgotPasswordPayload {
@@ -99,7 +98,7 @@ export interface Identity {
   /** Server-rendered human name ("Google"), already humanized. */
   label?: string | null
   email?: string | null
-  user_name?: string | null
+  display_name?: string | null
   created_at?: string | null
   [key: string]: unknown
 }

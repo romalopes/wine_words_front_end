@@ -32,7 +32,8 @@ export function createAuthApi(request: ApiRequester): AuthApi {
         email: payload.email,
         password: payload.password,
         password_confirmation: payload.password_confirmation,
-        ...(payload.user_name ? { user_name: payload.user_name } : {}),
+        first_name: payload.first_name,
+        last_name: payload.last_name,
       }
 
       // The response is a session *or* a pending-verification notice, so this

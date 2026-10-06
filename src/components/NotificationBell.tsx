@@ -73,19 +73,20 @@ function BellIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
+      width="22"
+      height="22"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      focusable="false"
     >
-      <path d="M12 22a4 4 0 0 0 4-4h-8a4 4 0 0 0 4 4z" />
-      <path d="M18 8a6 6 0 0 1-12 0C6 6.62 6.88 5.44 8 4.58V3a4 4 0 0 1 8 0v1.58C17.12 5.44 18 6.62 18 8z" />
-      <circle cx="12" cy="7" r="1.5" fill="currentColor" />
+      <path d="M12 2.75v1.5" />
+      <path d="M6.25 10a5.75 5.75 0 0 1 11.5 0v3.1c0 1.4.5 2.65 1.4 3.7a.75.75 0 0 1-.57 1.25H5.42a.75.75 0 0 1-.57-1.25c.9-1.05 1.4-2.3 1.4-3.7V10Z" />
+      <path d="M9.75 20a2.5 2.5 0 0 0 4.5 0" />
     </svg>
   );
 }

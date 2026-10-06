@@ -15,7 +15,6 @@ import type { CountryListItem } from "../types/reference";
 
 /** The editable profile form. Every field is a string so the inputs stay controlled. */
 interface AccountForm {
-  user_name: string
   first_name: string
   last_name: string
   phone: string
@@ -30,7 +29,6 @@ interface AccountForm {
 }
 
 const emptyAccount: AccountForm = {
-  user_name: "",
   first_name: "",
   last_name: "",
   phone: "",
@@ -126,7 +124,6 @@ export default function AccountSettings() {
       .then(([account, countryList]) => {
         if (cancelled) return;
         setForm({
-          user_name: str(account.user_name),
           first_name: str(account.first_name),
           last_name: str(account.last_name),
           phone: str(account.phone),
@@ -192,7 +189,6 @@ export default function AccountSettings() {
     setProfileError(null);
     try {
       await accountApi.update({
-        user_name: form.user_name,
         first_name: form.first_name || null,
         last_name: form.last_name || null,
         phone: form.phone || null,
@@ -206,7 +202,7 @@ export default function AccountSettings() {
         },
       });
       setProfileNotice("Account updated.");
-      refreshSession(); // the header shows user_name — keep it in sync
+      refreshSession(); // the header shows the account name — keep it in sync
     } catch (err) {
       setProfileError(parseApiError(err, "Could not save your account."));
     } finally {
@@ -281,7 +277,7 @@ export default function AccountSettings() {
       <div className="wine-management__header">
         <h1>Account settings</h1>
         <p className="review-card__comment">
-          Manage your username, personal information, address and password.
+          Manage your personal information, address and password.
         </p>
       </div>
 
@@ -297,30 +293,13 @@ export default function AccountSettings() {
               )}
               {profileError && <p className="review-form__error">{profileError}</p>}
 
-              <h3 className="account-section-title account-section-title--first">
-                Username
-              </h3>
-              <Field label="Username">
-                <input
-                  type="text"
-                  value={form.user_name}
-                  onChange={(e) => setField("user_name", e.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={40}
-                  autoComplete="username"
-                />
-                <small className="account-field-hint">
-                  2–40 characters. Letters, digits, spaces, dots, dashes and
-                  underscores.
-                </small>
-              </Field>
-
-              <h3 className="account-section-title">Personal information</h3>
+              <h3 className="account-section-title account-section-title--first">Personal information</h3>
               <div className="account-fields">
                 <Field label="First name">
                   <input
                     type="text"
+                    autoComplete="given-name"
+                    required
                     value={form.first_name}
                     onChange={(e) => setField("first_name", e.target.value)}
                     maxLength={80}
@@ -329,6 +308,8 @@ export default function AccountSettings() {
                 <Field label="Last name">
                   <input
                     type="text"
+                    autoComplete="family-name"
+                    required
                     value={form.last_name}
                     onChange={(e) => setField("last_name", e.target.value)}
                     maxLength={80}

@@ -34,7 +34,7 @@ vi.mock("../services/api", () => ({
   },
 }));
 
-let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+let currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
 
 /**
  * The first argument of a mock's first call. `noUncheckedIndexedAccess` makes
@@ -80,7 +80,7 @@ function renderForm(path = "/wine-packages/new?mode=arrived") {
 describe("WinePackageForm (create)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+    currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
     mockProducerSearch.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
     mockCreate.mockResolvedValue({ id: 9 });
   });
@@ -189,7 +189,7 @@ describe("WinePackageForm (create)", () => {
 describe("WinePackageForm (edit)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+    currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
     mockProducerSearch.mockResolvedValue([{ id: 3, name: "Penfolds" }]);
     mockShow.mockResolvedValue({
       id: 7,

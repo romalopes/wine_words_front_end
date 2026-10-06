@@ -42,7 +42,7 @@ export interface LogEntry {
 /** The user stub embedded in an audit entry — always has an id and email. */
 export interface AuditLogUser {
   id: number
-  user_name: string | null
+  display_name: string | null
   email: string
 }
 
@@ -91,7 +91,7 @@ import type { User } from "./authentication"
 export interface AdminUser {
   id: number
   email: string
-  user_name: string | null
+  display_name: string | null
   /** Numeric role ids currently assigned — drives the role checkboxes. */
   role_ids: number[]
   /** Human-readable role names, e.g. ["Admin", "Reader"]. */

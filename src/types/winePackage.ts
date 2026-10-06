@@ -35,7 +35,7 @@ export interface WinePackageListItem {
   producer_name?: string | null
   producer_slug?: string | null
   reviewer_id?: number | null
-  /** Falls back to the reviewer's email when `user_name` is blank. */
+  /** Falls back to the reviewer's email when `display_name` is blank. */
   reviewer_name?: string | null
   status: string
   source?: string | null

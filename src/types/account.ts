@@ -21,7 +21,6 @@ export interface AccountAddress {
 
 /** GET /api/v1/account — the current user's account with a nested address. */
 export interface Account {
-  user_name: string | null
   first_name: string | null
   last_name: string | null
   phone: string | null
@@ -37,12 +36,8 @@ export interface PasswordChange {
   password_confirmation: string
 }
 
-/**
- * PATCH /api/v1/account. The controller treats a *present* `user_name` as a
- * username change (`params.key?`), so every field is optional.
- */
+/** PATCH /api/v1/account — personal information and address. */
 export interface AccountUpdate {
-  user_name?: string
   first_name?: string | null
   last_name?: string | null
   phone?: string | null

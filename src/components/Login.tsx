@@ -26,14 +26,16 @@ interface LoginForm {
   email: string
   password: string
   password_confirmation: string
-  user_name: string
+  first_name: string
+  last_name: string
 }
 
 const initialForm: LoginForm = {
   email: "",
   password: "",
   password_confirmation: "",
-  user_name: "",
+  first_name: "",
+  last_name: "",
 };
 
 /**
@@ -166,7 +168,7 @@ function Login() {
     setSuccess(null);
 
     try {
-      const { email, password, password_confirmation, user_name } = form;
+      const { email, password, password_confirmation, first_name, last_name } = form;
 
       if (isForgot) {
         if (!email) {
@@ -183,6 +185,14 @@ function Login() {
         setFormError("Email and password are required.");
         return;
       }
+      if (isSignUp && (!first_name.trim() || !last_name.trim())) {
+        setFormError("First name and last name are required.");
+        return;
+      }
+      if (isSignUp && (first_name.trim().length > 80 || last_name.trim().length > 80)) {
+        setFormError("First name and last name must each be 80 characters or fewer.");
+        return;
+      }
       if (isSignUp && password.length < 6) {
         setFormError("Password must be at least 6 characters long.");
         return;
@@ -197,7 +207,8 @@ function Login() {
           email,
           password,
           password_confirmation,
-          user_name: user_name.trim(),
+          first_name: first_name.trim(),
+          last_name: last_name.trim(),
         });
         // Email verification required: the account exists but has no session.
         // Show the "check your inbox" banner with the verification deadline.
@@ -311,11 +322,23 @@ function Login() {
           <>
             <p className="wine-kicker">Verify your email</p>
             <h1 id="auth-title">Check your inbox</h1>
+            <p className="auth-card__intro">
+              <strong>One click away</strong> — we just need to know it&rsquo;s
+              really you.
+            </p>
             <p className="auth-card__status">
               We sent a verification link to <strong>{verificationNotice.email}</strong>.
               {verificationNotice.expired
                 ? " Your previous link has expired, so the account is locked until you verify."
                 : ` You have ${describeTimeRemaining(verificationNotice.deadline)} to click the link — after that the account is locked until you verify.`}
+            </p>
+            <ol className="auth-card__steps">
+              <li>Open your inbox</li>
+              <li>Locate our verification email</li>
+              <li>Click the verification link</li>
+            </ol>
+            <p className="auth-card__hint">
+              No email yet? Check your spam folder.
             </p>
             <button
               className="auth-form__submit"
@@ -368,19 +391,16 @@ function Login() {
             ) : (
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
                 {isSignUp && !isForgot ? (
-                  <label className="auth-form__field">
-                    <span>User Name</span>
-                    <input
-                      autoComplete="username"
-                      name="user_name"
-                      onChange={updateField("user_name")}
-                      type="text"
-                      value={form.user_name}
-                      minLength={2}
-                      maxLength={40}
-                      required
-                    />
-                  </label>
+                  <>
+                    <label className="auth-form__field">
+                      <span>First name</span>
+                      <input autoComplete="given-name" name="first_name" onChange={updateField("first_name")} type="text" value={form.first_name} maxLength={80} required />
+                    </label>
+                    <label className="auth-form__field">
+                      <span>Last name</span>
+                      <input autoComplete="family-name" name="last_name" onChange={updateField("last_name")} type="text" value={form.last_name} maxLength={80} required />
+                    </label>
+                  </>
                 ) : null}
 
                 <label className="auth-form__field">

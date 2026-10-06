@@ -37,7 +37,7 @@ vi.mock("../services/api", () => ({
   reviewsApi: { update: vi.fn(), show: vi.fn() },
 }));
 
-let currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+let currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({ user: currentUser, loading: false }),
@@ -147,7 +147,7 @@ function renderDetail() {
 describe("WinePackageDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    currentUser = { id: 1, user_name: "Reviewer", roles: ["Editor"] };
+    currentUser = { id: 1, display_name: "Reviewer", roles: ["Editor"] };
     mockShow.mockResolvedValue(packageDetail);
     mockTrackingShow.mockRejectedValue(
       Object.assign(new Error("No tracking recorded for this package"), {
@@ -180,7 +180,7 @@ describe("WinePackageDetail", () => {
       images: ["http://img.test/a.png", "http://img.test/b.png"],
       image_ids: [5, 6],
     });
-    currentUser = { id: 99, user_name: "Viewer", roles: ["Guest"] };
+    currentUser = { id: 99, display_name: "Viewer", roles: ["Guest"] };
 
     renderDetail();
 
@@ -194,7 +194,7 @@ describe("WinePackageDetail", () => {
   });
 
   it("does not render the image section for a viewer when the package has no images", async () => {
-    currentUser = { id: 99, user_name: "Viewer", roles: ["Guest"] };
+    currentUser = { id: 99, display_name: "Viewer", roles: ["Guest"] };
     renderDetail();
 
     await screen.findByRole("heading", { name: "Penfolds" });
@@ -374,7 +374,7 @@ describe("WinePackageDetail", () => {
   });
 
   it("hides every management control from a user who is not the reviewer", async () => {
-    currentUser = { id: 42, user_name: "Someone else", roles: ["Reviewer"] };
+    currentUser = { id: 42, display_name: "Someone else", roles: ["Reviewer"] };
     renderDetail();
 
     await screen.findByRole("heading", { name: "Penfolds" });

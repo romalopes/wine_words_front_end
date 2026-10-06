@@ -529,13 +529,13 @@ export interface ConfigurationApi {
 
 /**
  * Success body of `GET /api/v1/email-verifications/:token`. `message` is
- * optional because the API returns `status`/`email`/`user_name`; the UI falls
+ * optional because the API returns `status`/`email`/`display_name`; the UI falls
  * back to its own copy.
  */
 export interface EmailVerificationResult {
   status: string
   email?: string | null
-  user_name?: string | null
+  display_name?: string | null
   message?: string | null
 }
 

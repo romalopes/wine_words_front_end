@@ -388,7 +388,7 @@ function WinePackageForm() {
                   <option value="">Select…</option>
                   {reviewerResults.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
-                      {candidate.user_name || candidate.email}
+                      {candidate.display_name || candidate.email}
                     </option>
                   ))}
                 </select>

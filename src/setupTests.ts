@@ -10,3 +10,12 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn()
 }
 
+
+// Trix detects ElementInternals in jsdom, whose validation method is missing.
+// Keep this browser-API shim available to every form test that loads Trix.
+if (typeof ElementInternals !== "undefined" && !ElementInternals.prototype.setValidity) {
+  Object.defineProperty(ElementInternals.prototype, "setValidity", {
+    configurable: true,
+    value: vi.fn(),
+  });
+}
