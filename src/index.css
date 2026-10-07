@@ -2643,7 +2643,11 @@ textarea {
   min-height: 34px;
   padding: 7px 11px;
   text-decoration: none;
-  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 .article-project-detail .btn-link:hover:not(:disabled) {
   background: #27615e;
@@ -5533,6 +5537,41 @@ textarea {
   letter-spacing: 0.07em;
   margin-right: 0.4rem;
   text-transform: uppercase;
+}
+
+.article-project-form-page--embedded {
+  max-width: none;
+  padding: 0;
+}
+
+.article-project-form-page--embedded > .wine-detail__back,
+.article-project-form-page--embedded > .article-project-form__header {
+  display: none;
+}
+
+.article-project-form--tab-overview .article-project-form__section--article,
+.article-project-form--tab-overview .article-project-form__section--wines-notes,
+.article-project-form--tab-article .article-project-form__section--overview,
+.article-project-form--tab-article .article-project-form__section--wines-notes,
+.article-project-form--tab-wines-notes .article-project-form__section--overview,
+.article-project-form--tab-wines-notes .article-project-form__section--article {
+  display: none;
+}
+
+.article-project-detail__article-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.article-project-detail__article-editor,
+.article-project-detail__notice {
+  margin-top: 1rem;
+}
+
+.article-project-detail__article-editor h3 {
+  margin: 0 0 0.75rem;
 }
 
 /* Keep the reading column comfortable on small screens. */
