@@ -288,6 +288,129 @@
   flex: 0 0 auto;
 }
 
+/* --- Email Send Sandbox --- */
+
+.emailSandbox {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: var(--surface, #fafafa);
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.emailTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.emailDesc {
+  color: var(--text-muted, #666);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.emailTransport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.emailTransportKey {
+  color: var(--text-muted, #666);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+}
+
+.emailTransportValue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.emailForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.emailField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.emailLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #555);
+}
+
+.emailInput,
+.emailTextarea {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.emailInput:focus,
+.emailTextarea:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+}
+
+.emailTextarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.emailHint {
+  font-weight: 400;
+  color: var(--text-muted, #888);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.emailActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.emailResult {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e5e5e5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.inspectorWrapper {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.statusText {
+  font-size: 0.85rem;
+  color: var(--text, #333);
+}
+
 .infoValue {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

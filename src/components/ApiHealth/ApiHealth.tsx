@@ -16,6 +16,7 @@ import { isAdmin } from "../../constants/roles";
 import { APP_VERSION } from "../../constants/versions";
 import ResponseInspector from "./components/ResponseInspector";
 import WriteSandbox from "./components/WriteSandbox";
+import EmailSendSandbox from "./components/EmailSendSandbox";
 import type { DetailedHealthPayload } from "../../types/health";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -201,7 +202,15 @@ export default function ApiHealth() {
     () => API_CHECKS.filter((c) => !isWriteCheck(c)),
     [],
   );
-  const writeChecks = useMemo(() => API_CHECKS.filter(isWriteCheck), []);
+  const writeChecks = useMemo(
+    () => API_CHECKS.filter((c) => isWriteCheck(c) && c.id !== "email-send-test"),
+    [],
+  );
+  const emailChecks = useMemo(
+    () => API_CHECKS.filter((c) => c.id === "email-send-test" || c.id === "email-transport"),
+    [],
+  );
+
   const grouped = useMemo(() => {
     const map: Record<string, ApiCheck[]> = {};
     regularChecks.forEach((check) => {
@@ -273,6 +282,17 @@ export default function ApiHealth() {
     try {
       const result = await runWriteFlow(check, { getAuthToken });
       setResults((prev) => ({ ...prev, [check.id]: result }));
+    } finally {
+      setRunning((prev) => ({ ...prev, [check.id]: false }));
+    }
+  }
+
+  async function runEmailSingle(check: ApiCheck): Promise<HealthCheckResult> {
+    setRunning((prev) => ({ ...prev, [check.id]: true }));
+    try {
+      const result = await runCheck(check, { getAuthToken });
+      setResults((prev) => ({ ...prev, [check.id]: result }));
+      return result;
     } finally {
       setRunning((prev) => ({ ...prev, [check.id]: false }));
     }
@@ -443,6 +463,57 @@ export default function ApiHealth() {
           running={running[check.id] === true}
           onRun={() => runWriteSingle(check)}
         />
+      ))}
+
+      {emailChecks.map((check) => (
+        check.id === "email-send-test" ? (
+          <EmailSendSandbox
+            key={check.id}
+            check={check}
+            result={results[check.id]}
+            running={running[check.id] === true}
+            transportResult={results["email-transport"]}
+          />
+        ) : (
+          <div key={check.id}>
+            <div className={styles.row}>
+              <span className={`${styles.methodPill} ${methodClass[check.method as HttpMethod] ?? ""}`}>
+                {check.method}
+              </span>
+              <div className={styles.rowMeta}>
+                <p className={styles.rowName}>{check.name}</p>
+                <div className={styles.rowUrl}>{check.url}</div>
+              </div>
+              <StatusBadge passed={results[check.id]?.passed} />
+              {results[check.id] && (
+                <span className={styles.latency}>
+                  <span
+                    className={`${styles.badge} ${latencyClass(results[check.id].latencyRating)}`}
+                  >
+                    {results[check.id].latencyMs}ms
+                  </span>
+                  <span style={{ marginLeft: "0.4rem" }}>{results[check.id].status}</span>
+                </span>
+              )}
+              <button
+                type="button"
+                className={styles.btn}
+                disabled={running[check.id] === true || runningAll}
+                onClick={() => runSingle(check)}
+              >
+                {running[check.id] === true ? "Testing…" : "Test"}
+              </button>
+              <button
+                type="button"
+                className={styles.btn}
+                onClick={() => toggleInspector(check.id)}
+              >
+                {expanded[check.id] ? "Hide Details" : "Show Details"}
+              </button>
+            </div>
+            {expanded[check.id] && <ResponseInspector check={check} result={results[check.id]} />}
+          </div>
+        )
       ))}
 
       {history.length > 0 && (

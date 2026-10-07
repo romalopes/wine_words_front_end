@@ -66,6 +66,22 @@ export const areSubscriptionFeaturesValid = (data: unknown): boolean => {
 export const hasStatusOk = (data: unknown): boolean =>
   typeof data === "object" && data !== null && "status" in data && data.status === "ok";
 
+// --- Email diagnostics (issue #167) -------------------------------------------
+// The `POST /api/v1/health/email/test` success payload:
+//   { status: "delivered", configured_transport, effective_transport,
+//     recipients, message, delivered_at }
+export const isEmailTestDelivered = (data: unknown): boolean => {
+  if (!isRecord(data)) return false;
+  if (data.status !== "delivered") return false;
+  if (typeof data.configured_transport !== "string") return false;
+  if (typeof data.effective_transport !== "string") return false;
+  if (!Array.isArray(data.recipients)) return false;
+  if (data.recipients.some((recipient) => typeof recipient !== "string")) return false;
+  if (typeof data.message !== "string") return false;
+  if (typeof data.delivered_at !== "string") return false;
+  return true;
+};
+
 // --- Search index ----------------------------------------------------------
 // Full-text search runs on the `searchable` tsvector columns. A NULL tsvector
 // satisfies no match, so rows that were never indexed are invisible to every

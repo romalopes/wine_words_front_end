@@ -72,3 +72,13 @@ export interface HealthPayload {
   database: string
   version: string
 }
+
+/** The success payload of `POST /api/v1/health/email/test`. */
+export interface HealthEmailTestPayload {
+  status: string
+  configured_transport: string
+  effective_transport: string
+  recipients: string[]
+  message: string
+  delivered_at: string
+}

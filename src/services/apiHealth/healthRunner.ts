@@ -15,6 +15,7 @@ export interface HealthCheckOptions {
   // through without each one needing `?? undefined`.
   getAuthToken?: (() => string | null) | undefined;
   timeoutMs?: number | undefined;
+  body?: BodyInit | undefined;
 }
 
 export interface HealthCheckResult {
@@ -75,7 +76,7 @@ function redactHeaders(headers: HealthHeaders): HealthHeaders {
 
 async function attemptRequest(
   check: ApiCheck,
-  { getAuthToken, timeoutMs }: HealthCheckOptions,
+  { getAuthToken, timeoutMs, body }: HealthCheckOptions,
 ): Promise<AttemptResult> {
   const timeout = check.timeoutMs || timeoutMs || 5000;
   const controller = new AbortController();
@@ -87,11 +88,16 @@ async function attemptRequest(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  // A POST/SET body always carries an explicit content type; GET checks ship
+  // without one.
+  if (body) headers["Content-Type"] = "application/json";
+
   try {
     const response = await fetch(`${API_BASE_URL}${check.url}`, {
       method: check.method,
       headers,
       signal: controller.signal,
+      ...(body ? { body } : {}),
     });
     const contentType = response.headers.get("content-type") || "";
     const payload = contentType.includes("application/json")
@@ -105,7 +111,7 @@ async function attemptRequest(
 
 export async function runCheck(
   check: ApiCheck,
-  { getAuthToken, timeoutMs }: HealthCheckOptions = {},
+  { getAuthToken, timeoutMs, body }: HealthCheckOptions = {},
 ): Promise<HealthCheckResult> {
   const start = performance.now();
   let result: AttemptResult | null = null;
@@ -113,14 +119,14 @@ export async function runCheck(
   let retried = false;
 
   try {
-    result = await attemptRequest(check, { getAuthToken, timeoutMs });
+    result = await attemptRequest(check, { getAuthToken, timeoutMs, body });
   } catch (error) {
     requestError = error;
     if (isRetryableError(error)) {
       await sleep(300);
       retried = true;
       try {
-        result = await attemptRequest(check, { getAuthToken, timeoutMs });
+        result = await attemptRequest(check, { getAuthToken, timeoutMs, body });
         requestError = null;
       } catch (retryError) {
         requestError = retryError;
@@ -184,7 +190,6 @@ export async function runWriteFlow(
   });
   const headers: HealthHeaders = {
     Accept: "application/json",
-    "Content-Type": "application/json",
   };
 
   if (getAuthToken) {

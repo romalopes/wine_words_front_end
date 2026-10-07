@@ -9,6 +9,7 @@ import {
   hasStatusOk,
   isSearchIndexHealthy,
   describeSearchIndexFailure,
+  isEmailTestDelivered,
 } from "./apiHealthValidators";
 
 export const API_CATEGORIES = {
@@ -22,6 +23,7 @@ export const API_CATEGORIES = {
   ARTICLES: "Articles",
   SUBSCRIPTIONS: "Subscriptions",
   WRITE_SANDBOX: "Write Operations (Manual)",
+  EMAIL: "Email Diagnostics",
 };
 
 export type ApiCategory = (typeof API_CATEGORIES)[keyof typeof API_CATEGORIES];
@@ -294,6 +296,32 @@ export const API_CHECKS: ApiCheck[] = [
     description:
       "Creates a temporary producer (name suffixed with a timestamp) then deletes it. Self-cleaning.",
     validate: isProducerPayload,
+  },
+  // --- Email diagnostics (issue #167) ----------------------------------------
+  {
+    id: "email-transport",
+    category: API_CATEGORIES.EMAIL,
+    name: "E-mail Transport",
+    method: "GET",
+    url: "/health/email/transport",
+    expectedStatus: 200,
+    requiresAuth: false,
+    description: "Reports the configured and effective MAIL_TRANSPORT values.",
+    latencyThresholds: { excellent: 100, good: 300, slow: 800 },
+  },
+  {
+    id: "email-send-test",
+    category: API_CATEGORIES.EMAIL,
+    name: "Send Test E-mail",
+    method: "POST",
+    url: "/health/email/test",
+    expectedStatus: 200,
+    requiresAuth: true,
+    requiresManualTrigger: true,
+    description:
+      "Delivers a single test e-mail to the To address you supply (no create/delete\npair, no persisted state). Returns the configured and effective transports on success.",
+    validate: isEmailTestDelivered,
+    latencyThresholds: { excellent: 200, good: 500, slow: 1000 },
   },
 ];
 
