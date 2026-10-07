@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext"
 import { canAccessArticleProjects } from "../constants/roles"
 import usePagedList from "../hooks/usePagedList"
 import Pagination from "./Pagination"
+import styles from "./ArticleProjects.module.css"
 
 const PROJECT_STATUSES: ArticleProjectStatus[] = [
   "initiated", "planning", "pending_wines", "researching", "tasting",
@@ -64,37 +65,40 @@ function ArticleProjects() {
           <Link className="auth-form__submit" to="/article-projects/new">New Article Project</Link>
       </div>
 
-      <section aria-label="Article Project filters" className="wine-management__filters">
-        <label>
-          Search
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or publication" />
-        </label>
-        <label>
-          Assignment status
-          <select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
-            <option value="">All statuses</option>
-            {PROJECT_STATUSES.map((status) => <option key={status} value={status}>{readableStatus(status)}</option>)}
-          </select>
-        </label>
-        <label>
-          Drafting status
-          <select value={draftingStatus} onChange={(event) => setDraftingStatus(event.target.value)}>
-            <option value="">All drafting statuses</option>
-            {DRAFTING_STATUSES.map((status) => <option key={status} value={status}>{readableStatus(status)}</option>)}
-          </select>
-        </label>
-        <label>
-          Sort
-          <select value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="updated_at">Recently updated</option>
-            <option value="created_at">Recently created</option>
-            <option value="deadline">Deadline</option>
-            <option value="name">Name</option>
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" checked={overdue} onChange={(event) => setOverdue(event.target.checked)} /> Overdue only
-        </label>
+      <section aria-label="Article Project filters" className={`${styles.filters} wine-management__filters`}>
+        <div className={styles.filtersGrid}>
+          <label htmlFor="search-input" className={styles.filterGroup}>
+            <span>Search</span>
+            <input id="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or publication" />
+          </label>
+          <label htmlFor="assignment-status" className={styles.filterGroup}>
+            <span>Assignment status</span>
+            <select id="assignment-status" value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}>
+              <option value="">All statuses</option>
+              {PROJECT_STATUSES.map((status) => <option key={status} value={status}>{readableStatus(status)}</option>)}
+            </select>
+          </label>
+          <label htmlFor="drafting-status" className={styles.filterGroup}>
+            <span>Drafting status</span>
+            <select id="drafting-status" value={draftingStatus} onChange={(event) => setDraftingStatus(event.target.value)}>
+              <option value="">All drafting statuses</option>
+              {DRAFTING_STATUSES.map((status) => <option key={status} value={status}>{readableStatus(status)}</option>)}
+            </select>
+          </label>
+          <label htmlFor="sort" className={styles.filterGroup}>
+            <span>Sort</span>
+            <select id="sort" value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="updated_at">Recently updated</option>
+              <option value="created_at">Recently created</option>
+              <option value="deadline">Deadline</option>
+              <option value="name">Name</option>
+            </select>
+          </label>
+          <label className={`${styles.filterGroup} ${styles.checkboxGroup}`}>
+            <input type="checkbox" id="overdue-checkbox" checked={overdue} onChange={(event) => setOverdue(event.target.checked)} />
+            <span>Overdue only</span>
+          </label>
+        </div>
       </section>
 
       {list.loading && <p className="wine-management__loading">Loading Article Projects…</p>}

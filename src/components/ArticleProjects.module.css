@@ -1,0 +1,53 @@
+.filters {
+  padding: 1rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.filtersGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.filterGroup > span {
+  /* We are using the label text as the first child, but we wrapped the input inside the label.
+     Actually, we have: <label>Text <input/></label> or <label>Text <select/></label>
+     So the direct children are the text and the input/select. We want to style the text? 
+     We can wrap the text in a span for styling, but let's keep it simple and just style the label element.
+  */
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.filterGroup input,
+.filterGroup select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.checkboxGroup {
+  flex-direction: row;
+  align-items: center;
+}
+
+.checkboxGroup input {
+  margin: 0 0.5rem 0 0;
+  width: auto;
+}
+
+/* Responsive adjustments: if we want to change the grid at different breakpoints, we can add media queries */
+/* For example, on very small screens, we might want the grid to be 1 column */
+@media (max-width: 480px) {
+  .filtersGrid {
+    grid-template-columns: 1fr;
+  }
+}

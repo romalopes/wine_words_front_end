@@ -152,7 +152,9 @@ function Regions() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [expandedCountries, setExpandedCountries] = useState<Set<number>>(new Set());
+  const [expandedCountries, setExpandedCountries] = useState<Set<number>>(
+    new Set(),
+  );
   // Active highlight follows the row sent into the edit form (null = none).
   const [targetRegionId, setTargetRegionId] = useState<string | null>(null);
   const [showOnlyWithWines, setShowOnlyWithWines] = useState(true);
@@ -354,7 +356,9 @@ function Regions() {
                       {treeData
                         .map((c: CountryRegionNode) =>
                           c.regions
-                            ?.filter((r: RegionTreeNodeData) => r.parent_id === null)
+                            ?.filter(
+                              (r: RegionTreeNodeData) => r.parent_id === null,
+                            )
                             .map((r: RegionTreeNodeData) => (
                               <option key={r.id + "-parent"} value={r.id}>
                                 {r.name} ({c.name})
