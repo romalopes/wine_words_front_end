@@ -72,6 +72,8 @@ interface ReviewFormProps {
   // links it back to the line in the same request.
   packageId?: string | number | null;
   packageItemId?: string | number | null;
+  /** Initial values for the form when creating a new review (ignored when editing). */
+  initialValues?: Partial<ReviewFormState>;
 }
 
 function ReviewForm({

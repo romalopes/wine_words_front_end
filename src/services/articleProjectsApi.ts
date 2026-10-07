@@ -1,5 +1,6 @@
 import type { ArticleProjectsApi } from "../types/api"
-import type { ArticleProject, ArticleProjectDetail, ArticleProjectLookupItem, ArticleProjectLookupKind } from "../types/articleProject"
+import type { ArticleProject, ArticleProjectDetail, ArticleProjectLookupItem, ArticleProjectLookupKind, ArticleProjectNotebook } from "../types/articleProject"
+import type { Review } from "../types/review"
 import type { QueryParams, ResourceResponse } from "../types/common"
 import type { ApiRequester } from "./apiClient"
 import { buildQuery } from "./apiClient"
@@ -35,6 +36,40 @@ export function createArticleProjectsApi(request: ApiRequester): ArticleProjects
     },
     destroy(id) {
       return request(`/article_projects/${id}`, { method: "DELETE", auth: true })
+    },
+    // Notebook CRUD methods
+    listNotebooks(projectId, vintageId) {
+      return request<ArticleProjectNotebook[]>(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks`, { auth: true })
+    },
+    createNotebook(projectId, vintageId, payload) {
+      return request<ArticleProjectNotebook>(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks`, {
+        method: "POST",
+        auth: true,
+        body: { article_project_notebook: payload },
+      })
+    },
+    showNotebook(projectId, vintageId, notebookId) {
+      return request<ArticleProjectNotebook>(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks/${notebookId}`, { auth: true })
+    },
+    updateNotebook(projectId, vintageId, notebookId, payload) {
+      return request<ArticleProjectNotebook>(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks/${notebookId}`, {
+        method: "PATCH",
+        auth: true,
+        body: { article_project_notebook: payload },
+      })
+    },
+    destroyNotebook(projectId, vintageId, notebookId, lockVersion) {
+      return request(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks/${notebookId}`, {
+        method: "DELETE",
+        auth: true,
+        body: { article_project_notebook: { lock_version: lockVersion } },
+      })
+    },
+    createReviewFromNotebook(projectId, vintageId, notebookId) {
+      return request<Review>(`/article_projects/${projectId}/article_project_vintages/${vintageId}/notebooks/${notebookId}/review`, {
+        method: "POST",
+        auth: true,
+      })
     },
   }
 }

@@ -78,7 +78,7 @@ import type { ImageableType, ImageListResponse, ImageUploadResponse } from "./im
 import type { AdminUser, RoleOption } from "./user"
 import type { Vintage, Wine, WineListItem } from "./wine"
 import type { WinePackage, WinePackageItem, WinePackageListItem } from "./winePackage"
-import type { ArticleProject, ArticleProjectDetail, ArticleProjectLookupItem, ArticleProjectLookupKind, ArticleProjectWritePayload } from "./articleProject"
+import type { ArticleProject, ArticleProjectDetail, ArticleProjectLookupItem, ArticleProjectLookupKind, ArticleProjectNotebook, ArticleProjectWritePayload } from "./articleProject"
 
 export interface WineSearchInput {
   q?: string
@@ -113,12 +113,19 @@ export interface WineApi {
 }
 
 export interface ArticleProjectsApi {
+  list(params?: QueryParams): Promise<ResourceResponse<ArticleProject>>
   show(id: string | number): Promise<ArticleProjectDetail>
   lookup(kind: ArticleProjectLookupKind, query: string, producerId?: number): Promise<ArticleProjectLookupItem[]>
-  show(id: string | number): Promise<ArticleProject>
   create(payload: ArticleProjectWritePayload): Promise<ArticleProject>
   update(id: string | number, payload: ArticleProjectWritePayload): Promise<ArticleProject>
   destroy(id: string | number): Promise<unknown>
+  // Notebook CRUD methods
+  listNotebooks(projectId: string | number, vintageId: string | number): Promise<ArticleProjectNotebook[]>
+  createNotebook(projectId: string | number, vintageId: string | number, payload: { title: string; content?: string | null; position?: number }): Promise<ArticleProjectNotebook>
+  showNotebook(projectId: string | number, vintageId: string | number, notebookId: string | number): Promise<ArticleProjectNotebook>
+  updateNotebook(projectId: string | number, vintageId: string | number, notebookId: string | number, payload: { title?: string; content?: string | null; position?: number; lock_version: number }): Promise<ArticleProjectNotebook>
+  destroyNotebook(projectId: string | number, vintageId: string | number, notebookId: string | number, lockVersion: number): Promise<void>
+  createReviewFromNotebook(projectId: string | number, vintageId: string | number, notebookId: string | number): Promise<Review>
 }
 
 export interface ProducerWritePayload {

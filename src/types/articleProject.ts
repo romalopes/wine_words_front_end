@@ -26,6 +26,17 @@ export interface ArticleProjectCounts {
   tasted: number
 }
 
+export interface ArticleProjectNotebook {
+  id: number
+  title: string
+  content: string | null
+  position: number
+  lock_version: number
+  // Additional fields that might be present in the API response
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export interface ArticleProject {
   id: number
   name: string
@@ -72,6 +83,7 @@ export interface ArticleProjectVintageLink {
   date_received: string | null
   bottle_condition: "not_assessed" | "good" | "damaged" | "leaking" | "other"
   notes: string | null
+  article_project_notebooks?: ArticleProjectNotebook[]
 }
 
 export interface ArticleProjectReviewLink {
@@ -86,7 +98,18 @@ export interface ArticleProjectDetail extends ArticleProject {
   article_project_reviews: ArticleProjectReviewLink[]
 }
 
+export interface ArticleProjectVintageWithNotebooks extends ArticleProjectVintageLink {
+  article_project_notebooks?: ArticleProjectNotebook[]
+}
+
 export type ArticleProjectLookupKind = "article" | "producer" | "vintage" | "review"
+
+export type ArticleProjectWorkspaceTab = "overview" | "article" | "wines-notes"
+
+export interface ArticleProjectWorkspaceTabData {
+  id: ArticleProjectWorkspaceTab
+  label: string
+}
 
 export type ArticleProjectLookupItem =
   | ArticleProjectArticleLink
@@ -109,5 +132,6 @@ export interface ArticleProjectWritePayload {
   article_project_producers_attributes?: Array<{ id?: number; producer_id?: number; contacted?: boolean; request_confirmed?: boolean; notes?: string | null; _destroy?: boolean }>
   article_project_vintages_attributes?: Array<{ id?: number; vintage_id?: number; requested?: boolean; received?: boolean; selected?: boolean; tasted?: boolean; date_received?: string | null; bottle_condition?: string; notes?: string | null; _destroy?: boolean }>
   article_project_reviews_attributes?: Array<{ id?: number; review_id?: number; _destroy?: boolean }>
+  article_project_notebooks_attributes?: Array<{ id?: number; title?: string; content?: string | null; position?: number; _destroy?: boolean }>
   [key: string]: unknown
 }
