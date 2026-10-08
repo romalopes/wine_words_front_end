@@ -49,10 +49,11 @@ function ProducerList() {
     });
   }, []);
 
-  // Debounce search query
+  // Debounce searches; shorter input leaves the name filter inactive.
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+      const query = searchQuery.trim();
+      setDebouncedSearchQuery(query.length >= 3 ? query : "");
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -123,7 +124,7 @@ function ProducerList() {
               type="text"
               id="producer-search"
               className={styles.producersFiltersInput}
-              placeholder="Search by name…"
+              placeholder="Search by name (at least 3 characters)…"
               value={searchQuery}
               onChange={handleSearchChange}
             />
