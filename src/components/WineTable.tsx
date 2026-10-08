@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import LinkWineDialog from "./LinkWineDialog";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import { winesApi } from "../services/api";
 import type { WineListItem } from "../types/wine";
 import type { LinkEntityContext } from "../types/common";
 
@@ -11,7 +12,6 @@ interface WineTableProps {
   wines: WineListItem[];
   linkContext?: LinkEntityContext | undefined;
   onWineLinked?: (() => void) | undefined;
-  /** Accepted for call-site compatibility; the delete button is not rendered here. */
   onDeleted?: ((deleted: WineListItem) => void) | undefined;
 }
 
@@ -19,15 +19,29 @@ interface WineTableProps {
 // Vintages count and Edit actions for wine managers.
 // When `linkContext` is provided, shows a "Link a Wine" button that opens
 // a dialog to search and link wines to the given entity.
-function WineTable({ wines, linkContext, onWineLinked }: WineTableProps) {
+function WineTable({ wines, linkContext, onWineLinked, onDeleted }: WineTableProps) {
   const { user } = useAuth();
   const canManageWines = canManageWinesRole(user);
   const navigate = useNavigate();
   const returnToLink = useReturnToLink();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const excludeIds = Array.isArray(wines)
     ? wines.flatMap((w) => [w.id, w.slug].filter(Boolean))
     : [];
+
+  const handleDelete = async (wine: WineListItem) => {
+    if (!window.confirm(`Delete wine "${wine.name}"?`)) return;
+    setDeletingSlug(wine.slug);
+    try {
+      await winesApi.destroy(wine.slug);
+      onDeleted?.(wine);
+    } catch (err) {
+      alert(err.message || "Failed to delete wine");
+    } finally {
+      setDeletingSlug(null);
+    }
+  };
 
   if (!Array.isArray(wines) || wines.length === 0) {
     return (
@@ -163,8 +177,17 @@ function WineTable({ wines, linkContext, onWineLinked }: WineTableProps) {
                 >
                   Edit
                 </Link>
-                {/* Delete button intentionally omitted — deletion is handled
-                    by the pages that pass `onDeleted` (via wine detail). */}
+                <button
+                  type="button"
+                  className="btn-action btn-action--delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(wine);
+                  }}
+                  disabled={deletingSlug === wine.slug}
+                >
+                  {deletingSlug === wine.slug ? "Deleting…" : "Delete"}
+                </button>
               </td>
             )}
           </tr>
