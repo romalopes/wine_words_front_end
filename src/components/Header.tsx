@@ -285,6 +285,9 @@ function Header() {
               <NavLink to="/search" onClick={() => setExtrasOpen(false)}>
                 Search
               </NavLink>
+              <NavLink to="/archive" onClick={() => setExtrasOpen(false)}>
+                Archive
+              </NavLink>
             </div>
           )}
         </div>

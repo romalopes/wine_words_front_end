@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AboutPage from "./about/AboutPage";
 import AccountSettings from "./AccountSettings";
+import Archive from "./Archive";
 import Dashboard from "./Dashboard";
 import Home from "./Home";
 import Login from "./Login";
@@ -55,6 +56,7 @@ function AppRoutes() {
         <Route element={<Home />} path="/finder" />
         <Route element={<Quiz />} path="quiz" />
         <Route element={<AboutPage />} path="about" />
+        <Route element={<Archive />} path="/archive" />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
