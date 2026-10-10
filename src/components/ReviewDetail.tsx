@@ -9,6 +9,7 @@ import ShareButton from "./ShareButton";
 import CommentSection from "./comments/CommentSection";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
+import { useImageOrientation } from "../hooks/useImageOrientation";
 import DOMPurify from "dompurify";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
@@ -45,6 +46,18 @@ function ReviewDetail() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+
+  // Hero image resolution is needed before the early returns below so the
+  // orientation hook is always called (rules of hooks). When the review has no
+  // image, fall back to the reviewed wine's image (`wine_image`).
+  const hero =
+    review?.primary_image ??
+    (Array.isArray(review?.images) ? review.images[0] : null) ??
+    (typeof review?.wine_image === "string" && review.wine_image.length > 0
+      ? review.wine_image
+      : null);
+  const { orientation: heroOrientation, handleLoad: handleHeroLoad } =
+    useImageOrientation(hero);
 
   const isOwner =
     Boolean(user && review && Number(review.user_id) === Number(user.id));
@@ -144,14 +157,8 @@ function ReviewDetail() {
 
   // Editorial header data: the primary image leads, the rest become a
   // gallery; the byline date falls back to creation for drafts.
-  // When the review itself has no image, fall back to the reviewed wine's
-  // image (backend ships it as `wine_image`; merged into `primary_image` too).
+  // (`hero` and its orientation were resolved above, before the early returns.)
   const images = Array.isArray(review.images) ? review.images : [];
-  const wineImage =
-    typeof review.wine_image === "string" && review.wine_image.length > 0
-      ? review.wine_image
-      : null;
-  const hero = review.primary_image ?? images[0] ?? wineImage;
   const gallery = images.filter((src) => src !== hero);
   const categories = review.categories ?? [];
   const kicker = categories[0]?.name ?? "Review";
@@ -307,8 +314,10 @@ function ReviewDetail() {
         )}
 
         {hero && (
-          <figure className="article-page__hero">
-            <img src={hero} alt={review.title} />
+          <figure
+            className={`article-page__hero${heroOrientation ? ` is-${heroOrientation}` : ""}`}
+          >
+            <img src={hero} alt={review.title} onLoad={handleHeroLoad} />
           </figure>
         )}
         {gallery.length > 0 && (

@@ -19,6 +19,7 @@ import BackToSource from "./BackToSource";
 import LikeButton from "./LikeButton";
 import CommentSection from "./comments/CommentSection";
 import { useReturnToLink } from "../hooks/useReturnToLink";
+import AdaptiveImage from "./AdaptiveImage";
 
 function timeAgo(dateStr) {
   if (!dateStr) return null;
@@ -217,7 +218,7 @@ function WineDetail() {
       {Array.isArray(wine.images) && wine.images.length > 0 && (
         <div className="wine-detail__images">
           {wine.images.map((src, i) => (
-            <img key={i} src={src} alt={`${wine.name} ${i + 1}`} />
+            <AdaptiveImage key={i} src={src} alt={`${wine.name} ${i + 1}`} />
           ))}
         </div>
       )}

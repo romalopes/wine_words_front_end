@@ -11,6 +11,7 @@ import CommentSection from "./comments/CommentSection";
 import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
+import { useImageOrientation } from "../hooks/useImageOrientation";
 import type { Article } from "../types/article";
 import { errorMessage } from "../utils/errors";
 import { formatDate } from "../utils/dates";
@@ -48,6 +49,20 @@ function ArticleDetail() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+
+  // Hero image resolution is needed before the early returns below so the
+  // orientation hook is always called (rules of hooks). When the article has no
+  // image, fall back to the first linked review's image (`fallback_review_image`).
+  const hero = article
+    ? article.primary_image ??
+      (Array.isArray(article.images) ? article.images[0] : null) ??
+      (typeof article.fallback_review_image === "string" &&
+      article.fallback_review_image.length > 0
+        ? article.fallback_review_image
+        : null)
+    : null;
+  const { orientation: heroOrientation, handleLoad: handleHeroLoad } =
+    useImageOrientation(hero);
 
   const loadArticle = useCallback(async () => {
     if (!slug) return;
@@ -148,16 +163,8 @@ function ArticleDetail() {
   // Editorial header data: the primary image leads, the rest become a
   // gallery; the byline date falls back to creation because drafts (and
   // some seeded records) never get a published_at.
-  // When the article itself has no image, fall back to the first linked
-  // review's image (backend ships it as `fallback_review_image` and merges
-  // it into `primary_image` too).
+  // (`hero` and its orientation were resolved above, before the early returns.)
   const images = Array.isArray(article.images) ? article.images : [];
-  const reviewFallback =
-    typeof article.fallback_review_image === "string" &&
-    article.fallback_review_image.length > 0
-      ? article.fallback_review_image
-      : null;
-  const hero = article.primary_image ?? images[0] ?? reviewFallback;
   const gallery = images.filter((src) => src !== hero);
   const kicker = categories[0]?.name ?? "Article";
   const bylineDate = formatDate(article.published_at ?? article.created_at);
@@ -270,8 +277,10 @@ function ArticleDetail() {
         )}
 
         {hero && (
-          <figure className="article-page__hero">
-            <img src={hero} alt={article.title} />
+          <figure
+            className={`article-page__hero${heroOrientation ? ` is-${heroOrientation}` : ""}`}
+          >
+            <img src={hero} alt={article.title} onLoad={handleHeroLoad} />
           </figure>
         )}
         {gallery.length > 0 && (
