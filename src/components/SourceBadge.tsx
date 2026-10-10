@@ -22,3 +22,6 @@ export function sourceLabel(source: string | null | undefined): string | null {
   }
   return labels[source] ?? source
 }
+
+/** Selectable `source` values, in display order (used by the edit forms). */
+export const SOURCE_OPTIONS: readonly string[] = ["manual", "substack", "wine_front"]

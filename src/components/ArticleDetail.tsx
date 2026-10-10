@@ -10,8 +10,9 @@ import ShareButton from "./ShareButton";
 import CommentSection from "./comments/CommentSection";
 import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
-import { canManageWinesRole } from "../constants/roles";
+import { canManageWinesRole, canSeeSource } from "../constants/roles";
 import { useImageOrientation } from "../hooks/useImageOrientation";
+import SourceBadge from "./SourceBadge";
 import type { Article } from "../types/article";
 import { errorMessage } from "../utils/errors";
 import { formatDate } from "../utils/dates";
@@ -149,6 +150,7 @@ function ArticleDetail() {
   const canManage = canManageWinesRole(user);
   const isAuthor = Boolean(user && Number(article.user_id) === Number(user.id));
   const canEdit = canManage || isAuthor;
+  const showSource = canSeeSource(user);
   // Reviews shown under the article: link must be published AND review published.
   const visibleReviews = (article.reviews || []).filter(
     (r) => r.link_status === "published" && r.status === "published",
@@ -216,6 +218,7 @@ function ArticleDetail() {
               {article.status === "archived" && (
                 <span className="article-page__badge">Archived</span>
               )}
+              {showSource && <SourceBadge source={article.source} />}
             </span>
 
             <span className="article-page__byline-actions">

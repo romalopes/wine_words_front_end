@@ -2017,6 +2017,30 @@ textarea {
   color: #f7fff9;
 }
 
+/* Status filter row on the Reviews / Articles management views. */
+.content-status-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.content-status-filter {
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: #fff;
+  color: #4f4440;
+}
+
+.content-status-filter--active {
+  background: #8a273c;
+  border-color: #8a273c;
+  color: #fff8f2;
+}
+
 .review-form__error {
   background: rgba(185, 71, 95, 0.1);
   border: 1px solid rgba(185, 71, 95, 0.25);
@@ -3137,8 +3161,13 @@ textarea {
 
 .wine-management__thumb {
   width: 100%;
-  height: 8.5rem;
-  object-fit: cover;
+  height: 10rem;
+  /* Show the whole image: bottle shots are often portrait, so `cover` would
+     crop them. `contain` + a neutral backdrop keeps every image fully visible
+     and centred while the fixed-height media area keeps the card grid tidy. */
+  object-fit: contain;
+  object-position: center;
+  background: #efe5dc;
   border-radius: 0.6rem;
   margin-bottom: 0.75rem;
 }

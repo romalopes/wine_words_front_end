@@ -14,6 +14,8 @@ import RichTextEditor from "./RichTextEditor";
 import WritingDraftNotice from "./WritingDraftNotice";
 import { useWritingDraft } from "../hooks/useWritingDraft";
 import { useAuth } from "../contexts/AuthContext";
+import { canSeeSource } from "../constants/roles";
+import { SOURCE_OPTIONS, sourceLabel } from "./SourceBadge";
 import { uploadInlineImage } from "../services/inlineImages";
 
 /**
@@ -35,6 +37,7 @@ interface ArticleFormState {
   tag_names: string;
   producer_ids: number[];
   status: string;
+  source: string;
 }
 
 /** Reviews per selected vintage; a missing key means "still loading". */
@@ -57,6 +60,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
     tag_names: (article?.tags || []).join(", "),
     producer_ids: article?.producers?.map((p) => p.id) || [],
     status: article?.status || "draft",
+    source: article?.source || "manual",
   });
   // Selected vintages keep the wine context so reviews can be listed per vintage.
   const [selectedVintages, setSelectedVintages] = useState<SelectedVintage[]>(
@@ -259,6 +263,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
       abstract: form.abstract,
       body: form.body,
       status: form.status,
+      source: form.source,
       category_ids: form.category_ids || [],
       tag_names: form.tag_names,
       vintage_ids: selectedVintages.map((v) => v.id),
@@ -273,6 +278,7 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
     formData.append("article[abstract]", form.abstract);
     formData.append("article[body]", form.body);
     formData.append("article[status]", form.status);
+    formData.append("article[source]", form.source);
     (form.category_ids || []).forEach((id) =>
       formData.append("article[category_ids][]", String(id)),
     );
@@ -556,6 +562,23 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
           }}
         />
       </div>
+
+      {canSeeSource(user) && (
+        <div className="review-form__field">
+          <label htmlFor="article-source">Source</label>
+          <select
+            id="article-source"
+            value={form.source}
+            onChange={(e) => setForm((prev) => ({ ...prev, source: e.target.value }))}
+          >
+            {SOURCE_OPTIONS.map((value) => (
+              <option key={value} value={value}>
+                {sourceLabel(value)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="review-form__status-row">
         <button

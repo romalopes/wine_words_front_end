@@ -8,8 +8,9 @@ import LikeButton from "./LikeButton";
 import ShareButton from "./ShareButton";
 import CommentSection from "./comments/CommentSection";
 import { useAuth } from "../contexts/AuthContext";
-import { canManageWinesRole } from "../constants/roles";
+import { canManageWinesRole, canSeeSource } from "../constants/roles";
 import { useImageOrientation } from "../hooks/useImageOrientation";
+import SourceBadge from "./SourceBadge";
 import DOMPurify from "dompurify";
 import BackToSource from "./BackToSource";
 import { useReturnToLink } from "../hooks/useReturnToLink";
@@ -62,6 +63,7 @@ function ReviewDetail() {
   const isOwner =
     Boolean(user && review && Number(review.user_id) === Number(user.id));
   const canEdit = canManageWinesRole(user) || isOwner;
+  const showSource = canSeeSource(user);
 
   const loadReview = useCallback(async () => {
     if (!slug) {
@@ -242,6 +244,7 @@ function ReviewDetail() {
               {review.status === "archived" && (
                 <span className="article-page__badge">Archived</span>
               )}
+              {showSource && <SourceBadge source={review.source} />}
             </span>
 
             <span className="article-page__byline-actions">

@@ -376,23 +376,12 @@ function Reviews() {
           </div>
 
           {canManageContent && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+            <div className="content-status-filter-row">
               {["all", "draft", "published"].map((filter) => (
                 <button
                   key={filter}
                   type="button"
-                  style={{
-                    border: "1px solid #d7c8bb",
-                    borderRadius: "999px",
-                    padding: "6px 12px",
-                    fontWeight: 700,
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                    background: statusFilter === filter ? "#8a273c" : "#fff",
-                    color: statusFilter === filter ? "#fff8f2" : "#4f4440",
-                    borderColor:
-                      statusFilter === filter ? "#8a273c" : "#d7c8bb",
-                  }}
+                  className={`content-status-filter ${statusFilter === filter ? "content-status-filter--active" : ""}`}
                   onClick={() => setStatusFilter(filter)}
                 >
                   {filter.charAt(0).toUpperCase() + filter.slice(1)}

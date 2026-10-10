@@ -10,3 +10,48 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* "Filters" toggle button (shown on the Reviews / Articles management views). */
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4f4440;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.filterButton:hover {
+  border-color: #8a273c;
+  color: #8a273c;
+}
+
+.filterButton:focus-visible {
+  outline: 2px solid #8a273c;
+  outline-offset: 2px;
+}
+
+/* Count badge shown when one or more filters are active. */
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #8a273c;
+  color: #fff8f2;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}

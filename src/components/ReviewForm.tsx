@@ -13,6 +13,8 @@ import WritingDraftNotice from "./WritingDraftNotice";
 import InlineVintageCreateForm from "./InlineVintageCreateForm";
 import { useWritingDraft } from "../hooks/useWritingDraft";
 import { useAuth } from "../contexts/AuthContext";
+import { canSeeSource } from "../constants/roles";
+import { SOURCE_OPTIONS, sourceLabel } from "./SourceBadge";
 import { uploadInlineImage } from "../services/inlineImages";
 import { responseItems } from "../types/common";
 import type { ReviewWritePayload } from "../types/api";
@@ -43,6 +45,7 @@ interface ReviewFormState {
   comment: string;
   score: number | "";
   status: string;
+  source: string;
   drink_from: number | "";
   drink_to: number | "";
   drink_plus: boolean;
@@ -105,6 +108,7 @@ function ReviewForm({
           comment: review.comment || "",
           score: review.score ?? 80,
           status: review.status || "draft",
+          source: review.source || "manual",
           drink_from: review.drink_from ?? "",
           drink_to: review.drink_to ?? "",
           drink_plus: Boolean(review.drink_plus),
@@ -116,6 +120,7 @@ function ReviewForm({
           comment: "",
           score: 80,
           status: "draft",
+          source: "manual",
           drink_from: "",
           drink_to: "",
           drink_plus: false,
@@ -252,7 +257,7 @@ function ReviewForm({
   }, []);
 
   /** Builds the onChange handler for a text/number/checkbox field. */
-  function updateField(field: "drink_plus" | NumericField | "title" | "comment" | "status") {
+  function updateField(field: "drink_plus" | NumericField | "title" | "comment" | "status" | "source") {
     return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       const target = e.target as HTMLInputElement;
       let value: ReviewFormState[typeof field];
@@ -601,6 +606,23 @@ function ReviewForm({
           }}
         />
       </div>
+
+      {canSeeSource(user) && (
+        <div className="review-form__field">
+          <label htmlFor="review-source">Source</label>
+          <select
+            id="review-source"
+            value={form.source}
+            onChange={updateField("source")}
+          >
+            {SOURCE_OPTIONS.map((value) => (
+              <option key={value} value={value}>
+                {sourceLabel(value)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="review-form__status-row">
         <button
