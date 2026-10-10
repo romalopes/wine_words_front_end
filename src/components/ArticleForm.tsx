@@ -572,6 +572,13 @@ function ArticleForm({ article, onSaved, onCancel }: ArticleFormProps) {
         >
           Publish
         </button>
+        <button
+          type="button"
+          className={`review-form__status-btn ${form.status === "archived" ? "review-form__status-btn--active" : ""}`}
+          onClick={() => setForm((prev) => ({ ...prev, status: "archived" }))}
+        >
+          Archive
+        </button>
       </div>
 
       {error && <p className="review-form__error">{error}</p>}

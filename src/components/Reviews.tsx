@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { reviewsApi, categoriesApi } from "../services/api";
+import { reviewsApi, categoriesApi, winesApi } from "../services/api";
 import { useCategoryOrder, sortCategoryNames } from "../hooks/useCategoryOrder";
 import ReviewForm from "./ReviewForm";
 import ReviewCard from "./ReviewCard";
-import WineQuickCreate from "./WineQuickCreate";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageWinesRole } from "../constants/roles";
 import Pagination from "./Pagination";
@@ -195,51 +194,20 @@ function Reviews() {
     if (!selectedCategory) void loadGroups();
   };
 
-  // Quick-create state for the add-review form.
-  const [selectedWine, setSelectedWine] = useState<{
-    slug?: string;
-    name?: string;
-  } | null>(null);
-  const [selectedVintage, setSelectedVintage] = useState<{
-    id?: number;
-    year?: number | string;
-    no_vintage?: boolean;
-  } | null>(null);
   // Add-review form visibility and the review currently being edited.
-  // `ReviewForm` owns its own field state, so only the wine selection and the
-  // review being edited need to live here.
+  // `ReviewForm` owns its own field state (including its wine search picker),
+  // so only the review being edited needs to live here.
   const [showForm, setShowForm] = useState(false);
   const toggleFilterDrawer = () => {
     // Placeholder for filter drawer toggle logic
   };
   const [editingReview, setEditingReview] = useState<Review | null>(null);
 
-  const clearWineSelection = () => {
-    setSelectedWine(null);
-    setSelectedVintage(null);
-  };
-
-  // WineQuickCreate hands back the slug/id of the wine it just created.
-  const handleWineCreated = ({
-    slug,
-    vintageId,
-    name,
-  }: {
-    slug: string;
-    vintageId: number;
-    name: string;
-  }) => {
-    setSelectedWine({ slug, name });
-    setSelectedVintage({ id: vintageId });
-  };
-
   const closeForm = () => {
     setShowForm(false);
-    clearWineSelection();
   };
   const cancelForm = () => {
     setShowForm(false);
-    clearWineSelection();
   };
 
   const onSaved = () => {
@@ -326,11 +294,6 @@ function Reviews() {
     }
     removeFilter(key as keyof SearchParams);
   };
-  const quickCreateProps = {
-    ...(selectedWine?.slug != null ? { wineSlug: selectedWine.slug } : {}),
-    ...(selectedWine?.name != null ? { wineName: selectedWine.name } : {}),
-    ...(selectedVintage?.id != null ? { vintageId: selectedVintage.id } : {}),
-  };
 
   return (
     <main className="wine-app">
@@ -351,21 +314,10 @@ function Reviews() {
 
       {showForm && (
         <div className="review-form-wrapper">
-          <WineQuickCreate
-            onCreated={handleWineCreated}
-            onCancel={cancelForm}
-          />
-          <ReviewForm
-            {...quickCreateProps}
-            vintageNoVintage={selectedVintage?.no_vintage === true}
-            vintageYear={
-              typeof selectedVintage?.year === "number"
-                ? selectedVintage.year
-                : null
-            }
-            onSaved={onSaved}
-            onCancel={cancelForm}
-          />
+          {/* New review: render ReviewForm with no pre-supplied bottle so its
+              wine/vintage search picker opens immediately — the same flow edit
+              review uses behind its "Change wine/vintage" button. */}
+          <ReviewForm vintageYear={null} onSaved={onSaved} onCancel={cancelForm} />
         </div>
       )}
 

@@ -10,6 +10,7 @@ import {
 import ImageManager from "./ImageManager";
 import RichTextEditor from "./RichTextEditor";
 import WritingDraftNotice from "./WritingDraftNotice";
+import InlineVintageCreateForm from "./InlineVintageCreateForm";
 import { useWritingDraft } from "../hooks/useWritingDraft";
 import { useAuth } from "../contexts/AuthContext";
 import { uploadInlineImage } from "../services/inlineImages";
@@ -122,12 +123,21 @@ function ReviewForm({
         },
   );
 
-  // Edit mode: wine/vintage picker state.
-  const [changingWine, setChangingWine] = useState(false);
+  // Wine/vintage picker state, shared by edit and create. In create mode a
+  // caller may pre-supply the bottle via props; when it does not, we start in
+  // the picker so the reviewer searches for an existing wine — the same flow
+  // edit uses behind its "Change wine/vintage" button.
+  const [changingWine, setChangingWine] = useState(
+    isEditing ? false : vintageId == null,
+  );
   const [wineQuery, setWineQuery] = useState("");
   // `null` means "no search yet", which the UI distinguishes from "no results".
   const [wineResults, setWineResults] = useState<WineListItem[] | null>(null);
   const [pickedWine, setPickedWine] = useState<WineListItem | null>(null);
+  // Slug a *new* review is created against. Seeded from the prop and replaced
+  // when the reviewer picks a wine in the search picker, because the create
+  // endpoint is addressed by slug rather than by vintage id alone.
+  const [newWineSlug, setNewWineSlug] = useState<string | undefined>(wineSlug);
   const [pickedVintage, setPickedVintage] = useState<PickedVintage | null>(
     review
       ? {
@@ -135,12 +145,17 @@ function ReviewForm({
           year: review.vintage_year,
           wineName: review.wine_name,
         }
-      : null,
+      : vintageId != null
+        ? { id: vintageId, year: vintageYear, wineName: wineName ?? null }
+        : null,
   );
+  // Whether the inline "add a vintage" form is open inside the wine picker.
+  const [creatingVintage, setCreatingVintage] = useState(false);
 
-  // Debounced wine search for the edit-mode picker.
+  // Debounced wine search for the picker. Runs whenever the picker is open,
+  // in both edit and new-review mode, so the two flows search identically.
   useEffect(() => {
-    if (!isEditing || !changingWine) return undefined;
+    if (!changingWine) return undefined;
     const q = wineQuery.trim();
     if (q.length < 2) {
       setWineResults(null);
@@ -159,10 +174,11 @@ function ReviewForm({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [wineQuery, changingWine, isEditing]);
+  }, [wineQuery, changingWine]);
 
   function pickWine(wine: WineListItem) {
     setPickedWine(wine);
+    setNewWineSlug(wine.slug);
     setPickedVintage(null);
   }
 
@@ -178,12 +194,24 @@ function ReviewForm({
     setWineResults(null);
   }
 
-  // Keep the title in sync when the wine/vintage changes, until the user edits it.
+  // "Auto-generate name" (mirrors WineForm): while checked, the review title is
+  // rebuilt as "{Wine name} {Vintage year|NV}" whenever the picked wine/vintage
+  // changes. Unchecking hands the field back to the reviewer.
+  const [autoName, setAutoName] = useState(!isEditing);
+  const effectiveWineName =
+    pickedVintage?.wineName ?? pickedWine?.name ?? wineName ?? "";
+  const effectiveYear =
+    pickedVintage?.year ?? (vintageNoVintage ? "NV" : vintageYear ?? "NV");
+  const generatedTitle = effectiveWineName
+    ? `${effectiveWineName} ${effectiveYear}`
+    : "";
+
   useEffect(() => {
-    if (isEditing) return;
-    if (titleEditedRef.current) return;
-    setForm((prev) => ({ ...prev, title: autoTitle }));
-  }, [autoTitle, isEditing]);
+    if (!autoName) return;
+    setForm((prev) =>
+      prev.title === generatedTitle ? prev : { ...prev, title: generatedTitle },
+    );
+  }, [autoName, generatedTitle]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -289,16 +317,17 @@ function ReviewForm({
         onSaved(saved);
       } else {
         // Neither editing nor a package line: this is a brand-new review, which
-        // the API addresses by wine slug + vintage. Both callers that reach
-        // this branch (Reviews and the package line form) supply them; a caller
-        // that does not is a programming error, so it fails loudly here rather
-        // than posting a review against no bottle.
-        if (!wineSlug || vintageId == null) {
+        // the API addresses by wine slug + vintage. The bottle comes from the
+        // picker when the reviewer searched for it (newWineSlug/pickedVintage),
+        // or from the props when a caller pre-supplied it (wine/package pages).
+        const createSlug = newWineSlug || wineSlug;
+        const createVintageId = pickedVintage?.id ?? vintageId;
+        if (!createSlug || createVintageId == null) {
           throw new Error(
-            "A new review needs the wine it belongs to. Open the form from a wine or a package line.",
+            "Choose the wine and vintage this review belongs to before saving.",
           );
         }
-        const saved = await reviewsApi.create(wineSlug, vintageId, payload);
+        const saved = await reviewsApi.create(createSlug, createVintageId, payload);
         if (images && images.length > 0 && saved?.id) {
           await imagesApi.upload("review", saved.id, images);
         }
@@ -316,9 +345,10 @@ function ReviewForm({
     <form className="review-form" onSubmit={handleSubmit}>
       <WritingDraftNotice draft={writingDraft} onRestore={(fields) => {
         titleEditedRef.current = true;
+        setAutoName(false);
         setForm((prev) => ({ ...prev, title: fields.title ?? prev.title, comment: fields.comment ?? prev.comment }));
       }} />
-      {isEditing && (
+      {(isEditing || (!packageMode && vintageId == null)) && (
         <div className="review-form__field">
           <label>Wine &amp; Vintage</label>
           {!changingWine ? (
@@ -372,27 +402,48 @@ function ReviewForm({
                     Reviewing <strong>{pickedWine.name}</strong> — choose a
                     vintage.
                   </p>
-                  <div className="review-list">
-                    {(pickedWine.vintages || []).map((vintage) => (
+                  {!creatingVintage ? (
+                    <>
+                      <div className="review-list">
+                        {(pickedWine.vintages || []).map((vintage) => (
+                          <button
+                            key={vintage.id}
+                            type="button"
+                            className="review-card"
+                            onClick={() => pickVintage(vintage)}
+                          >
+                            <div className="review-card__top">
+                              <strong>
+                                {vintage.no_vintage ? "NV" : vintage.year}
+                              </strong>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                       <button
-                        key={vintage.id}
                         type="button"
-                        className="review-card"
-                        onClick={() => pickVintage(vintage)}
+                        className="review-form__cancel"
+                        onClick={() => setCreatingVintage(true)}
                       >
-                        <div className="review-card__top">
-                          <strong>
-                            {vintage.no_vintage ? "NV" : vintage.year}
-                          </strong>
-                        </div>
+                        Add a new vintage
                       </button>
-                    ))}
-                  </div>
+                    </>
+                  ) : (
+                    <InlineVintageCreateForm
+                      wine={pickedWine}
+                      onCreated={(created) => {
+                        pickVintage(created);
+                        setCreatingVintage(false);
+                      }}
+                      onCancel={() => setCreatingVintage(false)}
+                    />
+                  )}
                   <button
                     type="button"
                     className="review-form__cancel"
                     onClick={() => {
                       setPickedWine(null);
+                      setCreatingVintage(false);
                       setWineQuery("");
                       setWineResults(null);
                     }}
@@ -421,7 +472,19 @@ function ReviewForm({
           value={form.title}
           onChange={updateField("title")}
           placeholder="Give your review a short title"
+          readOnly={autoName}
         />
+        <label
+          className="auth-form__field"
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <input
+            type="checkbox"
+            checked={autoName}
+            onChange={() => setAutoName(!autoName)}
+          />
+          <span>Auto-generate name</span>
+        </label>
       </div>
 
       <div className="review-form__field">
@@ -553,6 +616,13 @@ function ReviewForm({
           onClick={() => setForm((prev) => ({ ...prev, status: "published" }))}
         >
           Publish
+        </button>
+        <button
+          type="button"
+          className={`review-form__status-btn ${form.status === "archived" ? "review-form__status-btn--active" : ""}`}
+          onClick={() => setForm((prev) => ({ ...prev, status: "archived" }))}
+        >
+          Archive
         </button>
       </div>
 

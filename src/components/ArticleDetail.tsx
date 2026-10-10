@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { articlesApi } from "../services/api";
 import ArticleForm from "./ArticleForm";
+import ContentStatusActions, { type ContentStatus } from "./ContentStatusActions";
 import ReviewCard from "./ReviewCard";
 import RelatedContent from "./RelatedContent";
 import LikeButton from "./LikeButton";
@@ -46,6 +47,7 @@ function ArticleDetail() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const loadArticle = useCallback(async () => {
     if (!slug) return;
@@ -67,15 +69,31 @@ function ArticleDetail() {
 
   // Every action below edits or deletes the article on screen, so there is
   // nothing to act on until one has loaded.
-  async function togglePublish() {
-    if (!article) return;
+  async function changeStatus(next: ContentStatus) {
+    if (!article || next === article.status) return;
     try {
-      await articlesApi.update(article.id, {
-        status: article.status === "draft" ? "published" : "draft",
-      });
-      loadArticle();
+      setStatusBusy(true);
+      const payload =
+        next === "published" && !article.published_at
+          ? { status: next, published_at: new Date().toISOString() }
+          : { status: next };
+      await articlesApi.update(article.id, payload);
+      // Patch only what changed instead of refetching the whole article —
+      // the byline badge and the status toolbar read `status`, so updating
+      // just these fields re-renders exactly those two areas.
+      setArticle((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: next,
+              published_at: payload.published_at ?? prev.published_at,
+            }
+          : prev,
+      );
     } catch (err) {
       alert(errorMessage(err, "Failed to update article"));
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -188,6 +206,9 @@ function ArticleDetail() {
               {article.status === "draft" && (
                 <span className="article-page__badge">Draft</span>
               )}
+              {article.status === "archived" && (
+                <span className="article-page__badge">Archived</span>
+              )}
             </span>
 
             <span className="article-page__byline-actions">
@@ -231,9 +252,12 @@ function ArticleDetail() {
             <button type="button" className="auth-form__submit" onClick={() => setEditing(true)}>
               Edit Article
             </button>
-            <button type="button" className="review-card__publish" onClick={togglePublish}>
-              {article.status === "draft" ? "Publish" : "Unpublish"}
-            </button>
+            <ContentStatusActions
+              status={article.status}
+              user={user}
+              busy={statusBusy}
+              onChange={changeStatus}
+            />
             <button
               type="button"
               className="review-form__cancel"

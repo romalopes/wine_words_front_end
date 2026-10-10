@@ -1814,6 +1814,38 @@ textarea {
   border-color: #8a7300;
 }
 
+/* Draft / Publish / Archive group on review & article detail pages. */
+.content-status {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.content-status__btn {
+  background: transparent;
+  border: 1px solid #d7c8bb;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  color: #27615e;
+  cursor: pointer;
+}
+
+.content-status__btn:hover:not(:disabled) {
+  background: #27615e;
+  border-color: #27615e;
+  color: #f7fff9;
+}
+
+.content-status__btn--active,
+.content-status__btn:disabled {
+  color: #8a7300;
+  border-color: rgba(138, 115, 0, 0.5);
+  background: rgba(138, 115, 0, 0.1);
+  cursor: default;
+}
+
 .review-card__unpublish {
   background: rgba(138, 39, 60, 0.06);
   color: #8a273c;

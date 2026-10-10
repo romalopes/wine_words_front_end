@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { winesApi, producersApi } from "../services/api";
+import { useState } from "react";
+import { winesApi } from "../services/api";
 import {
   VOLUMES,
   DEFAULT_VOLUME,
@@ -8,7 +8,7 @@ import {
   DEFAULT_ALCOHOL_PERCENTAGE,
 } from "../data/wineVolumes";
 import { errorMessage } from "../utils/errors";
-import type { Producer } from "../types/producer";
+import type { WineListItem, Vintage } from "../types/wine";
 
 /**
  * The wine fields this form collects. Numeric inputs are held as strings so a
@@ -23,7 +23,6 @@ interface WineQuickCreateForm {
   alcohol_percentage: string
   volume_ml: string
   prompt: string
-  producer_id: string
   vintage_year: string
 }
 
@@ -51,19 +50,10 @@ function WineQuickCreate({
     alcohol_percentage: String(DEFAULT_ALCOHOL_PERCENTAGE),
     volume_ml: String(DEFAULT_VOLUME),
     prompt: "",
-    producer_id: "",
     vintage_year: defaultVintageYear,
   });
-  const [producers, setProducers] = useState<Producer[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    producersApi
-      .list()
-      .then((data) => setProducers(Array.isArray(data) ? data : []))
-      .catch(() => setProducers([]));
-  }, []);
 
   // Every input below carries a matching `name`, so the whole form updates
   // through this one handler.
@@ -88,7 +78,6 @@ function WineQuickCreate({
           : null,
         volume_ml: form.volume_ml ? parseInt(form.volume_ml, 10) : null,
         prompt: form.prompt || null,
-        producer_id: form.producer_id ? parseInt(form.producer_id, 10) : null,
         vintages_attributes: [
           { year: parseInt(form.vintage_year, 10), prompt: null },
         ],
@@ -136,23 +125,6 @@ function WineQuickCreate({
           onChange={handleChange}
           placeholder="e.g. Château Margaux"
         />
-      </div>
-
-      <div className="review-form__field">
-        <label htmlFor="quick-wine-producer">Producer</label>
-        <select
-          id="quick-wine-producer"
-          name="producer_id"
-          value={form.producer_id}
-          onChange={handleChange}
-        >
-          <option value="">Select producer…</option>
-          {producers.map((producer) => (
-            <option key={producer.id} value={producer.id}>
-              {producer.name}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div className="review-form__field">

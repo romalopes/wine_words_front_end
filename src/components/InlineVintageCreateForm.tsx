@@ -32,8 +32,9 @@ function InlineVintageCreateForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
+  async function createVintage(event?: FormEvent<HTMLFormElement>): Promise<void> {
+    event?.preventDefault();
+    event?.stopPropagation();
 
     if (!wine?.slug) {
       setError("Select a wine before adding a vintage.");
@@ -55,6 +56,10 @@ function InlineVintageCreateForm({
       setError(errorMessage(err, "Failed to create vintage"));
       setSaving(false);
     }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    void createVintage(event);
   }
 
   return (
@@ -90,7 +95,12 @@ function InlineVintageCreateForm({
       </label>
 
       <div className={styles.inlineFormActions}>
-        <button type="submit" className="wine-btn wine-btn--primary wine-btn--lg" disabled={saving}>
+        <button
+          type="button"
+          className="wine-btn wine-btn--primary wine-btn--lg"
+          disabled={saving}
+          onClick={() => void createVintage()}
+        >
           {saving ? "Creating…" : "Add vintage"}
         </button>
         <button type="button" className="wine-btn wine-btn--secondary" onClick={onCancel}>

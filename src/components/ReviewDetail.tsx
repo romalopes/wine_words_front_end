@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { reviewsApi } from "../services/api";
 import ReviewForm from "./ReviewForm";
+import ContentStatusActions, { type ContentStatus } from "./ContentStatusActions";
 import RelatedContent from "./RelatedContent";
 import LikeButton from "./LikeButton";
 import ShareButton from "./ShareButton";
@@ -43,6 +44,7 @@ function ReviewDetail() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const isOwner =
     Boolean(user && review && Number(review.user_id) === Number(user.id));
@@ -88,6 +90,36 @@ function ReviewDetail() {
     } catch (err) {
       setError(errorMessage(err, "Failed to delete review"));
       setDeleting(false);
+    }
+  }
+
+  // Draft / Publish / Archive transition. Publishing also stamps
+  // `published_at` the first time, matching the wine-detail publish button.
+  async function changeStatus(next: ContentStatus) {
+    if (!review || next === review.status) return;
+    try {
+      setStatusBusy(true);
+      const payload =
+        next === "published" && !review.published_at
+          ? { status: next, published_at: new Date().toISOString() }
+          : { status: next };
+      await reviewsApi.update(review.id, payload);
+      // Patch only what changed instead of refetching the whole review —
+      // the byline badge and the status toolbar read `status`, so updating
+      // just these fields re-renders exactly those two areas.
+      setReview((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: next,
+              published_at: payload.published_at ?? prev.published_at,
+            }
+          : prev,
+      );
+    } catch (err) {
+      setError(errorMessage(err, "Failed to update review"));
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -200,6 +232,9 @@ function ReviewDetail() {
               {review.status === "draft" && (
                 <span className="article-page__badge">Draft</span>
               )}
+              {review.status === "archived" && (
+                <span className="article-page__badge">Archived</span>
+              )}
             </span>
 
             <span className="article-page__byline-actions">
@@ -235,6 +270,12 @@ function ReviewDetail() {
 
         {canEdit && !editing && (
           <div className="wine-detail__actions article-page__actions">
+            <ContentStatusActions
+              status={review.status}
+              user={user}
+              busy={statusBusy}
+              onChange={changeStatus}
+            />
             <button
               type="button"
               className="auth-form__submit"
