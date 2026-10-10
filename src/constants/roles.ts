@@ -32,6 +32,11 @@ export function canManageAllPackages(user: RoleUser | null | undefined): boolean
   return user?.roles?.some((role) => role === ROLES.ADMIN || role === ROLES.EDITOR) ?? false
 }
 
+/** Admins and Editors only (excludes Reviewers) — used for the `source` badge. */
+export function canSeeSource(user: RoleUser | null | undefined): boolean {
+  return user?.roles?.some((role) => role === ROLES.ADMIN || role === ROLES.EDITOR) ?? false
+}
+
 export function canAccessPackages(user: RoleUser | null | undefined): boolean {
   return canManageWinesRole(user)
 }

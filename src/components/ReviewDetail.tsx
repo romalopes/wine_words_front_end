@@ -112,8 +112,14 @@ function ReviewDetail() {
 
   // Editorial header data: the primary image leads, the rest become a
   // gallery; the byline date falls back to creation for drafts.
+  // When the review itself has no image, fall back to the reviewed wine's
+  // image (backend ships it as `wine_image`; merged into `primary_image` too).
   const images = Array.isArray(review.images) ? review.images : [];
-  const hero = review.primary_image ?? images[0] ?? null;
+  const wineImage =
+    typeof review.wine_image === "string" && review.wine_image.length > 0
+      ? review.wine_image
+      : null;
+  const hero = review.primary_image ?? images[0] ?? wineImage;
   const gallery = images.filter((src) => src !== hero);
   const categories = review.categories ?? [];
   const kicker = categories[0]?.name ?? "Review";

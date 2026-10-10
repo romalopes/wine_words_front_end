@@ -130,8 +130,16 @@ function ArticleDetail() {
   // Editorial header data: the primary image leads, the rest become a
   // gallery; the byline date falls back to creation because drafts (and
   // some seeded records) never get a published_at.
+  // When the article itself has no image, fall back to the first linked
+  // review's image (backend ships it as `fallback_review_image` and merges
+  // it into `primary_image` too).
   const images = Array.isArray(article.images) ? article.images : [];
-  const hero = article.primary_image ?? images[0] ?? null;
+  const reviewFallback =
+    typeof article.fallback_review_image === "string" &&
+    article.fallback_review_image.length > 0
+      ? article.fallback_review_image
+      : null;
+  const hero = article.primary_image ?? images[0] ?? reviewFallback;
   const gallery = images.filter((src) => src !== hero);
   const kicker = categories[0]?.name ?? "Article";
   const bylineDate = formatDate(article.published_at ?? article.created_at);

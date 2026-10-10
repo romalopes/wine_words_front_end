@@ -64,5 +64,7 @@ export interface Article {
   image_details?: ImageDetail[]
   /** URL of the primary (else first) image, or null when there are none. */
   primary_image?: string | null
+  /** Content origin: manual | substack | wine_front. Visible to Admin/Editor only. */
+  source?: string | null
   [key: string]: unknown
 }

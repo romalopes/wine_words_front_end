@@ -1402,6 +1402,14 @@ textarea {
   color: #27615e;
 }
 
+.wine-management__color-badge--source {
+  background: rgba(79, 68, 64, 0.1);
+  color: #4f4440;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  margin-left: 0.4rem;
+}
+
 .wine-management__card-actions {
   border-top: 1px solid #eee4db;
   display: flex;
@@ -5349,8 +5357,11 @@ textarea {
   border-radius: 10px;
   display: block;
   height: auto;
-  max-height: 26rem;
-  object-fit: cover;
+  max-height: 32rem;
+  /* Screenshots from WineFront are tall/portrait: contain (not cover) so
+     bottle shots are never cropped. Wide photos still fill the width. */
+  object-fit: contain;
+  object-position: center;
   width: 100%;
 }
 
