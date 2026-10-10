@@ -18,6 +18,8 @@ import WineSearch from "./WineSearch";
 import ProducerList from "./ProducerList";
 import ProducerDetail from "./ProducerDetail";
 import ProducerForm from "./ProducerForm";
+import SourceList from "./SourceList";
+import SourceDetail from "./SourceDetail";
 import ProducerWines from "./ProducerWines";
 import UserRoles from "./UserRoles";
 import Categories from "./Categories";
@@ -72,6 +74,8 @@ function AppRoutes() {
         <Route element={<WineForm />} path="/wines/new" />
         <Route element={<WineForm />} path="/wines/:slug/edit" />
         <Route element={<ProducerList />} path="/producers" />
+        <Route element={<SourceList />} path="/sources" />
+        <Route element={<SourceDetail />} path="/sources/:source" />
         <Route element={<ProducerWines />} path="/producers/:slug/wines" />
 
         <Route element={<ProducerDetail />} path="/producers/:slug" />

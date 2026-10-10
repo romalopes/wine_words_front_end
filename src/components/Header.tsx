@@ -312,6 +312,9 @@ function Header() {
                 <NavLink to="/producers" onClick={() => setSettingsOpen(false)}>
                   Producers
                 </NavLink>
+                <NavLink to="/sources" onClick={() => setSettingsOpen(false)}>
+                  Sources
+                </NavLink>
                 <NavLink
                   to="/categories"
                   onClick={() => setSettingsOpen(false)}

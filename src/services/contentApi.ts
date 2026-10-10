@@ -7,6 +7,8 @@ import type {
   ReviewApi,
   ReviewGroup,
   ReviewWritePayload,
+  SourcesApi,
+  SourcesResponse,
   WineApi,
   WineGroup,
   WineSearchInput,
@@ -167,6 +169,14 @@ export function createArticlesApi(request: ApiRequester): ArticleApi {
     },
     related(id, params, options) {
       return request<Article[]>(queryPath(`/articles/${id}/related`, params), { auth: true, ...options })
+    },
+  }
+}
+
+export function createSourcesApi(request: ApiRequester): SourcesApi {
+  return {
+    list() {
+      return request<SourcesResponse>("/sources", { auth: true })
     },
   }
 }

@@ -146,6 +146,24 @@ export interface ProducerApi {
   linkWine(id: string | number, wineId: string | number): Promise<Producer>
 }
 
+/** One content source (manual / substack / wine_front) with its item counts. */
+export interface Source {
+  source: string
+  label: string
+  reviews_count: number
+  articles_count: number
+  [key: string]: unknown
+}
+
+/** Envelope returned by `GET /api/v1/sources`. */
+export interface SourcesResponse {
+  sources: Source[]
+}
+
+export interface SourcesApi {
+  list(): Promise<SourcesResponse>
+}
+
 export interface ReviewWritePayload {
   title?: string
   comment?: string | null
